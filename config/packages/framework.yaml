@@ -1,0 +1,7 @@
+framework:
+    secret: '%env(APP_SECRET)%'
+    http_client: ~
+
+when@test:
+    framework:
+        test: true

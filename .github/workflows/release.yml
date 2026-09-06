@@ -1,0 +1,50 @@
+name: Release
+
+# A tag v1.2.0 builds the single executable and publishes it in this
+# repository's Releases.
+on:
+  push:
+    tags: ['v*']
+
+# Creating a release; the workflow's own token is enough, no secret to keep.
+permissions:
+  contents: write
+
+jobs:
+  executable:
+    name: Linux x86_64 executable
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: make php
+        run: make php
+
+      # No dev dependency exists, but --no-dev says so; -o saves the autoloader
+      # a file lookup per class inside the archive.
+      - name: composer install
+        run: ~/.local/share/sherpa/php "$(command -v composer)" install --no-dev -o --no-interaction --no-progress
+
+      # Built, then run end to end against a fake provider before anything is
+      # published (tests/release/smoke.sh).
+      - name: make release
+        run: make release VERSION="${GITHUB_REF_NAME#v}"
+
+      - name: publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # A release drafted in GitHub's interface creates the tag itself, and so
+        # starts this workflow with the release already there: then the files
+        # are added to it, replacing any from an earlier attempt.
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          binary="var/release/sherpa-${version}-linux-x86_64"
+          files=("$binary" "$binary.sha256" var/release/THIRD-PARTY-NOTICES.md)
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "${files[@]}" \
+              --title "Sherpa ${version}" \
+              --notes "Single executable for Linux x86_64 — nothing to install. See the README for setup, and THIRD-PARTY-NOTICES.md for the licences of what it bundles."
+          fi
