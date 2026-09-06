@@ -1,0 +1,28 @@
+{
+  "_comment": [
+    "phpgraph (https://github.com/hbenabdallah/phpgraph) as the run's MCP server:",
+    "make bench ARGS=\"--mcp=phpgraph …\". The published PHAR is downloaded once,",
+    "checked against its .sha256, and kept in var/bench/tools. The graph is written",
+    "next to the run, not in the project, so 'changes nothing' still holds.",
+    "{repo}, {project} and {run} are replaced for each run; 'grants' are the tools",
+    "allowed without a confirmation, as the bench grants file_write and shell_exec."
+  ],
+  "fetch": {
+    "{repo}/var/bench/tools/phpgraph-0.1.2.phar": "https://github.com/hbenabdallah/phpgraph/releases/download/v0.1.2/phpgraph.phar"
+  },
+  "mcpServers": {
+    "phpgraph": {
+      "command": "php",
+      "args": ["{repo}/var/bench/tools/phpgraph-0.1.2.phar", "serve", "{project}", "--output", "{run}/phpgraph-out"]
+    }
+  },
+  "grants": [
+    "mcp__phpgraph__overview",
+    "mcp__phpgraph__query_graph",
+    "mcp__phpgraph__get_node",
+    "mcp__phpgraph__get_neighbors",
+    "mcp__phpgraph__impact_of",
+    "mcp__phpgraph__shortest_path",
+    "mcp__phpgraph__god_nodes"
+  ]
+}
