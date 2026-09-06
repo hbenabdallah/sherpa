@@ -1,0 +1,19 @@
+/vendor/
+/var/
+/public/bundles/
+
+# Symfony Flex / dotenv
+/.env
+/.env.local
+/.env.*.local
+
+# IDE
+/.idea/
+/.vscode/
+*.iml
+
+# Build artifacts
+/build/
+*.phar
+
+.claude

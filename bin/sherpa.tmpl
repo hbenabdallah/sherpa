@@ -1,0 +1,23 @@
+#!/usr/bin/env sh
+# Sherpa launcher — written to ~/.local/bin/sherpa by `make link`.
+#
+# The point of it is that Sherpa runs in a container built from a checkout,
+# which means `docker compose` has to run from that checkout's directory. This
+# remembers where it is, and passes on the directory you were actually standing
+# in so Sherpa can open the project you are already working on.
+
+set -eu
+
+SHERPA_HOME="__SHERPA_HOME__"
+
+if [ ! -f "$SHERPA_HOME/docker-compose.yml" ]; then
+    echo "sherpa: installation introuvable dans $SHERPA_HOME" >&2
+    echo "        relancez 'make link' depuis le dépôt Sherpa." >&2
+    exit 1
+fi
+
+SHERPA_CWD="$PWD"
+export SHERPA_CWD
+
+cd "$SHERPA_HOME"
+exec docker compose run --rm --no-deps app php bin/sherpa "$@"

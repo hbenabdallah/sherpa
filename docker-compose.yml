@@ -1,0 +1,38 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - USER_ID=${USER_ID:-1000}
+        - GROUP_ID=${GROUP_ID:-1000}
+        - USER=${USER:-user}
+    user: "${USER_ID:-1000}:${GROUP_ID:-1000}"
+    volumes:
+      - .:/app
+      # Config and projects are mounted at the SAME path inside the container as
+      # on the host. Sherpa stores absolute project paths in projects.yaml, so
+      # host and container must agree on what "/home/you/workspace/foo" means —
+      # otherwise file_read / project_grep / file_write resolve to nothing.
+      - ${HOME_PATH:-/home/user}/.config/sherpa:${HOME_PATH:-/home/user}/.config/sherpa
+      - ${SHERPA_PROJECTS_ROOT:-/home/user/workspace}:${SHERPA_PROJECTS_ROOT:-/home/user/workspace}
+    working_dir: /app
+    stdin_open: true
+    tty: true
+    # Host networking: Sherpa talks to nothing but Ollama on the host, and this
+    # daemon's address pool has no room left for another bridge network. Also
+    # means Ollama is plain localhost — no host.docker.internal indirection.
+    network_mode: "host"
+    environment:
+      - HOME=${HOME_PATH:-/home/user}
+      - OLLAMA_URL=${OLLAMA_URL:-http://localhost:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5-coder:7b}
+      - OLLAMA_CTX=${OLLAMA_CTX:-32768}
+      # Unlimited by default: inference is local and CPU-bound, so there is no
+      # flaky network to protect against and no honest number to pick.
+      - OLLAMA_TIMEOUT=${OLLAMA_TIMEOUT:--1}
+      # The directory the user launched from, so Sherpa can open the project
+      # they are standing in. The container has no other way to know it.
+      - SHERPA_CWD=${SHERPA_CWD:-}
+      - APP_ENV=${APP_ENV:-prod}
+      - APP_SECRET=${APP_SECRET:-sherpa_secret}

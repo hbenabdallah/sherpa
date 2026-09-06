@@ -1,0 +1,50 @@
+parameters:
+    ollama_url:     '%env(OLLAMA_URL)%'
+    ollama_model:   '%env(OLLAMA_MODEL)%'
+    ollama_ctx:     '%env(int:OLLAMA_CTX)%'
+    # Idle timeout for inference, in seconds. Negative means unlimited — and it
+    # has to be negative, not zero: Symfony reads 0 as "zero seconds of allowed
+    # inactivity", which fails instantly.
+    ollama_timeout: '%env(float:OLLAMA_TIMEOUT)%'
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    App\:
+        resource: '../src/'
+
+    # Ollama platform — explicit wiring of scalar params
+    App\Platform\OllamaPlatform:
+        arguments:
+            $baseUrl:  '%ollama_url%'
+            $model:    '%ollama_model%'
+            $numCtx:   '%ollama_ctx%'
+            $timeout:  '%ollama_timeout%'
+            # Explicit: the parameter is nullable only because it trails
+            # defaulted ones, and a silent null would make Ctrl+C inert.
+            $interrupt: '@App\Runtime\Interrupt'
+
+    # The one implementation of the platform, for now. Everything else asks for
+    # the interface, so a second backend is a class and this line — not a change
+    # to the loop, the compactor, the extractor and the command.
+    App\Platform\PlatformInterface: '@App\Platform\OllamaPlatform'
+
+    # Context budget sized to the same window the platform requests. Both are
+    # only starting values now: SherpaCommand resolves the real profile at boot
+    # and applies it to the two of them together.
+    App\Agent\ContextBudget:
+        arguments:
+            $contextWindow: '%ollama_ctx%'
+
+    # The bottom of the precedence chain. Above it sit ~/.config/sherpa/config.yaml
+    # and the command line — see App\Config\ModelResolver.
+    App\Config\ModelResolver:
+        arguments:
+            $envModel:   '%ollama_model%'
+            $envContext: '%ollama_ctx%'
+
+    # HTTP client (Symfony built-in)
+    Symfony\Contracts\HttpClient\HttpClientInterface:
+        alias: 'http_client'
