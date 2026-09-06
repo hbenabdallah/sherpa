@@ -1,0 +1,48 @@
+#!/usr/bin/env sh
+# Sherpa launcher — written to ~/.local/bin/sherpa by `make link`.
+#
+# On the host when a PHP able to run Sherpa is found, in Docker otherwise.
+#
+# On the host, Sherpa is one more program in your terminal: shell_exec runs
+# with your own tools, `docker compose exec` reaches a project's container, and
+# a project can live anywhere. In Docker it sees only what is mounted — projects
+# under SHERPA_PROJECTS_ROOT, nothing else — and only what the image holds, which
+# is PHP and nothing more. So the host is preferred, and the container is what
+# is left when no suitable PHP exists.
+#
+#   SHERPA_RUNTIME=docker sherpa      the container, even when the host could
+#   SHERPA_RUNTIME=host sherpa        the host, or a clear failure
+#   SHERPA_PHP=/path/to/php sherpa   that PHP, rather than the one found
+
+set -eu
+
+SHERPA_HOME="__SHERPA_HOME__"
+
+if [ ! -f "$SHERPA_HOME/bin/sherpa" ] || [ ! -x "$SHERPA_HOME/bin/find-php.sh" ]; then
+    echo "sherpa: no installation found in $SHERPA_HOME" >&2
+    echo "        run 'make link' again from the Sherpa repository." >&2
+    exit 1
+fi
+
+# The directory you were standing in, so Sherpa opens the project you are in.
+# On the host it is also where the process starts; in Docker it is the only way
+# the container can know it.
+SHERPA_CWD="$PWD"
+export SHERPA_CWD
+
+runtime="${SHERPA_RUNTIME:-}"
+
+# Which PHP, if any, is decided in one script shared with make link and make
+# doctor, so the three never disagree about where Sherpa runs.
+if [ "$runtime" != "docker" ] && php=$("$SHERPA_HOME/bin/find-php.sh"); then
+    exec "$php" "$SHERPA_HOME/bin/sherpa" "$@"
+fi
+
+if [ "$runtime" = "host" ]; then
+    echo "sherpa: no PHP 8.4 with pdo_sqlite and pcntl was found." >&2
+    echo "        installez celui de Sherpa :  make -C $SHERPA_HOME php" >&2
+    exit 1
+fi
+
+cd "$SHERPA_HOME"
+exec docker compose run --rm --no-deps app php bin/sherpa "$@"
