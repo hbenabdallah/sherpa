@@ -1,0 +1,120 @@
+name: Release
+
+# A tag v1.2.0 builds the single executable for every platform, runs each one
+# end to end on that platform, and publishes them in this repository's
+# Releases.
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  # The phar inside is the same everywhere; only the micro runtime in front of
+  # it differs. So every platform is built here, once.
+  build:
+    name: Build the executables
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      # The pinned PHP and micro archives, kept between runs: the host they
+      # come from has had passing 500s. Keyed on the Makefile, where the pins are.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/sherpa
+            var/micro
+          key: static-php-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Makefile') }}
+
+      - name: make php
+        run: make php
+
+      # No dev dependency exists, but --no-dev says so; -o saves the autoloader
+      # a file lookup per class inside the archive.
+      - name: composer install
+        run: ~/.local/share/sherpa/php "$(command -v composer)" install --no-dev -o --no-interaction --no-progress
+
+      # Built, and the Linux x86_64 one smoke-tested here (tests/release/smoke.sh);
+      # the others are tested on their own platform below.
+      - name: make release-all
+        run: make release-all VERSION="${GITHUB_REF_NAME#v}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: var/release/
+          if-no-files-found: error
+
+  # Each executable run where it will run, against the fake provider, before
+  # anything is published. `make php` there also checks that platform's PHP has
+  # what Sherpa needs; the smoke test uses it to serve the fake provider.
+  smoke:
+    name: Smoke test, ${{ matrix.platform }}
+    needs: build
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-aarch64
+            runner: ubuntu-24.04-arm
+          - platform: macos-aarch64
+            runner: macos-14
+    steps:
+      - uses: actions/checkout@v5
+
+      # The pinned PHP and micro archives, kept between runs: the host they
+      # come from has had passing 500s. Keyed on the Makefile, where the pins are.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/sherpa
+            var/micro
+          key: static-php-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Makefile') }}
+
+      - name: make php
+        run: make php
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: release
+          path: var/release/
+
+      - name: smoke test
+        run: |
+          binary="var/release/sherpa-${GITHUB_REF_NAME#v}-${{ matrix.platform }}"
+          chmod +x "$binary"
+          tests/release/smoke.sh "$binary"
+
+  publish:
+    name: Publish the release
+    needs: [build, smoke]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Creating a release; the workflow's own token is enough, no secret to keep.
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release
+          path: var/release/
+
+      # A release drafted in GitHub's interface creates the tag itself, and so
+      # starts this workflow with the release already there: then the files
+      # are added to it, replacing any from an earlier attempt.
+      - name: publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          files=(var/release/sherpa-"$version"-* var/release/THIRD-PARTY-NOTICES.md)
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "${files[@]}" \
+              --title "Sherpa ${version}" \
+              --notes "Single executable for Linux (x86_64, aarch64) and macOS (Apple Silicon) — nothing to install. See the README for setup, and THIRD-PARTY-NOTICES.md for the licences of what it bundles."
+          fi

@@ -1,0 +1,12 @@
+Engagements du support
+
+Les demandes sont classées par priorité. P1 : le site est indisponible ou le
+paiement est impossible ; prise en charge sous une heure, jour et nuit.
+
+P2 : une fonctionnalité importante est dégradée ; prise en charge sous quatre
+heures ouvrées.
+
+P3 : gêne mineure ou question ; réponse sous deux jours ouvrés.
+
+Au-delà d'une heure sans solution pour un P1, l'astreinte prévient le directeur
+technique par téléphone.
