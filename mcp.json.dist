@@ -1,0 +1,34 @@
+{
+  "_comment": [
+    "Copy this file to ~/.config/sherpa/mcp.json to declare MCP servers.",
+    "The format is the one other MCP clients use: a configuration that works",
+    "elsewhere can be copied across as it is.",
+    "",
+    "Two ways to reach a server, and one of them has to be chosen:",
+    "  \"command\": a process started where Sherpa runs. On the machine, with your",
+    "             own tools (npx, uvx…); in Docker, PHP only, so an npx server",
+    "             there means adding Node to the Dockerfile.",
+    "  \"url\"    : a server already online, reached over HTTP. Nothing to install,",
+    "             and \"headers\" carries whatever authenticates you.",
+    "",
+    "Remote tools are always confirmed before they run."
+  ],
+  "mcpServers": {
+    "example-php": {
+      "command": "php",
+      "args": ["/app/tests/fixtures/mcp_server.php", "ok"],
+      "enabled": false
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/home/you/workspace"],
+      "env": {},
+      "enabled": false
+    },
+    "example-online": {
+      "url": "https://example.test/mcp",
+      "headers": { "Authorization": "Bearer YOUR_TOKEN" },
+      "enabled": false
+    }
+  }
+}
