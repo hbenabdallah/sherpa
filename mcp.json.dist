@@ -1,0 +1,24 @@
+{
+  "_comment": [
+    "Copiez ce fichier vers ~/.config/sherpa/mcp.json pour déclarer des serveurs MCP.",
+    "Le format est celui utilisé par les autres clients MCP : une configuration qui",
+    "marche ailleurs se recopie telle quelle.",
+    "",
+    "La commande est lancée DEPUIS LE CONTENEUR de Sherpa. L'image ne contient que",
+    "PHP : un serveur en npx ou uvx demande d'ajouter Node ou Python au Dockerfile.",
+    "Les tools distants sont toujours soumis à confirmation avant exécution."
+  ],
+  "mcpServers": {
+    "exemple-php": {
+      "command": "php",
+      "args": ["/app/tests/fixtures/mcp_server.php", "ok"],
+      "enabled": false
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/home/vous/workspace"],
+      "env": {},
+      "enabled": false
+    }
+  }
+}
