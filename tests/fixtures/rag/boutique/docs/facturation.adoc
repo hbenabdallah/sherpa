@@ -1,0 +1,21 @@
+= Facturation
+
+== Taux de TVA
+
+Les produits sont facturés au taux normal de 20 %. Les livres et cartes de randonnée
+relèvent du taux de 5,5 %. Aucun produit du catalogue n'est au taux de 10 %.
+
+== Numérotation des factures
+
+Les factures sont numérotées sans trou, au format `FAC-AAAA-NNNNN` (année puis compteur
+sur cinq chiffres remis à zéro chaque 1er janvier). Un numéro attribué n'est jamais
+réutilisé, même si la commande est annulée.
+
+== Avoirs
+
+Une facture émise ne se modifie pas : on émet un avoir, numéroté `AV-AAAA-NNNNN`,
+qui annule tout ou partie de la facture d'origine.
+
+== Conservation
+
+Les factures sont conservées dix ans, conformément aux obligations comptables.
