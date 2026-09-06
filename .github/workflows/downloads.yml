@@ -1,0 +1,64 @@
+name: Downloads badge
+
+# How many times the executable was downloaded from the Releases — what
+# install.sh fetches, so about one per install or update. The .sha256 and
+# notices files are left out: counted too, every install would count twice.
+#
+# The figure goes to downloads.json on the `badges` branch, which shields.io
+# reads for the badge in the README:
+#   https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/<owner>/<repo>/badges/downloads.json
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  count:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: count the executable downloads
+        id: count
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          total=0
+          page=1
+          while :; do
+            releases=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/releases?per_page=100&page=$page")
+            [ "$(echo "$releases" | jq 'length')" -eq 0 ] && break
+            count=$(echo "$releases" | jq '[.[].assets[] | select(.name | test("\\.(sha256|md)$") | not) | .download_count] | add // 0')
+            total=$((total + count))
+            page=$((page + 1))
+          done
+          echo "total=$total" >> "$GITHUB_OUTPUT"
+          echo "Executable downloads: $total"
+
+      - name: write it on the badges branch
+        env:
+          TOTAL: ${{ steps.count.outputs.total }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if git ls-remote --exit-code --heads origin badges > /dev/null; then
+            git checkout badges
+          else
+            git checkout --orphan badges
+            git rm -rfq .
+          fi
+          # The logo's lime, like the rest of Sherpa.
+          printf '{"schemaVersion":1,"label":"installs","message":"%s","color":"afd75f"}\n' "$TOTAL" > downloads.json
+          git add downloads.json
+          git diff --cached --quiet && { echo 'No change.'; exit 0; }
+          git commit -qm "Downloads: $TOTAL"
+          git push -q origin badges
