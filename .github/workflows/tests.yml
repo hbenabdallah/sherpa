@@ -1,0 +1,71 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+# A newer push to the same branch makes the check still running moot.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suites:
+    name: Hermetic suites
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      # The path someone takes on a fresh machine, not a CI-only imitation of
+      # it: .env from .env.dist, the image from the Dockerfile, the dependencies
+      # installed inside it. Two suites boot the Symfony container and read
+      # variables only docker-compose provides, so running PHP straight on the
+      # runner would test a setup nobody uses. What passes here is what
+      # `make install` gives someone who has just cloned the repository.
+      - name: make install
+        run: make install
+        env:
+          NO_PROMPT: 1
+          # The legacy builder is a workaround for one laptop's daemon.
+          BUILDKIT: 1
+
+      # No network model is called: every suite runs against fakes.
+      - name: make test
+        run: make test
+
+  host:
+    name: Suites on the host
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      # The PHP a host install runs with: static, musl-based, pinned by
+      # checksum. Not the Docker image's — the two differ exactly where it
+      # shows (GLOB_BRACE is missing, iconv does not transliterate), and this
+      # is the one people run Sherpa with.
+      - name: make php
+        run: make php
+
+      - name: composer install
+        run: ~/.local/share/sherpa/php "$(command -v composer)" install --no-interaction --no-progress
+
+      # No compose here: every setting falls back on config/services.yaml,
+      # which is precisely the path a host install takes.
+      - name: suites
+        run: ~/.local/share/sherpa/php tests/run.php
+
+  shell:
+    name: Shell scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+
+      # The installer and the doctor are shell, and the suites only run PHP:
+      # without this, nothing checks them at all. Through make lint, which pins
+      # the shellcheck version — the runner's own changes when GitHub updates
+      # its images, and did not match the one used to check locally.
+      - name: shellcheck
+        run: make lint
