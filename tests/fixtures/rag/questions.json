@@ -1,0 +1,37 @@
+[
+  {"kind": "exact", "q": "Quel est le format de numérotation des factures ?", "expect": [{"path": "docs/facturation.adoc", "section": "Numérotation des factures"}]},
+  {"kind": "exact", "q": "Combien de requêtes par minute une clé API peut-elle faire ?", "expect": [{"path": "docs/api/authentification.md", "section": "Limites de débit"}]},
+  {"kind": "exact", "q": "Que signifie le code d'erreur AUTH-003 ?", "expect": [{"path": "docs/api/authentification.md", "section": "Codes d'erreur"}]},
+  {"kind": "exact", "q": "Qu'est-ce qu'un SKU ?", "expect": [{"path": "docs/glossaire.md", "section": "SKU"}]},
+  {"kind": "exact", "q": "Quelle commande lance les tests d'intégration ?", "expect": [{"path": "README.md", "section": "Lancer les tests"}]},
+  {"kind": "exact", "q": "Quels articles sont exclus du remboursement ?", "expect": [{"path": "docs/remboursements.md", "section": "Articles exclus"}]},
+  {"kind": "exact", "q": "Comment fonctionne la commande make rollback ?", "expect": [{"path": "docs/deploiement.rst", "section": "Retour arrière"}]},
+  {"kind": "exact", "q": "Quel est le taux de TVA des livres ?", "expect": [{"path": "docs/facturation.adoc", "section": "Taux de TVA"}]},
+  {"kind": "exact", "q": "Combien de temps les factures sont-elles conservées ?", "expect": [{"path": "docs/facturation.adoc", "section": "Conservation"}]},
+  {"kind": "exact", "q": "Sur quel port écoute l'application ?", "expect": [{"path": "README.md", "section": "Installation"}]},
+  {"kind": "exact", "q": "Quel niveau de PHPStan est exigé ?", "expect": [{"path": "docs/conventions.md", "section": "Style"}]},
+  {"kind": "exact", "q": "Comment sont nommées les branches git ?", "expect": [{"path": "docs/conventions.md", "section": "Commits et branches"}]},
+
+  {"kind": "paraphrase", "q": "Combien de temps un client a-t-il pour renvoyer un produit et récupérer son argent ?", "expect": [{"path": "docs/remboursements.md", "section": "Délai de rétractation"}]},
+  {"kind": "paraphrase", "q": "Quels jours a-t-on le droit de livrer une nouvelle version en production ?", "expect": [{"path": "docs/deploiement.rst", "section": "Fenêtres de mise en production"}]},
+  {"kind": "paraphrase", "q": "Pourquoi la base de données a-t-elle changé ?", "expect": [{"path": "docs/adr/0003-choix-postgresql.md", "section": ""}]},
+  {"kind": "paraphrase", "q": "Que faire si une mise en production casse le site ?", "expect": [{"path": "docs/deploiement.rst", "section": "Retour arrière"}]},
+  {"kind": "paraphrase", "q": "Qui doit donner son accord pour rembourser une grosse somme ?", "expect": [{"path": "docs/remboursements.md", "section": "Validation des montants élevés"}]},
+  {"kind": "paraphrase", "q": "Est-ce que le client paie le renvoi de son colis ?", "expect": [{"path": "docs/remboursements.md", "section": "Frais de retour"}]},
+  {"kind": "paraphrase", "q": "Combien de temps reste valide un jeton avant de devoir se reconnecter ?", "expect": [{"path": "docs/api/authentification.md", "section": "Jetons d'accès"}]},
+  {"kind": "paraphrase", "q": "Mon colis n'avance plus depuis une semaine, que se passe-t-il ?", "expect": [{"path": "docs/livraison.html", "section": "Colis perdu"}]},
+  {"kind": "paraphrase", "q": "À partir de quel montant ne paie-t-on pas l'envoi ?", "expect": [{"path": "docs/livraison.html", "section": "Livraison offerte"}]},
+  {"kind": "paraphrase", "q": "Qui faut-il appeler quand le site est en panne depuis plus d'une heure ?", "expect": [{"path": "docs/support.txt", "section": ""}]},
+  {"kind": "paraphrase", "q": "Où sont rangés les PDF générés par l'application ?", "expect": [{"path": "docs/architecture.md", "section": "Stockage"}]},
+  {"kind": "paraphrase", "q": "Pourquoi les workers redémarrent-ils régulièrement ?", "expect": [{"path": "docs/architecture.md", "section": "Tâches asynchrones"}]},
+  {"kind": "paraphrase", "q": "Comment activer une nouvelle fonctionnalité pour quelques utilisateurs seulement ?", "expect": [{"path": "docs/deploiement.rst", "section": "Drapeaux de fonctionnalité"}]},
+
+  {"kind": "table", "q": "Quel est le délai de livraison pour Marseille ?", "expect": [{"path": "docs/livraison.html", "section": "Délais par zone"}]},
+  {"kind": "table", "q": "Combien coûte l'envoi en Corse ?", "expect": [{"path": "docs/livraison.html", "section": "Délais par zone"}]},
+  {"kind": "table", "q": "Quel transporteur livre en Belgique ?", "expect": [{"path": "docs/livraison.html", "section": "Délais par zone"}, {"path": "CHANGELOG.md", "section": "2.3.0"}]},
+
+  {"kind": "english", "q": "How long is an access token valid?", "expect": [{"path": "docs/api/authentification.md", "section": "Jetons d'accès"}]},
+  {"kind": "english", "q": "What is the refund deadline?", "expect": [{"path": "docs/remboursements.md", "section": "Délai de rétractation"}]},
+  {"kind": "english", "q": "Which database does the application use?", "expect": [{"path": "docs/architecture.md", "section": "Stockage"}, {"path": "docs/adr/0003-choix-postgresql.md", "section": ""}]},
+  {"kind": "english", "q": "When are deployments allowed?", "expect": [{"path": "docs/deploiement.rst", "section": "Fenêtres de mise en production"}]}
+]
