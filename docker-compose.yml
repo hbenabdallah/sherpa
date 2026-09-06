@@ -1,0 +1,62 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - USER_ID=${USER_ID:-1000}
+        - GROUP_ID=${GROUP_ID:-1000}
+        - USER=${USER:-user}
+    user: "${USER_ID:-1000}:${GROUP_ID:-1000}"
+    volumes:
+      - .:/app
+      # Config and projects are mounted at the SAME path inside the container as
+      # on the host. Sherpa stores absolute project paths in projects.yaml, so
+      # host and container must agree on what "/home/you/workspace/foo" means —
+      # otherwise file_read / project_grep / file_write resolve to nothing.
+      - ${HOME_PATH:-/home/user}/.config/sherpa:${HOME_PATH:-/home/user}/.config/sherpa
+      - ${SHERPA_PROJECTS_ROOT:-/home/user/workspace}:${SHERPA_PROJECTS_ROOT:-/home/user/workspace}
+    working_dir: /app
+    stdin_open: true
+    tty: true
+    # Host networking: Sherpa talks to nothing but Ollama on the host, and this
+    # daemon's address pool has no room left for another bridge network. Also
+    # means Ollama is plain localhost — no host.docker.internal indirection.
+    network_mode: "host"
+    environment:
+      - HOME=${HOME_PATH:-/home/user}
+      - OLLAMA_URL=${OLLAMA_URL:-http://localhost:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5-coder:7b}
+      - OLLAMA_CTX=${OLLAMA_CTX:-32768}
+      # Unlimited by default: inference is local, so there is no flaky network
+      # to protect against — and the same request is seconds against a GPU and
+      # minutes against a CPU, so there is no honest number to pick either.
+      # Cancellation is Ctrl+C's job, not a deadline's.
+      - OLLAMA_TIMEOUT=${OLLAMA_TIMEOUT:--1}
+      # How long the model stays resident between turns. Ollama's own default
+      # is 5 minutes, which unloads it while someone reads a diff and pays to
+      # re-upload the weights on the next question.
+      - OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:-30m}
+      # Which backend runs the model: api (the default) or ollama.
+      - SHERPA_BACKEND=${SHERPA_BACKEND:-api}
+      # Any OpenAI-compatible API. The key is read from the shell first, then
+      # from .env, and only ever travels as an environment variable.
+      - SHERPA_API_URL=${SHERPA_API_URL:-}
+      - SHERPA_API_KEY=${SHERPA_API_KEY:-}
+      - SHERPA_API_MODEL=${SHERPA_API_MODEL:-}
+      - SHERPA_API_CONTEXT=${SHERPA_API_CONTEXT:-32768}
+      # Structured output wants determinism, not creativity; and a reply has to
+      # respect the room ContextBudget set aside for it. Both backends.
+      - SHERPA_TEMPERATURE=${SHERPA_TEMPERATURE:-0.15}
+      - SHERPA_MAX_TOKENS=${SHERPA_MAX_TOKENS:-4096}
+      # Tokens a session may use, sent plus received; 0 for no cap.
+      - SHERPA_MAX_SESSION_TOKENS=${SHERPA_MAX_SESSION_TOKENS:-0}
+      # on / off: the end-of-session request that saves durable facts.
+      - SHERPA_FACT_EXTRACTION=${SHERPA_FACT_EXTRACTION:-on}
+      # The model that turns documentation into vectors; empty: keywords only.
+      - SHERPA_EMBEDDING_MODEL=${SHERPA_EMBEDDING_MODEL:-}
+      # The directory the user launched from, so Sherpa can open the project
+      # they are standing in. The container has no other way to know it.
+      - SHERPA_CWD=${SHERPA_CWD:-}
+      - APP_ENV=${APP_ENV:-prod}
+      - APP_SECRET=${APP_SECRET:-sherpa_secret}

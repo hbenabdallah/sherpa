@@ -1,0 +1,143 @@
+parameters:
+    # Defaults for everything a fresh checkout may not have in its .env yet.
+    # The API ones are empty on purpose: no provider, model or key can be
+    # guessed, and Sherpa says what to set rather than inventing one.
+    #
+    # docker-compose.yml repeats them as ${VAR:-default}, because a variable it
+    # passes empty is defined, and a defined variable never falls back to these.
+    # Two copies of one fact drift, so tests/defaults_test.php holds them equal.
+    # Run on the host, with no compose in between, these are the only defaults.
+    env(OLLAMA_URL): 'http://localhost:11434'
+    env(OLLAMA_MODEL): 'qwen2.5-coder:7b'
+    env(OLLAMA_CTX): '32768'
+    env(OLLAMA_TIMEOUT): '-1'
+    env(OLLAMA_KEEP_ALIVE): '30m'
+    env(SHERPA_BACKEND): 'api'
+    env(SHERPA_API_URL): ''
+    env(SHERPA_API_KEY): ''
+    env(SHERPA_API_MODEL): ''
+    env(SHERPA_API_CONTEXT): '32768'
+    env(SHERPA_TEMPERATURE): '0.15'
+    env(SHERPA_MAX_TOKENS): '4096'
+    env(SHERPA_MAX_SESSION_TOKENS): '0'
+    env(SHERPA_FACT_EXTRACTION): 'on'
+    env(SHERPA_EMBEDDING_MODEL): ''
+
+    sherpa_backend: '%env(SHERPA_BACKEND)%'
+
+    ollama_url:     '%env(OLLAMA_URL)%'
+    ollama_model:   '%env(OLLAMA_MODEL)%'
+    ollama_ctx:     '%env(int:OLLAMA_CTX)%'
+    # Idle timeout for inference, in seconds. Negative means unlimited — and it
+    # has to be negative, not zero: Symfony reads 0 as "zero seconds of allowed
+    # inactivity", which fails instantly.
+    ollama_timeout: '%env(float:OLLAMA_TIMEOUT)%'
+    # How long the backend keeps the model resident between turns. Its own
+    # default is five minutes, which unloads a model over a coffee break and
+    # pays to reload it — invisible when a turn took minutes anyway, very
+    # visible once it takes seconds.
+    ollama_keep_alive: '%env(OLLAMA_KEEP_ALIVE)%'
+
+    api_url:     '%env(SHERPA_API_URL)%'
+    # Read from the environment only. Never a config file Sherpa writes, and
+    # never a tracked one.
+    api_key:     '%env(SHERPA_API_KEY)%'
+    api_model:   '%env(SHERPA_API_MODEL)%'
+    api_context: '%env(int:SHERPA_API_CONTEXT)%'
+
+    # Shared by both backends: they are properties of what Sherpa asks for, not
+    # of who serves it.
+    sampling_temperature: '%env(float:SHERPA_TEMPERATURE)%'
+    # Read three times on purpose: it is the ceiling each backend enforces on a
+    # reply AND the room ContextBudget withholds from the prompt for it. Two
+    # numbers for one fact is how a budget starts lying — see ModelProfile for
+    # the last time that happened here.
+    reply_max_tokens: '%env(int:SHERPA_MAX_TOKENS)%'
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    App\:
+        # A pattern, not the bare directory: inside the single executable
+        # (a phar:// path), Symfony filters a bare directory with an empty
+        # pattern and discovers no class at all.
+        resource: '%kernel.project_dir%/src/**/*.php'
+
+    # Ollama platform — explicit wiring of scalar params
+    App\Platform\OllamaPlatform:
+        arguments:
+            $baseUrl:  '%ollama_url%'
+            $model:    '%ollama_model%'
+            $numCtx:   '%ollama_ctx%'
+            $timeout:  '%ollama_timeout%'
+            $keepAlive: '%ollama_keep_alive%'
+            $temperature: '%sampling_temperature%'
+            $maxTokens: '%reply_max_tokens%'
+            # Explicit: the parameter is nullable only because it trails
+            # defaulted ones, and a silent null would make Ctrl+C inert.
+            $interrupt: '@App\Runtime\Interrupt'
+
+    # Any provider speaking OpenAI's /chat/completions — the default backend.
+    App\Platform\OpenAiCompatiblePlatform:
+        arguments:
+            $baseUrl:       '%api_url%'
+            $model:         '%api_model%'
+            $apiKey:        '%api_key%'
+            $contextWindow: '%api_context%'
+            $interrupt:     '@App\Runtime\Interrupt'
+            $temperature:   '%sampling_temperature%'
+            $maxTokens:     '%reply_max_tokens%'
+
+    App\Command\SherpaCommand:
+        arguments:
+            # on / off. Off skips the end-of-session request that asks the
+            # model what was worth remembering.
+            $extractFacts: '%env(bool:SHERPA_FACT_EXTRACTION)%'
+
+    # One per session, shared by the platform switch that feeds it and the
+    # command that shows it. 0 means no cap.
+    App\Usage\UsageMeter:
+        arguments:
+            $cap: '%env(int:SHERPA_MAX_SESSION_TOKENS)%'
+
+    # Everything asks for the interface and gets whichever backend is in
+    # force. The command switches it; nothing else knows there are two.
+    App\Platform\PlatformInterface: '@App\Platform\SwitchablePlatform'
+
+    # Measured speed of this machine, shared by everything that used to assume
+    # one. Fed by AgentLoop from the platform's own timings; no probe, no flag.
+    App\Agent\InferenceSpeed: ~
+
+    # Context budget sized to the same window the platform requests. Both are
+    # only starting values now: SherpaCommand resolves the real profile at boot
+    # and applies it to the two of them together.
+    App\Agent\ContextBudget:
+        arguments:
+            $contextWindow: '%ollama_ctx%'
+            # The same number the platform caps a reply at. wiring_test asserts
+            # they match, because nothing else would notice if they stopped.
+            $reservedForResponse: '%reply_max_tokens%'
+
+    # The bottom of the precedence chain. Above it sit ~/.config/sherpa/config.yaml
+    # and the command line — see App\Config\ModelResolver.
+    # Documentation search embeds with the backend in force. The other
+    # implementations — a fixed model for evaluations, a hashing stand-in for
+    # tests — are never what the running agent uses.
+    App\Rag\Embedding\EmbeddingProvider: '@App\Rag\Embedding\BackendEmbeddings'
+
+    App\Config\ModelResolver:
+        arguments:
+            $envModel:      '%ollama_model%'
+            $envContext:    '%ollama_ctx%'
+            $envBackend:    '%sherpa_backend%'
+            $envApiModel:   '%api_model%'
+            $envApiContext: '%api_context%'
+            # Documentation search: the model that makes vectors, when
+            # config.yaml names none for the backend in force.
+            $envEmbeddingModel: '%env(SHERPA_EMBEDDING_MODEL)%'
+
+    # HTTP client (Symfony built-in)
+    Symfony\Contracts\HttpClient\HttpClientInterface:
+        alias: 'http_client'
