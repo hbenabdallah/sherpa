@@ -110,6 +110,22 @@ $waited = microtime(true) - $started;
 check('a server that never answers times out', $threw && $waited < 5.0, sprintf('%.1fs: %s', $waited, $message ?? 'no throw'));
 $hanging->close();
 
+// A server that exits between two calls — crashed, killed, restarted itself.
+// Writing to it raised a "Broken pipe" notice over the screen, then the call
+// waited out its timeout for an answer that could not come.
+$dying = McpClient::for(server('dies'), callTimeout: 5.0);
+$dying->listTools();
+usleep(200_000);
+$started = microtime(true);
+$notices = [];
+set_error_handler(function (int $severity, string $text) use (&$notices): bool { $notices[] = $text; return true; });
+try { $result = $dying->callTool('echo', ['text' => 'revenu']); } catch (McpException $e) { $result = ['text' => $e->getMessage()]; }
+restore_error_handler();
+$waited = microtime(true) - $started;
+check('a server that exited is started again and the call goes through', str_contains($result['text'], 'revenu') && $waited < 2.0, sprintf('%.1fs: %s', $waited, $result['text']));
+check('without a notice on the screen', $notices === [], implode(' | ', $notices));
+$dying->close();
+
 // ---- the registry ----------------------------------------------------------
 
 function writeConfig(array $servers): string

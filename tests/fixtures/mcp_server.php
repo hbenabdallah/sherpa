@@ -15,6 +15,8 @@
  *   paginated   returns its tools two pages at a time
  *   silent      accepts the handshake and then never answers
  *   crash       exits during the handshake
+ *   dies        exits once its tools are listed, as a server that crashed or
+ *               was killed in the middle of a session
  *   toolerror   answers tools/call with isError
  *   protoerror  answers tools/call with a JSON-RPC error
  */
@@ -64,5 +66,9 @@ while (($line = fgets(STDIN)) !== false) {
 
     if ($answer !== null) {
         reply($answer);
+    }
+
+    if ($mode === 'dies' && $method === 'tools/list') {
+        exit(0);
     }
 }
