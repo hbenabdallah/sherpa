@@ -4,7 +4,6 @@ namespace App\Mcp;
 
 use Mcp\Client as Sdk;
 use Mcp\Client\Transport\HttpTransport;
-use Mcp\Client\Transport\StdioTransport;
 use Mcp\Client\Transport\TransportInterface;
 use Mcp\Exception\ExceptionInterface as SdkException;
 use Mcp\Schema\Content\AudioContent;
@@ -110,7 +109,7 @@ final class McpClient
         // and stopping at the first page would hide the rest without saying so.
         do {
             try {
-                $page = $this->client?->listTools($cursor);
+                $page = $this->request(fn(Sdk $client) => $client->listTools($cursor));
             } catch (SdkException $e) {
                 throw $this->failure('listing the tools failed', $e);
             }
@@ -139,7 +138,7 @@ final class McpClient
         $this->connect();
 
         try {
-            $result = $this->client?->callTool($name, $arguments);
+            $result = $this->request(fn(Sdk $client) => $client->callTool($name, $arguments));
         } catch (SdkException $e) {
             // A protocol-level error is not an answer: the tool never ran, and
             // saying otherwise would have the model act on a result that does
@@ -168,7 +167,7 @@ final class McpClient
 
         do {
             try {
-                $page = $this->client?->listResources($cursor);
+                $page = $this->request(fn(Sdk $client) => $client->listResources($cursor));
             } catch (SdkException) {
                 return $resources;
             }
@@ -197,7 +196,7 @@ final class McpClient
         $this->connect();
 
         try {
-            $result = $this->client?->readResource($uri);
+            $result = $this->request(fn(Sdk $client) => $client->readResource($uri));
         } catch (SdkException $e) {
             throw $this->failure("reading {$uri} failed", $e);
         }
@@ -229,7 +228,7 @@ final class McpClient
 
         do {
             try {
-                $page = $this->client?->listPrompts($cursor);
+                $page = $this->request(fn(Sdk $client) => $client->listPrompts($cursor));
             } catch (SdkException) {
                 return $prompts;
             }
@@ -264,7 +263,7 @@ final class McpClient
         $this->connect();
 
         try {
-            $result = $this->client?->getPrompt($name, $arguments);
+            $result = $this->request(fn(Sdk $client) => $client->getPrompt($name, $arguments));
         } catch (SdkException $e) {
             throw $this->failure("getting the prompt {$name} failed", $e);
         }
@@ -308,11 +307,37 @@ final class McpClient
     }
 
     /**
+     * One request, sent again once if the server's process turns out to have
+     * exited since the last one: a server that restarted, crashed or was killed
+     * comes back on the next call instead of failing every call after it.
+     *
+     * Once only. A server that dies again at once is not going to answer, and
+     * its failure is reported in its own words like any other.
+     *
+     * @template T
+     *
+     * @param \Closure(Sdk): T $request
+     *
+     * @return T
+     */
+    private function request(\Closure $request): mixed
+    {
+        try {
+            return $request($this->client);
+        } catch (ServerGone) {
+            $this->close();
+            $this->connect();
+
+            return $request($this->client);
+        }
+    }
+
+    /**
      * A child process, talked to over its pipes. The command is checked here
      * because proc_open() succeeds on one that does not exist, and the failure
      * would surface as a handshake timeout saying nothing about the typo.
      */
-    private function stdio(): StdioTransport
+    private function stdio(): ServerProcess
     {
         if ($this->which($this->config->command) === null) {
             throw new McpException(
@@ -320,7 +345,7 @@ final class McpClient
             );
         }
 
-        return new StdioTransport(
+        return new ServerProcess(
             command: $this->config->command,
             args: $this->config->args,
             cwd: null,
