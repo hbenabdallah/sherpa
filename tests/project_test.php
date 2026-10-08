@@ -122,6 +122,9 @@ $after = $store->update($before, 'Après déménagement', $work . '/apres', new 
 check('the name changes', $after->name === 'Après déménagement', $after->name);
 check('the path changes', $after->path === $work . '/apres', $after->path);
 check('the docker configuration changes', $after->docker->enabled && $after->docker->container === 'app-1', json_encode($after->docker));
+check('commands run as the host user unless told otherwise', $after->docker->user === DockerConfig::USER_HOST, $after->docker->user);
+check('a project saved before the setting existed reads as the host user', DockerConfig::fromArray(['enabled' => true, 'container' => 'a'])->user === DockerConfig::USER_HOST);
+check('and the setting survives a save', DockerConfig::fromArray((new DockerConfig(true, 'a', '', 'www-data'))->toArray())->user === 'www-data');
 
 // The slug names the memory directory and is what `sherpa -p` takes. Re-slugging
 // a rename would strand everything Sherpa has learned and break every alias.

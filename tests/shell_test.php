@@ -6,6 +6,7 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 
 use App\Project\PathOutsideProjectException;
 use App\Project\ProjectPathResolver;
+use App\Project\DockerConfig;
 use App\Tool\ContainerInspector;
 use App\Tool\ShellExecTool;
 
@@ -159,6 +160,49 @@ check('a path below the mount keeps its tail', $inspector->translate($table, '/h
 // into the wrong container directory.
 check('a sibling sharing a prefix does not match', $inspector->translate($table, '/home/x/projet-old') === null);
 check('an unrelated path does not match', $inspector->translate($table, '/etc') === null);
+
+// ---- who the command runs as -------------------------------------------------
+// A container's default user is usually root, and what root writes in the
+// mounted project comes back to the host owned by root: Sherpa could no longer
+// edit the files a fixer or a generator had touched.
+
+final class HomelessInspector extends ContainerInspector
+{
+    public function __construct(private readonly string $home) {}
+
+    public function inspect(string $container): ?array
+    {
+        return ['workdir' => '/srv/app', 'mounts' => []];
+    }
+
+    public function home(string $container, string $user): ?string
+    {
+        return $this->home;
+    }
+}
+
+$command = fn(ShellExecTool $tool): array => (new ReflectionMethod($tool, 'buildCommand'))->invoke($tool, 'ls', $project);
+
+$explicit = new ShellExecTool($paths, new HomelessInspector('/home/www'));
+$explicit->setDockerContainer('c', 'www-data');
+check('a user named in the configuration is passed to docker exec', in_array('www-data', $command($explicit), true) && in_array('--user', $command($explicit), true), implode(' ', $command($explicit)));
+check('and shown before the command runs', str_contains($explicit->describe('ls'), 'user: www-data'), $explicit->describe('ls'));
+check('a user with a home keeps it', !in_array('HOME=/tmp', $command($explicit), true), implode(' ', $command($explicit)));
+
+$homeless = new ShellExecTool($paths, new HomelessInspector('/'));
+$homeless->setDockerContainer('c', '1000:1000');
+check('a uid the image does not know gets a HOME it can write to', in_array('HOME=/tmp', $command($homeless), true), implode(' ', $command($homeless)));
+
+$own = new ShellExecTool($paths, new HomelessInspector('/'));
+$own->setDockerContainer('c', DockerConfig::USER_CONTAINER);
+check('"container" leaves the container\'s own user', !in_array('--user', $command($own), true) && !str_contains($own->describe('ls'), 'user:'), implode(' ', $command($own)));
+
+$host = new ShellExecTool($paths, new HomelessInspector('/'));
+$host->setDockerContainer('c');
+$expected = PHP_OS_FAMILY === 'Linux' && posix_getuid() !== 0 ? posix_getuid() . ':' . posix_getgid() : null;
+check('by default it runs as the user running Sherpa', $expected === null
+    ? !in_array('--user', $command($host), true)
+    : in_array($expected, $command($host), true), implode(' ', $command($host)));
 
 exec('rm -rf ' . escapeshellarg($project));
 printf("\n%d passed, %d failed\n", $pass, $fail);

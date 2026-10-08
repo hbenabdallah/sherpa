@@ -23,7 +23,7 @@ final class BackgroundJobs
     /** How long a job is watched at start, to report an early failure or a first line. */
     public const FIRST_LOOK_SECONDS = 3.0;
 
-    /** @var array<int, array{command: string, process: Process, started: float, container: ?string, group: bool, stopped: bool}> */
+    /** @var array<int, array{command: string, process: Process, started: float, container: ?string, inContainer: callable(string): list<string>, group: bool, stopped: bool}> */
     private array $jobs = [];
 
     private int $next = 1;
@@ -51,7 +51,7 @@ final class BackgroundJobs
         $process = new Process($command, cwd: $cwd, timeout: null);
         $process->start();
 
-        $this->jobs[$id] = ['command' => $shown, 'process' => $process, 'started' => microtime(true), 'container' => $container, 'group' => $group, 'stopped' => false];
+        $this->jobs[$id] = ['command' => $shown, 'process' => $process, 'started' => microtime(true), 'container' => $container, 'inContainer' => $inContainer, 'group' => $group, 'stopped' => false];
 
         return $id;
     }
@@ -98,8 +98,11 @@ final class BackgroundJobs
         }
 
         if ($job['container'] !== null) {
-            $kill = new Process(['docker', 'exec', $job['container'], 'sh', '-c',
-                'kill -TERM "$(cat ' . self::pidFile($id) . ')" 2>/dev/null; rm -f ' . self::pidFile($id)], timeout: 10);
+            // As the user the job runs as: another one may not be allowed to
+            // signal it, nor to remove the pid file it wrote.
+            $kill = new Process(($job['inContainer'])(
+                'kill -TERM "$(cat ' . self::pidFile($id) . ')" 2>/dev/null; rm -f ' . self::pidFile($id),
+            ), timeout: 10);
             $kill->run();
         } elseif ($job['group'] && function_exists('posix_kill') && ($pid = $process->getPid()) !== null) {
             // The whole group: the shell and everything it started.
@@ -171,7 +174,7 @@ final class BackgroundJobs
         return '/tmp/sherpa-job-' . getmypid() . "-{$id}.pid";
     }
 
-    /** @return array{command: string, process: Process, started: float, container: ?string, group: bool, stopped: bool} */
+    /** @return array{command: string, process: Process, started: float, container: ?string, inContainer: callable(string): list<string>, group: bool, stopped: bool} */
     private function job(int $id): array
     {
         return $this->jobs[$id] ?? throw new \RuntimeException("no job {$id}: /jobs lists them, and ids are given when a job starts.");

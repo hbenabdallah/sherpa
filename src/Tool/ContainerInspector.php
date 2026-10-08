@@ -18,6 +18,9 @@ class ContainerInspector
     /** Inspecting is a fork and a JSON parse; once per container is plenty. */
     private array $cache = [];
 
+    /** @var array<string, ?string> */
+    private array $homes = [];
+
     /**
      * @return array{workdir: ?string, mounts: array<int, array{source: string, destination: string}>}|null
      *         null when the container cannot be inspected at all
@@ -95,5 +98,30 @@ class ContainerInspector
         }
 
         return $best === null ? null : ($best === '' ? '/' : $best);
+    }
+
+    /**
+     * The HOME a user gets in the container, or null when docker cannot say.
+     * A uid the image has no account for gets "/", where composer, npm or git
+     * cannot write a thing — which is what running as the host user means in
+     * most images.
+     */
+    public function home(string $container, string $user): ?string
+    {
+        $key = $container . "\0" . $user;
+
+        if (array_key_exists($key, $this->homes)) {
+            return $this->homes[$key];
+        }
+
+        $process = new Process(['docker', 'exec', '--user', $user, $container, 'sh', '-c', 'printf %s "$HOME"'], timeout: 10);
+
+        try {
+            $process->run();
+        } catch (\Throwable) {
+            return $this->homes[$key] = null;
+        }
+
+        return $this->homes[$key] = $process->isSuccessful() ? trim($process->getOutput()) : null;
     }
 }

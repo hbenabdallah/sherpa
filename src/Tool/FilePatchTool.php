@@ -8,6 +8,7 @@ use App\Agent\Tool\Permission;
 use App\Project\PathOutsideProjectException;
 use App\Project\PathSuggestions;
 use App\Project\ProjectPathResolver;
+use App\Tool\Edit\FileSaver;
 use App\Tool\Edit\PatchOutcome;
 use App\Tool\Edit\SyntaxGuard;
 use App\Tool\Edit\TextPatch;
@@ -56,7 +57,7 @@ class FilePatchTool
             );
         }
 
-        file_put_contents($resolved, $outcome->content);
+        FileSaver::save($resolved, $path, (string) $outcome->content);
 
         // Said when it was not the exact text, so the next patch in the
         // session starts from the right habit rather than from the slip.

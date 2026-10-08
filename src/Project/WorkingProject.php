@@ -184,6 +184,7 @@ class WorkingProject
         $this->paths->setRoot($project->path);
         $this->shell->setDockerContainer(
             $project->docker->enabled && $project->docker->container !== '' ? $project->docker->container : null,
+            $project->docker->user,
         );
     }
 }

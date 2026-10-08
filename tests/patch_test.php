@@ -153,6 +153,26 @@ check('file_write refuses a new file that does not parse', $result->isError && !
 $result = $write('src/New.php', "<?php\nclass New_ {}\n");
 check('and writes one that does', !$result->isError && is_file("{$dir}/src/New.php"), $result->content);
 
+// A file it may not write — rewritten as root in a container, say. PHP's own
+// answer was a warning printed over the screen and a result marked as a
+// success; the model then went around it with sed in the container.
+$warnings = [];
+set_error_handler(function (int $severity, string $text) use (&$warnings): bool { $warnings[] = $text; return true; });
+chmod("{$dir}/src/New.php", 0444);
+$result = $write('src/New.php', "<?php\nclass New_ { }\n");
+check('a file that is not writable is a failure, not a success', $result->isError, $result->content);
+check('which says what to do and not to go around it', str_contains($result->content, 'not writable') && str_contains($result->content, 'shell_exec'), $result->content);
+$result = $patch('class New_ {}', 'class New_ { }', 'src/New.php');
+check('file_patch says so too, rather than failing in silence', $result->isError && str_contains($result->content, 'not writable'), $result->content);
+chmod("{$dir}/src", 0555);
+$result = $write('src/Other.php', "<?php\n");
+check('a directory it may not write in is named', $result->isError && str_contains($result->content, 'directory src'), $result->content);
+$result = $write('src/Deeper/Other.php', "<?php\n");
+check('and one it cannot create', $result->isError && str_contains($result->content, 'create src/Deeper'), $result->content);
+chmod("{$dir}/src", 0755);
+restore_error_handler();
+check('without a PHP warning on the screen', $warnings === [], implode(' | ', $warnings));
+
 exec('rm -rf ' . escapeshellarg($dir));
 
 printf("\n%d passed, %d failed\n", $pass, $fail);

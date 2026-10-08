@@ -6,6 +6,7 @@ use App\Agent\ContextBudget;
 use App\Agent\Tool\AsTool;
 use App\Agent\Tool\Param;
 use App\Agent\Tool\Permission;
+use App\Project\DockerConfig;
 use App\Project\PathOutsideProjectException;
 use App\Project\ProjectPathResolver;
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
@@ -13,7 +14,7 @@ use Symfony\Component\Process\Process;
 
 #[AsTool(
     name: 'shell_exec',
-    description: 'Execute a shell command in the project directory. Use for running tests, checking routes, debugging, etc. With background=true it is left running — a dev server, a watcher, a long suite — and you get a job id: read it with job_output, stop it with job_stop.',
+    description: 'Execute a shell command in the project directory. Use for running tests, checking routes, debugging, and the project\'s own tools (linters, fixers, generators, package managers). Never to edit a file yourself — no sed -i, perl -pi, cat/echo/tee into a file: that is file_patch and file_write. With background=true it is left running — a dev server, a watcher, a long suite — and you get a job id: read it with job_output, stop it with job_stop.',
     permission: Permission::CONFIRM,
 )]
 class ShellExecTool
@@ -39,6 +40,8 @@ class ShellExecTool
 
     private ?string $dockerContainer = null;
 
+    private string $dockerUser = DockerConfig::USER_HOST;
+
     /**
      * @param int $timeout Seconds a command may run. Long enough for a test
      *                     suite, short enough that a command waiting on input
@@ -63,9 +66,11 @@ class ShellExecTool
             ?? self::MIN_OUTPUT_BYTES;
     }
 
-    public function setDockerContainer(?string $container): void
+    /** @param string $user see DockerConfig::$user */
+    public function setDockerContainer(?string $container, string $user = DockerConfig::USER_HOST): void
     {
         $this->dockerContainer = $container;
+        $this->dockerUser = $user;
     }
 
     public function __invoke(
@@ -198,9 +203,58 @@ class ShellExecTool
 
         $inside = $this->containerWorkDir($workDir);
 
-        return $inside === null
-            ? ['docker', 'exec', '-i', $this->dockerContainer, 'bash', '-c', $command]
-            : ['docker', 'exec', '-i', '-w', $inside, $this->dockerContainer, 'bash', '-c', $command];
+        return [
+            'docker', 'exec', '-i',
+            ...($inside === null ? [] : ['-w', $inside]),
+            ...$this->userArgs(),
+            $this->dockerContainer, 'bash', '-c', $command,
+        ];
+    }
+
+    /**
+     * Who runs the command, told to `docker exec`. With a HOME that can be
+     * written to: a uid the image has no account for is otherwise handed "/",
+     * and composer or npm fail on their caches before doing any work.
+     *
+     * @return list<string>
+     */
+    private function userArgs(): array
+    {
+        $user = $this->execUser();
+
+        if ($user === null) {
+            return [];
+        }
+
+        $home = $this->containers->home((string) $this->dockerContainer, $user);
+
+        return $home === '/' || $home === ''
+            ? ['--user', $user, '-e', 'HOME=/tmp']
+            : ['--user', $user];
+    }
+
+    /** The `--user` value, or null to leave the container's own user. */
+    private function execUser(): ?string
+    {
+        return match ($this->dockerUser) {
+            DockerConfig::USER_CONTAINER => null,
+            DockerConfig::USER_HOST      => self::hostUser(),
+            default                      => $this->dockerUser,
+        };
+    }
+
+    /**
+     * uid:gid of whoever runs Sherpa, or null where it would change nothing:
+     * run as root, or off Linux — Docker Desktop on macOS and Windows already
+     * gives what a container writes in a bind mount to the host user.
+     */
+    private static function hostUser(): ?string
+    {
+        if (PHP_OS_FAMILY !== 'Linux' || !function_exists('posix_getuid') || posix_getuid() === 0) {
+            return null;
+        }
+
+        return posix_getuid() . ':' . posix_getgid();
     }
 
     /**
@@ -237,7 +291,10 @@ class ShellExecTool
             // host path there would be showing something that does not happen.
             $inside = $this->containerWorkDir($workDir);
 
+            $user = $this->execUser();
+
             return "container: {$this->dockerContainer}\n"
+                . ($user === null ? '' : "user: {$user}\n")
                 . 'cwd: ' . ($inside ?? "(the container's default)") . "\n\$ {$command}";
         }
 

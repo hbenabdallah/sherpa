@@ -7,6 +7,7 @@ use App\Agent\Tool\Param;
 use App\Agent\Tool\Permission;
 use App\Project\PathOutsideProjectException;
 use App\Project\ProjectPathResolver;
+use App\Tool\Edit\FileSaver;
 use App\Tool\Edit\SyntaxGuard;
 
 #[AsTool(
@@ -27,11 +28,6 @@ class FileWriteTool
     ): string {
         $resolved = $this->paths->resolve($path);
 
-        $dir = dirname($resolved);
-        if (!is_dir($dir) && !mkdir($dir, 0755, true)) {
-            return "Error: could not create directory: {$dir}";
-        }
-
         $exists = file_exists($resolved);
 
         // Same rule as file_patch: never turn a file that parses into one that
@@ -43,9 +39,9 @@ class FileWriteTool
             );
         }
 
-        if (file_put_contents($resolved, $content) === false) {
-            return "Error: could not write to file: {$path}";
-        }
+        // Thrown, like every other failure here, so it is shown and counted
+        // as one: returned as text, it came back marked as a success.
+        FileSaver::save($resolved, $path, $content);
 
         $lines = substr_count($content, "\n") + 1;
         $action = $exists ? 'Updated' : 'Created';

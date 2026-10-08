@@ -105,6 +105,9 @@ class ProjectQuestions
             enabled: true,
             container: $container,
             dbContainer: $this->askWithDefault('  DB container (optional)', $current?->dbContainer ?: $this->pick($running, self::DB_HINTS, required: false)),
+            // Not asked: the default is right almost everywhere, and the rest
+            // is one line of projects.yaml.
+            user: $current?->user ?? DockerConfig::USER_HOST,
         );
     }
 
