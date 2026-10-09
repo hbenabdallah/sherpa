@@ -11,6 +11,7 @@
 //     ARGS="--dry-run"                    # the scenarios with no agent: each must fail
 //     ARGS="--scenarios=architecture"     # tests/bench/scenarios-architecture.php instead
 //     ARGS="--mcp=phpgraph"               # with the MCP servers of tests/bench/mcp/phpgraph.json
+//     ARGS="--pause=60"                   # seconds between two runs, for a provider's rate limit
 //
 // The model is SHERPA_BENCH_MODEL, or SHERPA_API_MODEL, or --model=.
 
@@ -348,12 +349,15 @@ final class BenchRun
 
 // ---- the run -----------------------------------------------------------------
 
-$options = getopt('', ['only:', 'repeat:', 'label:', 'model:', 'timeout:', 'cap:', 'compare:', 'to:', 'list', 'dry-run', 'scenarios:', 'mcp:']);
+$options = getopt('', ['only:', 'repeat:', 'label:', 'model:', 'timeout:', 'cap:', 'compare:', 'to:', 'list', 'dry-run', 'scenarios:', 'mcp:', 'pause:']);
 $only = isset($options['only']) ? explode(',', (string) $options['only']) : null;
 $repeat = max(1, (int) ($options['repeat'] ?? 1));
 $label = preg_replace('/[^a-z0-9_-]/i', '', (string) ($options['label'] ?? ''));
 $timeout = (int) ($options['timeout'] ?? 600);
 $cap = (int) ($options['cap'] ?? 200_000);
+// A rate limit counts requests over a window: runs back to back exhaust it, and
+// every run after that fails on a 429 instead of measuring anything.
+$pause = max(0, (int) ($options['pause'] ?? 0));
 $model = (string) ($options['model'] ?? (getenv('SHERPA_BENCH_MODEL') ?: getenv('SHERPA_API_MODEL') ?: ''));
 
 $repo = dirname(__DIR__, 2);
@@ -668,12 +672,17 @@ $commit = trim($commit->getOutput()) . (trim((new Process(['git', '-c', 'safe.di
 
 $mcp = $mcpName === '' ? null : loadMcp($repo, $mcpName);
 
-printf("Sherpa benchmark · %s · %d scenario(s) × %d · %s%s\n\n", $model, count($scenarios), $repeat, $commit, $mcp === null ? '' : " · MCP {$mcpName}");
+printf("Sherpa benchmark · %s · %d scenario(s) × %d · %s%s%s\n\n", $model, count($scenarios), $repeat, $commit,
+    $mcp === null ? '' : " · MCP {$mcpName}", $pause === 0 ? '' : " · {$pause} s between runs");
 
 $rows = [];
 
 foreach ($scenarios as $scenario) {
     for ($attempt = 1; $attempt <= $repeat; $attempt++) {
+        if ($pause > 0 && $rows !== []) {
+            sleep($pause);
+        }
+
         $run = BenchRun::prepare($root, projectSource($repo, $scenario['project']), $scenario['name'], $attempt);
 
         if (isset($scenario['setup'])) {
