@@ -181,6 +181,13 @@ nom, et si ses commandes tournent dans un conteneur Docker — et il est enregis
 personnel ou à `/` : ses outils de fichiers sont confinés au projet, et là ce
 serait tout.
 
+Dans le conteneur, les commandes tournent sous votre utilisateur (votre uid:gid),
+et ce qu'elles écrivent dans le projet reste à vous. Avec Docker rootless ou
+Podman, le root du conteneur, c'est déjà vous : mettez `user: container` sous le
+`docker:` du projet dans `~/.config/sherpa/projects.yaml`, sinon les fichiers
+reviennent à un uid subordonné. `user` accepte aussi un nom ou un uid, comme
+`docker exec --user` (`www-data`).
+
 ## Utilisation
 
 Tapez une demande ; Sherpa la traite avec ses outils, puis répond. Ctrl+C arrête

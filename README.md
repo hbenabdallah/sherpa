@@ -174,6 +174,12 @@ its name, and whether its commands run in a Docker container — and is saved at
 your first message. Sherpa refuses to start in your home directory or at `/`:
 its file tools are confined to the project, and there that would be everything.
 
+In the container, commands run as you (your uid:gid), so what they write in the
+project stays yours. With rootless Docker or Podman, the container's root
+already is you: set `user: container` under the project's `docker:` in
+`~/.config/sherpa/projects.yaml`, or files come back owned by a subordinate uid.
+`user` also takes a name or a uid as `docker exec --user` does (`www-data`).
+
 ## Using it
 
 Type a request; Sherpa works through it with its tools and answers. Ctrl+C stops
