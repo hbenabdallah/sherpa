@@ -134,7 +134,11 @@ class ShellExecTool
      */
     private function startJob(string $command, string $workDir): string
     {
-        $id = $this->jobs->start($command, $command, $workDir, $this->dockerContainer, fn(string $script) => $this->buildCommand($script, $workDir));
+        // The container and user of now, not of when it is stopped: after a
+        // /project edit, the kill would go to another container, or to the host.
+        [$container, $user] = [$this->dockerContainer, $this->dockerUser];
+        $id = $this->jobs->start($command, $command, $workDir, $container,
+            fn(string $script) => $this->commandIn($container, $user, $script, $workDir));
         $this->jobs->firstLook($id);
         $state = $this->jobs->read($id);
         $output = trim($state['output']);
@@ -197,17 +201,27 @@ class ShellExecTool
     /** @return string[] */
     private function buildCommand(string $command, string $workDir): array
     {
-        if ($this->dockerContainer === null) {
+        return $this->commandIn($this->dockerContainer, $this->dockerUser, $command, $workDir);
+    }
+
+    /**
+     * @param string $user see DockerConfig::$user
+     *
+     * @return string[]
+     */
+    private function commandIn(?string $container, string $user, string $command, string $workDir): array
+    {
+        if ($container === null) {
             return ['bash', '-c', $command];
         }
 
-        $inside = $this->containerWorkDir($workDir);
+        $inside = $this->containerWorkDir($container, $workDir);
 
         return [
             'docker', 'exec', '-i',
             ...($inside === null ? [] : ['-w', $inside]),
-            ...$this->userArgs(),
-            $this->dockerContainer, 'bash', '-c', $command,
+            ...$this->userArgs($container, $user),
+            $container, 'bash', '-c', $command,
         ];
     }
 
@@ -218,15 +232,15 @@ class ShellExecTool
      *
      * @return list<string>
      */
-    private function userArgs(): array
+    private function userArgs(string $container, string $user): array
     {
-        $user = $this->execUser();
+        $user = self::execUser($user);
 
         if ($user === null) {
             return [];
         }
 
-        $home = $this->containers->home((string) $this->dockerContainer, $user);
+        $home = $this->containers->home($container, $user);
 
         return $home === '/' || $home === ''
             ? ['--user', $user, '-e', 'HOME=/tmp']
@@ -234,12 +248,12 @@ class ShellExecTool
     }
 
     /** The `--user` value, or null to leave the container's own user. */
-    private function execUser(): ?string
+    private static function execUser(string $user): ?string
     {
-        return match ($this->dockerUser) {
+        return match ($user) {
             DockerConfig::USER_CONTAINER => null,
             DockerConfig::USER_HOST      => self::hostUser(),
-            default                      => $this->dockerUser,
+            default                      => $user,
         };
     }
 
@@ -262,15 +276,15 @@ class ShellExecTool
      * handed to `docker exec -w` fails before the command starts. Unmounted,
      * the container's own working directory beats a path known to be wrong.
      */
-    private function containerWorkDir(string $workDir): ?string
+    private function containerWorkDir(string $container, string $workDir): ?string
     {
-        $container = $this->containers->inspect((string) $this->dockerContainer);
+        $inspected = $this->containers->inspect($container);
 
-        if ($container === null) {
+        if ($inspected === null) {
             return null;
         }
 
-        return $this->containers->translate($container, $workDir) ?? $container['workdir'];
+        return $this->containers->translate($inspected, $workDir) ?? $inspected['workdir'];
     }
 
     /**
@@ -289,9 +303,9 @@ class ShellExecTool
         if ($this->dockerContainer !== null) {
             // The overlay exists to show what will actually run. Showing the
             // host path there would be showing something that does not happen.
-            $inside = $this->containerWorkDir($workDir);
+            $inside = $this->containerWorkDir($this->dockerContainer, $workDir);
 
-            $user = $this->execUser();
+            $user = self::execUser($this->dockerUser);
 
             return "container: {$this->dockerContainer}\n"
                 . ($user === null ? '' : "user: {$user}\n")

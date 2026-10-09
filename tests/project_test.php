@@ -124,6 +124,7 @@ check('the path changes', $after->path === $work . '/apres', $after->path);
 check('the docker configuration changes', $after->docker->enabled && $after->docker->container === 'app-1', json_encode($after->docker));
 check('commands run as the host user unless told otherwise', $after->docker->user === DockerConfig::USER_HOST, $after->docker->user);
 check('a project saved before the setting existed reads as the host user', DockerConfig::fromArray(['enabled' => true, 'container' => 'a'])->user === DockerConfig::USER_HOST);
+check('uid 0 is taken as root, not as an empty setting', DockerConfig::fromArray(['enabled' => true, 'container' => 'a', 'user' => 0])->user === '0');
 check('and the setting survives a save', DockerConfig::fromArray((new DockerConfig(true, 'a', '', 'www-data'))->toArray())->user === 'www-data');
 
 // The slug names the memory directory and is what `sherpa -p` takes. Re-slugging

@@ -5,6 +5,7 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 
 use App\Agent\Tool\Permission;
 use App\Agent\Tool\Toolbox;
+use App\Project\DockerConfig;
 use App\Project\ProjectPathResolver;
 use App\Tool\BackgroundJobs;
 use App\Tool\ContainerInspector;
@@ -105,6 +106,54 @@ check('/jobs has every job, with its command', count($listed) >= 4 && str_contai
 $pids = array_filter(array_map(fn(array $j) => $j['running'] ? $j['id'] : null, $jobs->all()));
 $jobs->stopAll();
 check('stopAll leaves nothing running', array_filter($jobs->all(), fn(array $j) => $j['running']) === [], json_encode($jobs->all()));
+
+// ---- a job in the project's container ---------------------------------------------
+// It is stopped in the container it was started in. /project edit can change the
+// container, or turn Docker off, while it runs: the kill then went there, or to
+// the host, and the server was left running in the first one.
+
+final class RunningContainer extends ContainerInspector
+{
+    public function inspect(string $container): ?array
+    {
+        return ['workdir' => '/srv/app', 'mounts' => []];
+    }
+
+    public function home(string $container, string $user): ?string
+    {
+        return '/home/dev';
+    }
+}
+
+// A docker that notes what it is asked, and runs a job as a plain sleep.
+$fakeBin = $root . '/fake-docker';
+$calls = $root . '/docker-calls.log';
+mkdir($fakeBin);
+file_put_contents("{$fakeBin}/docker", "#!/bin/sh\necho \"\$*\" >> " . escapeshellarg($calls) . "\n"
+    . "case \"\$*\" in *'kill -TERM'*) exit 0 ;; esac\nexec sleep 30\n");
+chmod("{$fakeBin}/docker", 0755);
+$savedPath = getenv('PATH');
+putenv("PATH={$fakeBin}:{$savedPath}");
+
+$kills = fn(): array => array_values(preg_grep('/kill -TERM/', file($calls, FILE_IGNORE_NEW_LINES) ?: []));
+
+foreach (['another container' => ['new-app-1', 'www-data'], 'Docker turned off' => [null, DockerConfig::USER_HOST]] as $change => [$next, $nextUser]) {
+    @unlink($calls);
+    $containerJobs = new BackgroundJobs();
+    $inContainer = new ShellExecTool($paths, new RunningContainer(), 300, null, $containerJobs);
+    $inContainer->setDockerContainer('old-app-1', '1000:1000');
+    $out = $inContainer('npm run dev', background: true);
+    $id = preg_match('/job (\d+)/', $out, $m) === 1 ? (int) $m[1] : 0;
+
+    $inContainer->setDockerContainer($next, $nextUser);
+    $containerJobs->stop($id);
+    $kill = $kills()[0] ?? '';
+    check("after {$change}, a container job is stopped in the container it runs in",
+        str_contains($kill, 'old-app-1') && !str_contains($kill, 'new-app-1'), $kill ?: $out);
+    check("as the user it runs as", str_contains($kill, '--user 1000:1000'), $kill);
+}
+
+putenv("PATH={$savedPath}");
 
 // ---- permissions ----------------------------------------------------------------
 $toolbox = new Toolbox([$shell, $output, $stop]);

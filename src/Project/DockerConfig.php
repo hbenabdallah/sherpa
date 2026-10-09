@@ -28,11 +28,14 @@ final class DockerConfig
 
     public static function fromArray(array $data): self
     {
+        $user = trim((string) ($data['user'] ?? ''));
+
         return new self(
             enabled: (bool) ($data['enabled'] ?? false),
             container: $data['container'] ?? '',
             dbContainer: $data['db_container'] ?? '',
-            user: trim((string) ($data['user'] ?? '')) ?: self::USER_HOST,
+            // Compared to '', not by truthiness: "0" is root's uid, not a blank.
+            user: $user === '' ? self::USER_HOST : $user,
         );
     }
 
