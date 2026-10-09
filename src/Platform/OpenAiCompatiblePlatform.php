@@ -170,6 +170,8 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
 
     /**
      * $onToken, and a way to ask afterwards whether anything went through it.
+     * Blank text does not count: some models open every reply with line
+     * breaks, and a second reply after them reads as the only one.
      *
      * @param (callable(string): void)|null $onToken
      *
@@ -179,7 +181,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
     {
         $shown = false;
         $forward = $onToken === null ? null : function (string $token) use ($onToken, &$shown): void {
-            $shown = true;
+            $shown = $shown || trim($token) !== '';
             $onToken($token);
         };
 

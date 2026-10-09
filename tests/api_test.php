@@ -476,6 +476,28 @@ $retried = api([
 ], $sentRetry)->stream([['role' => 'user', 'content' => 'x']], [], fn() => null);
 check('an overload before any text is retried', count($sentRetry) === 2 && $retried['content'] === 'fine now', json_encode($retried));
 
+// Nemotron opens its replies with line breaks. Blank, they put nothing on the
+// screen that a second reply would follow: the overload after them is retried.
+$sentBlank = [];
+$afterBlank = api([
+    sse([textChunk("\n\n"), event(['error' => ['message' => 'Service temporarily overloaded']])]),
+    sse([textChunk('fine now'), 'data: [DONE]' . "\n\n"]),
+], $sentBlank)->stream([['role' => 'user', 'content' => 'x']], [], fn() => null);
+check('an overload after blank text only is retried too', count($sentBlank) === 2 && $afterBlank['content'] === 'fine now', json_encode($afterBlank));
+
+// Once words are on the screen, a retry would print a second reply after them.
+$sentWords = [];
+$threw = null;
+try {
+    api([
+        sse([textChunk('Let me look'), event(['error' => ['message' => 'Service temporarily overloaded']])]),
+        sse([textChunk('fine now'), 'data: [DONE]' . "\n\n"]),
+    ], $sentWords)->stream([['role' => 'user', 'content' => 'x']], [], fn() => null);
+} catch (RuntimeException $e) {
+    $threw = $e->getMessage();
+}
+check('an overload after shown words is not retried', count($sentWords) === 1 && str_contains((string) $threw, 'overloaded'), (string) $threw);
+
 $sentOnce = [];
 $threw = null;
 try {
