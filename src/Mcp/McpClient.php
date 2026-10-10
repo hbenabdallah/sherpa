@@ -349,7 +349,7 @@ final class McpClient
             command: $this->config->command,
             args: $this->config->args,
             cwd: null,
-            env: $this->config->env === [] ? null : $this->config->env + $this->inheritedEnv(),
+            env: $this->config->env + $this->inheritedEnv(),
             logger: $this->log,
         );
     }
@@ -399,23 +399,24 @@ final class McpClient
     }
 
     /**
-     * A declared env is added to the one Sherpa runs with, not substituted for
-     * it: a server started with an env of exactly `{"TOKEN": "…"}` loses PATH,
-     * and then cannot find its own interpreter.
+     * The environment a server starts with: the one Sherpa runs in, with any
+     * declared env added on top rather than substituted — a server started
+     * with exactly `{"TOKEN": "…"}` loses PATH and cannot find its own
+     * interpreter.
+     *
+     * The real environment, not $_SERVER: that one also holds what .env loaded
+     * for Sherpa, and its SHERPA_* settings stay out either way — they include
+     * the API key, which is no business of somebody else's process.
      *
      * @return array<string, string>
      */
     private function inheritedEnv(): array
     {
-        $env = [];
-
-        foreach ($_SERVER as $key => $value) {
-            if (is_string($key) && is_string($value)) {
-                $env[$key] = $value;
-            }
-        }
-
-        return $env;
+        return array_filter(
+            getenv(),
+            static fn(string $key) => !str_starts_with($key, 'SHERPA_'),
+            ARRAY_FILTER_USE_KEY,
+        );
     }
 
     /**

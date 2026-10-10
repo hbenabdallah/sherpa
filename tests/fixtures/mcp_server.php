@@ -19,6 +19,7 @@
  *               was killed in the middle of a session
  *   toolerror   answers tools/call with isError
  *   protoerror  answers tools/call with a JSON-RPC error
+ *   env         answers tools/call with the environment it was started with
  */
 
 $protocol = require __DIR__ . '/mcp_protocol.php';
@@ -60,6 +61,13 @@ while (($line = fgets(STDIN)) !== false) {
     if ($mode === 'noisy') {
         fwrite(STDERR, "log: {$method}\n");
         fwrite(STDOUT, "this is not JSON\n");
+    }
+
+    if ($mode === 'env' && $method === 'tools/call') {
+        reply(['jsonrpc' => '2.0', 'id' => $request['id'], 'result' => [
+            'content' => [['type' => 'text', 'text' => json_encode(getenv())]],
+        ]]);
+        continue;
     }
 
     $answer = $protocol->answer($request, $mode);

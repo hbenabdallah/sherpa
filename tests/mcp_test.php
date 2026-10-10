@@ -446,6 +446,31 @@ check('and the report says the tools come from off the machine',
 $registry->shutdown();
 unlink($path);
 
+// ---- what a server is started with -----------------------------------------
+// .env is loaded into $_SERVER, Sherpa's API key with it. A server declaring an
+// env of its own got that added to the whole of $_SERVER: the key went to
+// somebody else's process along with PATH.
+$_SERVER['SHERPA_API_KEY'] = 'sk-from-dotenv';
+$envClient = McpClient::for(new ServerConfig(name: 'envcheck', command: PHP_BINARY,
+    args: [dirname(__DIR__) . '/tests/fixtures/mcp_server.php', 'env'], env: ['SERVER_TOKEN' => 'declared']));
+$envClient->listTools();
+$seen = json_decode($envClient->callTool('echo', [])['text'], true) ?: [];
+$envClient->close();
+unset($_SERVER['SHERPA_API_KEY']);
+check('a server gets the env it declares', ($seen['SERVER_TOKEN'] ?? null) === 'declared', json_encode(array_keys($seen)));
+check('on top of the environment Sherpa runs in, PATH included', isset($seen['PATH']), json_encode(array_keys($seen)));
+check('but not what .env loaded for Sherpa itself, its API key first', !isset($seen['SHERPA_API_KEY']), (string) ($seen['SHERPA_API_KEY'] ?? ''));
+
+// Exported in the shell, or handed over by docker compose, the key is in the
+// real environment: a server declaring nothing inherited it as is.
+putenv('SHERPA_API_KEY=sk-exported');
+$bare = McpClient::for(server('env', 'bare'));
+$bare->listTools();
+$seen = json_decode($bare->callTool('echo', [])['text'], true) ?: [];
+$bare->close();
+putenv('SHERPA_API_KEY');
+check('a server declaring no env does not inherit Sherpa\'s key either', !isset($seen['SHERPA_API_KEY']) && isset($seen['PATH']), (string) ($seen['SHERPA_API_KEY'] ?? 'no PATH'));
+
 if (is_resource($httpServer)) {
     proc_terminate($httpServer);
     proc_close($httpServer);
