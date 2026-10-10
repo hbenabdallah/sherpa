@@ -4,6 +4,7 @@ namespace App\Memory;
 
 use App\Agent\ContextBudget;
 use App\Agent\MessageBag;
+use App\Agent\PlanMode;
 use App\Platform\PlatformInterface;
 use App\Runtime\Interrupt;
 
@@ -106,13 +107,13 @@ class FactExtractor
 
         foreach ($messages as $message) {
             $role = $message['role'] ?? '';
-            $content = trim((string) ($message['content'] ?? ''));
+            $content = trim(PlanMode::unframe((string) ($message['content'] ?? '')));
 
             if ($content === '' || !in_array($role, ['user', 'assistant'], true)) {
                 continue;
             }
 
-            $lines[] = ($role === 'user' ? '[UTILISATEUR] ' : '[AGENT] ') . $content;
+            $lines[] = ($role === 'user' ? '[USER] ' : '[AGENT] ') . $content;
         }
 
         $transcript = implode("\n\n", $lines);

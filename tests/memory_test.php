@@ -247,7 +247,16 @@ $bag->tool('file_read', 'CONTENU_DE_FICHIER_VOLUMINEUX');
 (new FactExtractor(new OllamaPlatform($recorder, 'http://x', 'm', 32768, -1.0, new Interrupt()), $fresh, new Interrupt()))->extract($bag);
 check('the system prompt is not fed back into the extractor', !str_contains($seen, 'the project memory digest lives here'), substr($seen, 0, 200));
 check('nor are tool results', !str_contains($seen, 'CONTENU_DE_FICHIER_VOLUMINEUX'), substr($seen, 0, 200));
-check('but the conversation itself is', str_contains($seen, 'question 0') && str_contains($seen, 'UTILISATEUR'), substr($seen, 0, 300));
+check('but the conversation itself is, labelled in the prompt\'s language', str_contains($seen, 'question 0') && str_contains($seen, '[USER]') && !str_contains($seen, 'UTILISATEUR'), substr($seen, 0, 300));
+
+// A request made in plan mode is handed over as it was typed.
+$planned = new App\Agent\PlanMode();
+$planned->on();
+$bag = conversation();
+$bag->user($planned->frame('Planifie la migration'));
+$bag->assistant('Plan prêt.');
+(new FactExtractor(new OllamaPlatform($recorder, 'http://x', 'm', 32768, -1.0, new Interrupt()), $fresh, new Interrupt()))->extract($bag);
+check('without plan mode\'s reminder', str_contains($seen, 'Planifie la migration') && !str_contains($seen, 'Plan mode'), substr($seen, -400));
 
 // ---- ranking: the digest has more than recency to go on now ----------------
 // The system prompt is built before anyone has asked anything, which was taken
