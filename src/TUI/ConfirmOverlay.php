@@ -11,6 +11,9 @@ use App\Tool\ShellExecTool;
 
 class ConfirmOverlay
 {
+    /** Rows of preview the box holds; past them, it says how many it hid. */
+    private const PREVIEW_ROWS = 24;
+
     public function __construct(
         private readonly Terminal $terminal,
         private readonly FileWriteTool $fileWriteTool,
@@ -30,7 +33,7 @@ class ConfirmOverlay
         [$cols] = $this->terminal->size();
         $width = max(20, min(76, $cols - 4));
 
-        $diffLines = array_slice(explode("\n", $this->buildPreview($call)), 0, 18);
+        $diffLines = explode("\n", $this->buildPreview($call));
 
         echo "\n" . $this->frame($call, $def, $diffLines, $width);
 
@@ -91,10 +94,13 @@ class ConfirmOverlay
     }
 
     /**
-     * The box, as lines to print in sequence. Every line is cut to the width
-     * and stripped: this is the screen the user approves an action from, and a
-     * diff carrying its own escape sequences could repaint it to say something
-     * else entirely.
+     * The box, as lines to print in sequence. Every line is stripped: this is
+     * the screen the user approves an action from, and a diff carrying its own
+     * escape sequences could repaint it to say something else entirely.
+     *
+     * The preview is wrapped, never cut at the width — the end of a long
+     * command, after a run of spaces, was approved without being seen — and
+     * what does not fit is counted out loud rather than dropped.
      *
      * @param array<int, string> $diffLines
      */
@@ -119,18 +125,52 @@ class ConfirmOverlay
         $out .= $row($this->summarizeArgs($call->arguments, $inner), Terminal::WHITE);
         $out .= $row(str_repeat('─', $inner), Terminal::GRAY);
 
-        foreach ($diffLines as $line) {
-            $plain = Terminal::plain($line, singleLine: true);
+        $shown = 0;
+        foreach ($diffLines as $index => $line) {
+            $plain = str_replace("\t", '    ', Terminal::plain($line, singleLine: true));
             $colour = match (true) {
                 str_starts_with($plain, '+') => Terminal::GREEN,
                 str_starts_with($plain, '-') => Terminal::RED,
                 str_starts_with($plain, '@') => Terminal::CYAN,
                 default                      => Terminal::GRAY,
             };
-            $out .= $row($plain, $colour);
+
+            $pieces = self::wrap($plain, $inner);
+            if ($shown + count($pieces) > self::PREVIEW_ROWS - 1 && $index < count($diffLines) - 1
+                || $shown + count($pieces) > self::PREVIEW_ROWS) {
+                $hidden = count($diffLines) - $index;
+                $out .= $row("⚠ {$hidden} more line" . ($hidden > 1 ? 's' : '') . ' not shown — refuse unless you have seen enough', Terminal::RED);
+                break;
+            }
+
+            foreach ($pieces as $piece) {
+                $out .= $row($piece, $colour);
+                $shown++;
+            }
         }
 
         return $out . '  ' . $yellow . Terminal::BL . str_repeat(Terminal::H, $width - 2) . Terminal::BR . Terminal::RESET . "\n";
+    }
+
+    /**
+     * A line in pieces that fit the width, measured as the terminal draws them.
+     *
+     * @return array<int, string>
+     */
+    private static function wrap(string $line, int $width): array
+    {
+        $pieces = [];
+        $piece = '';
+
+        foreach (mb_str_split($line) as $char) {
+            if ($piece !== '' && mb_strwidth($piece . $char) > $width) {
+                $pieces[] = $piece;
+                $piece = '';
+            }
+            $piece .= $char;
+        }
+
+        return [...$pieces, $piece];
     }
 
     /**

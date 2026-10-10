@@ -272,5 +272,25 @@ $summary = $summarize->invoke($overlay, ['command' => "rm -rf /\e[2J\e[H"], 200)
 check('the approval screen cannot be repainted from arguments', !str_contains($summary, "\e"), bin2hex($summary));
 check('the approval screen still shows the command', str_contains($summary, 'rm -rf /'));
 
+// What is approved is what is seen. The preview was cut at the box's width and
+// at 18 lines, with nothing to say so: the end of a long command — after a run
+// of spaces, or on its twenty-first line — was approved without being shown.
+$call = new App\Agent\Tool\ToolCall('c1', 'shell_exec', []);
+$def = new App\Agent\Tool\ToolDefinition('shell_exec', 'Run a command', [], App\Agent\Tool\Permission::CONFIRM, new stdClass());
+$padded = Terminal::plain($overlay->frame($call, $def, ['$ ls; ' . str_repeat(' ', 150) . 'rm -rf ~/projet'], 60));
+// The rows' contents, end to end: a wrapped line reads across them.
+$contents = implode('', array_map(
+    fn(string $row) => preg_match('/│ (.*) │/u', $row, $m) === 1 ? rtrim($m[1]) : '',
+    explode("\n", $padded),
+));
+check('the end of a long line is shown, wrapped rather than cut', str_contains($contents, 'rm -rf ~/projet'), $padded);
+
+$long = array_merge(['$ ' . str_repeat("echo ok\n", 1)], array_fill(0, 25, 'echo ok'), ['rm -rf ~/projet']);
+$tall = Terminal::plain($overlay->frame($call, $def, $long, 60));
+check('lines past what the box holds are said to be hidden, with how many', (bool) preg_match('/(\d+) more lines? not shown/', $tall), $tall);
+check('every row stays inside the box', max(array_map('mb_strwidth', explode("\n", rtrim($tall)))) <= 62, $tall);
+$tabbed = Terminal::plain($overlay->frame($call, $def, ["\$ a\t\t\t\t\t\t\t\t\t\tb"], 40));
+check('a tab is not a way to push text past the border', !str_contains($tabbed, "\t"), json_encode($tabbed));
+
 printf("\n%d passed, %d failed\n", $pass, $fail);
 exit($fail === 0 ? 0 : 1);
