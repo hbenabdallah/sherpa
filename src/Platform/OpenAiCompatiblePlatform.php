@@ -174,7 +174,9 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
             try {
                 return $this->consume($response, $forward, $onWait, $startedAt);
             } catch (StreamFailed $e) {
-                $this->waitBeforeRetry($e, $shown(), $try);
+                if (!$this->waitBeforeRetry($e, $shown(), $try, $onWait)) {
+                    return ['role' => 'assistant', 'content' => ''];
+                }
             }
         }
     }
@@ -205,14 +207,16 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
      * A stream the server gave up on is asked again — the same patience as
      * for a 503 — while it was a passing condition and nothing reached the
      * screen; a second reply would print after the first half.
+     *
+     * @return bool false when the user cut the wait short
      */
-    private function waitBeforeRetry(StreamFailed $e, bool $shown, int $try): void
+    private function waitBeforeRetry(StreamFailed $e, bool $shown, int $try, ?callable $onWait): bool
     {
         if (!$e->retryable || $shown || $try >= self::MAX_ATTEMPTS || $this->interrupt?->requested()) {
             throw $e;
         }
 
-        sleep(min(self::MAX_BACKOFF_SECONDS, 2 ** $try));
+        return $this->pause(min(self::MAX_BACKOFF_SECONDS, 2 ** $try), $this->name() . ' is overloaded', $onWait);
     }
 
     /**
@@ -894,7 +898,9 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
                 break;
             } catch (StreamFailed $e) {
                 $this->lastUsage = $stream->lastUsage();
-                $this->waitBeforeRetry($e, $shown(), $attempt);
+                if (!$this->waitBeforeRetry($e, $shown(), $attempt, $onWait)) {
+                    return ['role' => 'assistant', 'content' => ''];
+                }
             }
         }
 

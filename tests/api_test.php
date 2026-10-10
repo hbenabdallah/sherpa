@@ -561,6 +561,21 @@ try {
 }
 check('an overload after shown words is not retried', count($sentWords) === 1 && str_contains((string) $threw, 'overloaded'), (string) $threw);
 
+// Its wait is a rate limit's: said in the spinner, and Ctrl+C heard during it.
+$overload = fn() => sse([event(['error' => ['message' => 'Service temporarily overloaded']])]);
+[$sent, $waits, $said] = [[], [], []];
+$reply = patient([$overload(), sse([textChunk('fine now'), 'data: [DONE]' . "\n\n"])], $sent, $waits, $said);
+check('waiting out an overload says so', ($reply['content'] ?? '') === 'fine now' && str_starts_with($said[0] ?? '', 'api.example.com is overloaded, trying again in 2 s'), json_encode($said));
+$interrupt = new Interrupt();
+$interrupt->beginTurn();
+$sent = [];
+$client = new MockHttpClient(function () use (&$sent, $overload) { $sent[] = 1; return $overload(); });
+$platform = new OpenAiCompatiblePlatform($client, 'https://api.example.com/v1/', 'm', 'k', 64000, 30.0, $interrupt,
+    sleep: function () use ($interrupt) { $interrupt->request(); });
+$reply = $platform->stream([['role' => 'user', 'content' => 'x']], [], fn() => null);
+check('and Ctrl+C during that wait ends the turn, with no second request', count($sent) === 1 && ($reply['content'] ?? null) === '', json_encode([$sent, $reply]));
+$interrupt->endTurn();
+
 $sentOnce = [];
 $threw = null;
 try {
