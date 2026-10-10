@@ -45,7 +45,7 @@ class MemoryStore
     /** Share of the budget spent quoting facts; the rest indexes the leftovers. */
     private const DIGEST_DETAIL_SHARE = 0.75;
 
-    /** Room kept for the ", et N autres." that closes the index line. */
+    /** Room kept for the ", and N others." that closes the index line. */
     private const DIGEST_TAIL_RESERVE = 20;
 
     private ?Connection $conn = null;
@@ -212,7 +212,9 @@ class MemoryStore
         $overflow = [];
 
         foreach ($facts as $fact) {
-            $line = '- ' . $fact->key . ': ' . $this->elide($fact->value, self::DIGEST_MAX_VALUE);
+            // On one line: a value's own line breaks spilled into the list, and
+            // one of its lines starting with "- " read as another fact.
+            $line = '- ' . $fact->key . ': ' . $this->elide(self::oneLine($fact->value), self::DIGEST_MAX_VALUE);
 
             // Once one fact has overflowed, later ones follow it into the index
             // rather than jumping the queue because they happen to be shorter.
@@ -413,9 +415,14 @@ class MemoryStore
         }
 
         $rest = count($keys) - count($named);
-        $tail = $rest > 0 ? ($named === [] ? '' : ', ') . "et {$rest} autre" . ($rest > 1 ? 's' : '') : '';
+        $tail = $rest > 0 ? ($named === [] ? '' : ', ') . "and {$rest} other" . ($rest > 1 ? 's' : '') : '';
 
         return $prefix . implode(', ', $named) . $tail . '.';
+    }
+
+    private static function oneLine(string $value): string
+    {
+        return trim((string) preg_replace('/\s+/u', ' ', $value));
     }
 
     private function elide(string $value, int $max): string

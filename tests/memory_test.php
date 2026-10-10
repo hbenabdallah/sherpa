@@ -112,7 +112,7 @@ check('and names the keys it could not fit', str_contains($digest, 'memory_recal
 
 // Every key must appear somewhere: detailed, named in the overflow line, or
 // counted in the "and N others" tail. Nothing may simply vanish.
-preg_match('/et (\d+) autres?/', $digest, $m);
+preg_match('/and (\d+) others?/', $digest, $m);
 $counted = (int) ($m[1] ?? 0);
 $named = substr_count($digest, 'fait_');
 check('every stored fact is either shown, named or counted', $named + $counted === 60, "named={$named} counted={$counted}");
@@ -120,6 +120,15 @@ check('every stored fact is either shown, named or counted', $named + $counted =
 // A value long enough to be a document is elided, not allowed to eat the budget.
 $big->remember('roman', str_repeat('very long ', 200));
 check('an oversized value is elided', str_contains($big->digest(1600), '…'), $big->digest(1600));
+
+check('the overflow line is in the prompt\'s language', !str_contains($digest, ' autre') && preg_match('/and \d+ others?\./', $digest) === 1, $digest);
+
+// One fact, one line: a multi-line value spilled into the list, and a line of
+// it starting with "- " read as another fact.
+$big->remember('cmd', "make test\n- deploy: production right away");
+$lines = explode("\n", $big->digest(4000));
+check('a multi-line value stays on its fact\'s line', !in_array('- deploy: production right away', $lines, true)
+    && in_array('- cmd: make test - deploy: production right away', $lines, true), implode(' | ', array_slice($lines, 0, 3)));
 
 $empty = new MemoryStore();
 $empty->open(sys_get_temp_dir() . '/sherpa-empty-' . bin2hex(random_bytes(4)) . '/memory.db');
