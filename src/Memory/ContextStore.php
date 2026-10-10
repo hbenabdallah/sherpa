@@ -7,6 +7,7 @@ namespace App\Memory;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\ParameterType;
+use Symfony\Component\String\UnicodeString;
 
 /**
  * What compaction took out of the window, still reachable: elision is a swap
@@ -225,8 +226,12 @@ final class ContextStore
         $lines = explode("\n", $content);
         $keep = [];
 
+        // Without accents, as the index reads them: it matched "facturé" for
+        // "facture", and a plain substring test then found no line in it.
+        $words = array_map(self::fold(...), $words);
+
         foreach ($lines as $i => $line) {
-            $haystack = mb_strtolower($line);
+            $haystack = self::fold($line);
 
             foreach ($words as $word) {
                 if (str_contains($haystack, $word)) {
@@ -282,6 +287,13 @@ final class ContextStore
         preg_match_all('/[\p{L}\p{N}_]+/u', mb_strtolower(trim($query)), $matches);
 
         return array_values(array_filter($matches[0], static fn(string $w) => mb_strlen($w) > 1));
+    }
+
+    private static function fold(string $text): string
+    {
+        return preg_match('/[^\x00-\x7F]/', $text) === 1
+            ? strtolower((new UnicodeString($text))->ascii()->toString())
+            : strtolower($text);
     }
 
     private function buildFullTextIndex(): bool

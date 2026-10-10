@@ -385,6 +385,18 @@ check('a match-heavy excerpt is capped rather than returned whole',
 check('and the overflow is counted out loud',
     str_contains($flood, 'more matching'), substr($flood, -200));
 
+// The index ignores accents; the passages were cut by a plain substring match,
+// so "facture" found the excerpt holding "facturé", then no line in it.
+$accents = new App\Memory\ContextStore();
+$accents->open();
+$accents->keep('file_read', "ligne un\n// Le montant facturé au client\nligne trois");
+$found = $accents->search('facture', 2000);
+check('a search without the accents finds the passage with them', str_contains($found, 'facturé au client'), $found);
+$plain = new App\Memory\ContextStore();
+$plain->open();
+$plain->keep('file_read', "ligne un\n// total facture HT\nligne trois");
+check('and the other way round', str_contains($plain->search('facturé', 2000), 'total facture HT'), $plain->search('facturé', 2000));
+
 $transcript = json_encode($swapBag->all(), JSON_UNESCAPED_UNICODE);
 check('the stub tells the model how to get it back', str_contains($transcript, 'context_recall'), substr($transcript, 0, 400));
 check('and quotes the id to ask for', (bool) preg_match('/context_recall\(id: \d+\)/', $transcript), substr($transcript, 0, 400));
