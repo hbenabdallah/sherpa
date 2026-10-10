@@ -29,6 +29,9 @@ class FileReadTool
     /** Longest line shown whole: minified code is one line of a megabyte. */
     private const MAX_LINE_CHARS = 2000;
 
+    /** Entries named when a directory is asked for, before the rest are counted. */
+    private const DIRECTORY_ENTRIES = 40;
+
     public function __construct(
         private readonly ProjectPathResolver $paths = new ProjectPathResolver(),
         private readonly ?ContextBudget $budget = null,
@@ -50,9 +53,12 @@ class FileReadTool
         }
         // Models do ask for a directory — the project root, typically. file()
         // on one prints a PHP notice into the terminal and returns nothing,
-        // which read as a successful read of an empty file.
+        // which read as a successful read of an empty file. What it holds is
+        // said with the refusal: the next call can be the right read, rather
+        // than a list_dir first.
         if (is_dir($resolved)) {
-            throw new \RuntimeException("{$path} is a directory, not a file: use project_grep to find the file you want");
+            throw new \RuntimeException("{$path} is a directory, not a file. It holds:\n" . self::entries($resolved, $path)
+                . "\nRead one of these, or list_dir to look deeper.");
         }
         if (!is_readable($resolved)) {
             throw new \RuntimeException("file is not readable: {$path}");
@@ -88,5 +94,26 @@ class FileReadTool
         }
 
         return implode("\n", $numbered);
+    }
+
+    /** A directory's own entries, as paths to copy: subdirectories first, marked with a slash. */
+    private static function entries(string $dir, string $shown): string
+    {
+        $names = array_values(array_diff(scandir($dir) ?: [], ['.', '..']));
+        usort($names, fn(string $a, string $b) => [!is_dir("{$dir}/{$a}"), $a] <=> [!is_dir("{$dir}/{$b}"), $b]);
+
+        if ($names === []) {
+            return '  (nothing)';
+        }
+
+        $prefix = rtrim($shown, '/') === '' || rtrim($shown, '/') === '.' ? '' : rtrim($shown, '/') . '/';
+        $lines = array_map(
+            fn(string $name) => '  ' . $prefix . $name . (is_dir("{$dir}/{$name}") ? '/' : ''),
+            array_slice($names, 0, self::DIRECTORY_ENTRIES),
+        );
+
+        $more = count($names) - self::DIRECTORY_ENTRIES;
+
+        return implode("\n", $lines) . ($more > 0 ? "\n  … and {$more} more" : '');
     }
 }

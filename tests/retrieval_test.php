@@ -302,6 +302,22 @@ $directory = (new App\Agent\Tool\Toolbox([new App\Tool\FileReadTool($grepPaths)]
 check('reading a directory is an error, not an empty file',
     $directory->isError && str_contains($directory->content, 'is a directory'), $directory->content);
 
+// Seen in the bench: file_read on config/routes, then a list_dir to learn what
+// was in it. Said with the refusal, the next call can be the right read.
+mkdir($grepDir . '/src/Routes');
+file_put_contents($grepDir . '/src/Routes/courses.yaml', "courses: ~\n");
+$listed = (new App\Agent\Tool\Toolbox([new App\Tool\FileReadTool($grepPaths)]))
+    ->execute(new App\Agent\Tool\ToolCall('c5', 'file_read', ['path' => 'src']))->content;
+check('and it names what the directory holds, as paths to read', str_contains($listed, '  src/User.php') && str_contains($listed, '  src/Routes/'), $listed);
+check('subdirectories first', strpos($listed, 'src/Routes/') < strpos($listed, 'src/User.php'), $listed);
+for ($i = 0; $i < 45; $i++) {
+    touch(sprintf('%s/src/Routes/r%02d.yaml', $grepDir, $i));
+}
+$crowded = (new App\Agent\Tool\Toolbox([new App\Tool\FileReadTool($grepPaths)]))
+    ->execute(new App\Agent\Tool\ToolCall('c6', 'file_read', ['path' => 'src/Routes/']))->content;
+check('a crowded directory is cut and the rest counted', str_contains($crowded, '… and 6 more') && !str_contains($crowded, 'r44.yaml'), $crowded);
+exec('rm -rf ' . escapeshellarg($grepDir . '/src/Routes'));
+
 $before = $grepStore->searchStats()['groping'];
 $failedRead = new SearchTrace($grepStore);
 $failedRead->beginTurn();
