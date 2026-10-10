@@ -69,7 +69,7 @@ check('a heading with nothing under it is not a section, but stays in the path b
 
 $delivery = array_values(array_filter($doc->sections, fn($s) => ($s->headings[1] ?? '') === 'Delivery'))[0] ?? null;
 check('a table is kept as written', str_contains($delivery?->text ?? '', '| Paris | 2 days |'), $delivery?->text ?? '');
-check('line numbers point at the file: the section starts right under its heading', $delivery?->startLine === 18, (string) $livraison?->startLine);
+check('line numbers point at the file: the section starts right under its heading', $delivery?->startLine === 18, (string) $delivery?->startLine);
 
 // ---- HTML --------------------------------------------------------------------
 $html = <<<HTML
