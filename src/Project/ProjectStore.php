@@ -34,6 +34,9 @@ class ProjectStore
     /** What the file looked like when we last read or wrote it. */
     private ?string $fingerprint = null;
 
+    /** Why the last save did not reach the disk, until it is said. */
+    private ?string $writeError = null;
+
     private function load(): void
     {
         $this->projects = $this->read();
@@ -61,11 +64,21 @@ class ProjectStore
         return $projects;
     }
 
+    /**
+     * Written whole or not at all: in place, a second session reading during
+     * the write found an empty file, took it for no projects, and its own next
+     * save wrote back only the ones it had touched — every other project and
+     * its grants gone. A write that fails keeps its changes for the next save
+     * and says why once (takeWriteError), instead of a PHP warning over the
+     * screen and a session that believes it saved.
+     */
     private function save(): void
     {
         $dir = dirname($this->configFile);
-        if (!is_dir($dir)) {
-            mkdir($dir, 0755, true);
+        if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) {
+            $this->failedToWrite("cannot create {$dir}");
+
+            return;
         }
 
         // Re-read first: whatever another session wrote since we loaded is the
@@ -88,12 +101,35 @@ class ProjectStore
             $data['projects'][$slug] = $project->toArray();
         }
 
-        file_put_contents($this->configFile, Yaml::dump($data, 4, 2));
+        $tmp = $this->configFile . '.' . getmypid() . '.tmp';
+        if (@file_put_contents($tmp, Yaml::dump($data, 4, 2)) === false || !@rename($tmp, $this->configFile)) {
+            $why = error_get_last()['message'] ?? 'no reason given';
+            @unlink($tmp);
+            $this->failedToWrite($why);
 
+            return;
+        }
+
+        $this->writeError = null;
         $this->projects = $merged;
         $this->touched = [];
         $this->removed = [];
         $this->fingerprint = $this->fingerprintOfFile();
+    }
+
+    private function failedToWrite(string $why): void
+    {
+        $this->writeError = 'Could not save ' . $this->configFile . " ({$why}): this session's project changes "
+            . 'are kept in memory and saved at the next change, once the directory is writable again '
+            . '(make config-dir gives it back to you).';
+    }
+
+    /** Why the last save failed, once, or null when it did not. */
+    public function takeWriteError(): ?string
+    {
+        [$error, $this->writeError] = [$this->writeError, null];
+
+        return $error;
     }
 
     /**

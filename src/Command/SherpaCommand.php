@@ -305,6 +305,10 @@ class SherpaCommand extends Command
             // this session has been running on them since. It cannot adopt a
             // change made out there, so it says so once and leaves the decision
             // to restart to the user.
+            if (($writeError = $this->projectStore->takeWriteError()) !== null) {
+                $this->chat->showError($writeError);
+            }
+
             if (!$warnedAboutConfig && $this->projectStore->changedOnDisk()) {
                 $warnedAboutConfig = true;
                 $this->chat->showInfo(

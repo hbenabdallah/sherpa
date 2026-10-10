@@ -279,6 +279,54 @@ $rightProject = $right->adopt($rightDraft);
 check('two sessions drafting one directory end up in one project',
     $rightProject->slug === $leftProject->slug, "{$leftProject->slug} vs {$rightProject->slug}");
 
+// ---- writing projects.yaml -------------------------------------------------
+// Rewritten in place, a second session reading during the write found an empty
+// file, took it for no projects, and its next save wrote back only its own.
+$configFile = $home . '/.config/sherpa/projects.yaml';
+$reader = fopen($configFile, 'r');
+$inodeBefore = fstat($reader)['ino'];
+$contentBefore = file_get_contents($configFile);
+$writer = new ProjectStore(new StackDetector());
+$writer->create('Atomique', $fresh(), $none);
+clearstatcache();
+check('projects.yaml is replaced whole, not rewritten in place', fileinode($configFile) !== $inodeBefore);
+check('so a session reading during the write still has the whole file', stream_get_contents($reader) === $contentBefore);
+fclose($reader);
+check('and no temporary file is left behind', glob($home . '/.config/sherpa/*.tmp') === []);
+
+// A directory given to root by a container: the save fails, and says so.
+if (posix_getuid() !== 0) {
+    chmod($home . '/.config/sherpa', 0555);
+    $warnings = [];
+    // Those silenced with @ reach a handler too; PHP itself would not print them.
+    set_error_handler(function (int $no, string $message) use (&$warnings) {
+        if ((error_reporting() & $no) !== 0) {
+            $warnings[] = $message;
+        }
+
+        return true;
+    });
+    $locked = new ProjectStore(new StackDetector());
+    $locked->create('Verrouillé', $fresh(), $none);
+    restore_error_handler();
+    $error = $locked->takeWriteError();
+    check('a failed save prints no PHP warning over the screen', $warnings === [], json_encode($warnings));
+    check('it says why, naming the file', str_contains((string) $error, 'projects.yaml') && str_contains((string) $error, 'make config-dir'), (string) $error);
+    check('once', $locked->takeWriteError() === null);
+    check('and the file is untouched', !str_contains((string) file_get_contents($configFile), 'Verrouillé'));
+
+    chmod($home . '/.config/sherpa', 0755);
+    $locked->create('Ensuite', $fresh(), $none);
+    $saved = (string) file_get_contents($configFile);
+    check('the change it kept is saved with the next one, once writable again',
+        str_contains($saved, 'Verrouillé') && str_contains($saved, 'Ensuite') && $locked->takeWriteError() === null, $saved);
+    $locked->delete('verrouille');
+    $locked->delete('ensuite');
+} else {
+    echo " SKIP running as root, a read-only directory refuses nothing\n";
+}
+$writer->delete('atomique');
+
 // ---- reload ----------------------------------------------------------------
 $reopened = new ProjectStore(new StackDetector());
 check('projects survive a reload with their slugs intact', $reopened->get('editeur-d-essai')?->name === "Éditeur d'essai", json_encode(array_map(fn($p) => $p->slug, $reopened->all())));
