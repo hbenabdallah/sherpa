@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Session;
 
+use App\Agent\PlanMode;
 use App\Project\Project;
 
 /**
@@ -41,6 +42,14 @@ final class SessionStore
      */
     private ?string $title = null;
 
+    /**
+     * The file as this session last wrote or loaded it, by inode: every save
+     * replaces it with a new one. Another inode means another terminal wrote
+     * this conversation meanwhile — resumed in both, the last to save erased
+     * what the other had said since.
+     */
+    private ?int $inode = null;
+
     public function bind(Project $project): void
     {
         $this->dir = dirname(Project::defaultMemoryDb($project->slug)) . '/sessions';
@@ -68,6 +77,7 @@ final class SessionStore
         $this->id = null;
         $this->startedAt = null;
         $this->title = null;
+        $this->inode = null;
     }
 
     /** Carry on writing into a resumed conversation's own file. */
@@ -76,6 +86,7 @@ final class SessionStore
         $this->id = $session->id;
         $this->startedAt = $session->startedAt;
         $this->title = $session->title;
+        $this->inode = $this->dir === null ? null : $this->inodeOf($this->file($session->id));
     }
 
     public function currentId(): ?string
@@ -112,6 +123,14 @@ final class SessionStore
         }
 
         $now = new \DateTimeImmutable();
+
+        // Written meanwhile from elsewhere: both stay, this one in a file of
+        // its own under the same title, rather than one erasing the other.
+        if ($this->id !== null && $this->inodeOf($this->file($this->id)) !== $this->inode) {
+            $this->id = null;
+            $this->startedAt = null;
+        }
+
         $this->startedAt ??= $now;
         $this->id ??= $now->format('Ymd-His') . '-' . bin2hex(random_bytes(2));
 
@@ -145,6 +164,8 @@ final class SessionStore
 
             return false;
         }
+
+        $this->inode = $this->inodeOf($file);
 
         $this->prune();
 
@@ -210,6 +231,13 @@ final class SessionStore
         return $this->dir;
     }
 
+    private function inodeOf(string $file): ?int
+    {
+        clearstatcache(true, $file);
+
+        return @fileinode($file) ?: null;
+    }
+
     private function file(string $id): string
     {
         return $this->dir . '/' . $id . '.json';
@@ -251,7 +279,7 @@ final class SessionStore
     {
         foreach ($conversation as $message) {
             if (($message['role'] ?? '') === 'user') {
-                $text = trim((string) preg_replace('/\s+/', ' ', (string) ($message['content'] ?? '')));
+                $text = trim((string) preg_replace('/\s+/', ' ', PlanMode::unframe((string) ($message['content'] ?? ''))));
 
                 return mb_strlen($text) > 80 ? mb_substr($text, 0, 79) . '…' : $text;
             }

@@ -50,4 +50,10 @@ final class PlanMode
     {
         return $this->active ? self::REMINDER . $request : $request;
     }
+
+    /** The request as the user typed it, for showing it back: a title, a summary. */
+    public static function unframe(string $message): string
+    {
+        return str_starts_with($message, self::REMINDER) ? substr($message, strlen(self::REMINDER)) : $message;
+    }
 }

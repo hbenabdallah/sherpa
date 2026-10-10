@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Session;
 
+use App\Agent\PlanMode;
+
 /**
  * One conversation as it was left: what was said, and what compaction had put
  * aside.
@@ -40,7 +42,7 @@ final class SavedSession
     {
         for ($i = count($this->messages) - 1; $i >= 0; $i--) {
             if (($this->messages[$i]['role'] ?? '') === 'user') {
-                return (string) ($this->messages[$i]['content'] ?? '');
+                return PlanMode::unframe((string) ($this->messages[$i]['content'] ?? ''));
             }
         }
 

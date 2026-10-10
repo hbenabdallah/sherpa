@@ -122,6 +122,48 @@ check('a project keeps its ' . SessionStore::KEEP . ' most recent conversations'
 check('and the one being written is never among those removed',
     $store->load((string) $store->currentId()) !== null);
 
+// ---- a conversation started in plan mode -----------------------------------
+// The request reaches the model behind plan mode's reminder, and the reminder
+// became the title: every planned conversation listed under the same words.
+$planned = (new App\Agent\PlanMode());
+$planned->on();
+$store->startNew();
+$store->save([$system, ['role' => 'user', 'content' => $planned->frame('Migrer les factures vers Stripe')]], [], 'api', 'm');
+$plannedSession = $store->load((string) $store->currentId());
+check('a conversation started in plan mode is titled by its request, not the reminder',
+    $plannedSession?->title === 'Migrer les factures vers Stripe', (string) $plannedSession?->title);
+check('and its last question reads as asked', $plannedSession?->lastQuestion() === 'Migrer les factures vers Stripe', (string) $plannedSession?->lastQuestion());
+check('while the model, on resume, still gets what it was sent',
+    str_starts_with((string) ($plannedSession?->messages[0]['content'] ?? ''), '[Plan mode'), (string) ($plannedSession?->messages[0]['content'] ?? ''));
+
+// ---- two terminals on one conversation -------------------------------------
+// Both resumed it and both wrote its file after every turn: whichever wrote
+// last erased what the other had said since.
+$shared = [$system, ['role' => 'user', 'content' => 'Conversation partagée']];
+$first = new SessionStore();
+$first->bind($project);
+$first->save($shared, [], 'api', 'm');
+$sharedId = (string) $first->currentId();
+
+$second = new SessionStore();
+$second->bind($project);
+$second->adopt($second->load($sharedId));
+usleep(10_000);
+$second->save([...$shared, ['role' => 'user', 'content' => 'dit dans le second terminal']], [], 'api', 'm');
+
+usleep(10_000);
+$first->save([...$shared, ['role' => 'user', 'content' => 'dit dans le premier']], [], 'api', 'm');
+$kept = $first->load($sharedId);
+check('a conversation written meanwhile by another terminal is not overwritten',
+    str_contains(json_encode($kept?->messages, JSON_UNESCAPED_UNICODE), 'dit dans le second terminal'), json_encode($kept?->messages, JSON_UNESCAPED_UNICODE));
+check('this terminal carries on in a file of its own, under the same title',
+    $first->currentId() !== $sharedId && $first->load((string) $first->currentId())?->title === 'Conversation partagée'
+    && str_contains(json_encode($first->load((string) $first->currentId())?->messages, JSON_UNESCAPED_UNICODE), 'dit dans le premier'),
+    (string) $first->currentId());
+$before = $first->currentId();
+$first->save([...$shared, ['role' => 'user', 'content' => 'dit dans le premier'], ['role' => 'user', 'content' => 'encore']], [], 'api', 'm');
+check('and keeps writing there afterwards', $first->currentId() === $before);
+
 // ---- the excerpts compaction set aside -------------------------------------
 $excerpts = new ContextStore();
 $excerpts->open();
