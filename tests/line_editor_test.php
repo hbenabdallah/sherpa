@@ -213,5 +213,39 @@ foreach ([LineBuffer::PASTE_START, ...str_split($log), LineBuffer::PASTE_END] as
 }
 check('a bracketed paste is folded the same way', $b->text() === '[Pasted text #1 +25 lines]', json_encode($b->text()));
 
+// ---- the history file -----------------------------------------------------------
+// Two terminals: the last to exit wrote its own list back, and what the other
+// had typed was gone. And the file holds everything ever typed at the prompt.
+$realHome = $_SERVER['HOME'] ?? null;
+$_SERVER['HOME'] = sys_get_temp_dir() . '/sherpa-hist-' . bin2hex(random_bytes(4));
+$editor = function (): App\TUI\LineEditor {
+    $e = new App\TUI\LineEditor();
+    (new ReflectionMethod($e, 'loadPlainHistory'))->invoke($e);
+
+    return $e;
+};
+$type = function (App\TUI\LineEditor $e, string $line): void {
+    $p = new ReflectionProperty($e, 'history');
+    $p->setValue($e, [...$p->getValue($e), $line]);
+};
+$first = $editor();
+$second = $editor();
+$type($first, 'dit dans le premier');
+$type($second, "dit dans le second\nsur deux lignes");
+$first->saveHistory();
+$second->saveHistory();
+$file = $_SERVER['HOME'] . '/.config/sherpa/history';
+$kept = (string) @file_get_contents($file);
+check('two terminals keep both their histories', str_contains($kept, 'dit dans le premier') && str_contains($kept, 'dit dans le second'), $kept);
+check('a message of several lines is still one entry', substr_count(trim($kept), "\n") === 1, json_encode($kept));
+check('the history is readable by its owner only', (fileperms($file) & 0777) === 0600, sprintf('%o', fileperms($file) & 0777));
+$second->saveHistory();
+check('saving twice adds nothing twice', substr_count((string) file_get_contents($file), 'dit dans le second') === 1, (string) file_get_contents($file));
+check('a third terminal reads both back', in_array('dit dans le premier', (new ReflectionProperty(App\TUI\LineEditor::class, 'history'))->getValue($editor()), true));
+exec('rm -rf ' . escapeshellarg($_SERVER['HOME']));
+if ($realHome !== null) {
+    $_SERVER['HOME'] = $realHome;
+}
+
 printf("\n%d passed, %d failed\n", $pass, $fail);
 exit($fail === 0 ? 0 : 1);

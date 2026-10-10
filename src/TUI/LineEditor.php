@@ -37,6 +37,9 @@ class LineEditor
 
     private bool $historyLoaded = false;
 
+    /** Entries the history held when read: what follows was typed here. */
+    private int $historyRead = 0;
+
     /** Past lines, oldest first, when there is no libreadline to keep them. */
     private array $history = [];
 
@@ -218,15 +221,33 @@ class LineEditor
             return;
         }
 
-        if ($this->historyLoaded) {
-            // One line per entry — the format GNU readline writes too, so the
-            // same history reads back whichever PHP runs Sherpa next time.
-            // A message of several lines is one entry, its breaks written as ␤.
-            $entries = array_map(fn(string $e) => str_replace("\n", self::NEWLINE_IN_HISTORY, $e), $this->history);
-            @file_put_contents($file, implode("\n", $entries) . ($entries === [] ? '' : "\n"));
+        if (!$this->historyLoaded) {
+            return;
         }
 
-        $this->truncateHistory($file);
+        // What is on disk now, plus what was typed here: another terminal on
+        // the same machine saved its own meanwhile, and writing this list back
+        // whole erased it.
+        $entries = $this->readHistory($file);
+        foreach (array_slice($this->history, $this->historyRead) as $typed) {
+            if (end($entries) !== $typed) {
+                $entries[] = $typed;
+            }
+        }
+        $entries = array_slice($entries, -self::MAX_HISTORY);
+        $this->historyRead = count($this->history);
+
+        // One line per entry — the format GNU readline writes too, so the
+        // same history reads back whichever PHP runs Sherpa next time. A
+        // message of several lines is one entry, its breaks written as ␤.
+        // Whole or not at all, and for its owner only: it holds everything
+        // ever typed at the prompt.
+        $lines = array_map(fn(string $e) => str_replace("\n", self::NEWLINE_IN_HISTORY, $e), $entries);
+        $tmp = $file . '.' . getmypid() . '.tmp';
+        if (@file_put_contents($tmp, implode("\n", $lines) . ($lines === [] ? '' : "\n")) === false
+            || !@chmod($tmp, 0600) || !@rename($tmp, $file)) {
+            @unlink($tmp);
+        }
     }
 
     /**
@@ -442,14 +463,8 @@ class LineEditor
         $this->historyLoaded = true;
 
         $file = $this->historyFile();
-        if ($file === null || !is_file($file)) {
-            return;
-        }
-
-        $lines = @file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        $this->history = is_array($lines)
-            ? array_map(fn(string $e) => str_replace(self::NEWLINE_IN_HISTORY, "\n", $e), array_slice(array_values($lines), -self::MAX_HISTORY))
-            : [];
+        $this->history = $file === null ? [] : $this->readHistory($file);
+        $this->historyRead = count($this->history);
     }
 
     private function decorate(string $label, string $colour): string
@@ -488,14 +503,13 @@ class LineEditor
         return $home . '/.config/sherpa/history';
     }
 
-    /** PHP exposes no binding for history_truncate_file(), so trim by hand. */
-    private function truncateHistory(string $file): void
+    /** @return list<string> the entries on disk, line breaks restored */
+    private function readHistory(string $file): array
     {
-        $lines = @file($file, FILE_IGNORE_NEW_LINES);
-        if ($lines === false || count($lines) <= self::MAX_HISTORY) {
-            return;
-        }
+        $lines = is_file($file) ? @file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) : false;
 
-        @file_put_contents($file, implode("\n", array_slice($lines, -self::MAX_HISTORY)) . "\n");
+        return is_array($lines)
+            ? array_map(fn(string $e) => str_replace(self::NEWLINE_IN_HISTORY, "\n", $e), array_slice(array_values($lines), -self::MAX_HISTORY))
+            : [];
     }
 }
