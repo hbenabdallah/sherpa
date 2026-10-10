@@ -173,6 +173,16 @@ check('and so does which arguments are required',
     ($definition?->parameters['text']['required'] ?? null) === true && ($definition?->parameters['fois']['required'] ?? null) === false,
     json_encode($definition?->parameters));
 
+// What the server says of a parameter beyond its type reaches the model: an
+// array's items, a closed list of values. OpenAI refuses the whole request over
+// an array schema without items — one MCP tool then failed every turn.
+$sent = $definition?->toFunctionSchema()['function']['parameters']['properties'] ?? [];
+check('an array parameter keeps its items', ($sent['tags']['items']['type'] ?? null) === 'string', json_encode($sent['tags'] ?? null));
+check('an enum keeps its values', ($sent['ton']['enum'] ?? null) === ['calme', 'fort'], json_encode($sent['ton'] ?? null));
+check('an array declared without items is given some, so the request is not refused',
+    isset($sent['brut']['items']) && json_encode($sent['brut']['items']) === '{}', json_encode($sent['brut'] ?? null));
+check('and a native tool\'s schema is unchanged', array_keys($sent['fois'] ?? []) === ['type', 'description'], json_encode($sent['fois'] ?? null));
+
 // Through the Toolbox, which is how the agent actually calls it — including the
 // argument coercion, since a model writes "2" as readily as 2.
 $result = $toolbox->execute(new ToolCall(id: 'c1', name: 'mcp__demo__echo', arguments: ['text' => 'salut', 'fois' => '2']));

@@ -253,10 +253,14 @@ class McpRegistry
 
     /**
      * JSON Schema as the server sends it, in the shape ToolDefinition expects.
+     * What it says beyond type and description — an array's items, an enum,
+     * nested properties, bounds — travels as is under 'schema': cut, the model
+     * guessed at values, and OpenAI refused every request over an array schema
+     * with no items. One without is given an open one.
      *
      * @param array<string, mixed> $schema
      *
-     * @return array<string, array{type: string, description: string, required: bool}>
+     * @return array<string, array{type: string, description: string, required: bool, schema: array<string, mixed>}>
      */
     private function parameters(array $schema): array
     {
@@ -268,10 +272,17 @@ class McpRegistry
         foreach ($properties as $name => $spec) {
             $spec = is_array($spec) ? $spec : [];
 
+            $type = $this->type($spec['type'] ?? 'string');
+            $extra = array_diff_key($spec, ['type' => true, 'description' => true]);
+            if ($type === 'array' && !isset($extra['items'])) {
+                $extra['items'] = new \stdClass();
+            }
+
             $parameters[(string) $name] = [
-                'type'        => $this->type($spec['type'] ?? 'string'),
+                'type'        => $type,
                 'description' => (string) ($spec['description'] ?? ''),
                 'required'    => in_array((string) $name, $required, true),
+                'schema'      => $extra,
             ];
         }
 

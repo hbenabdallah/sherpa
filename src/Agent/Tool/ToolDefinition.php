@@ -18,10 +18,11 @@ final class ToolDefinition
         $required = [];
 
         foreach ($this->parameters as $name => $param) {
+            // 'schema': the rest of an MCP server's JSON Schema for it.
             $properties[$name] = [
                 'type'        => $param['type'],
                 'description' => $param['description'],
-            ];
+            ] + ($param['schema'] ?? []);
             if ($param['required'] ?? false) {
                 $required[] = $name;
             }
