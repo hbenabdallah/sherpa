@@ -161,8 +161,11 @@ class ChatPane
      * chose to think — with no way to tell a slow model from a hung one. Drawn
      * on its own line with \r and erased before any real output, so it never
      * ends up in the scrollback.
+     *
+     * @param string|null $why what is awaited instead of the model — a rate
+     *                         limit — said as is
      */
-    public function showWaiting(bool $reasoning = false): void
+    public function showWaiting(bool $reasoning = false, ?string $why = null): void
     {
         $now = microtime(true);
         if ($this->waiting && $now - $this->lastWaitFrame < self::WAIT_FRAME_SECONDS) {
@@ -171,7 +174,7 @@ class ChatPane
 
         $this->lastWaitFrame = $now;
         $this->waiting = true;
-        $this->showSpinner($reasoning ? 'Sherpa is reasoning…' : 'Sherpa is thinking…');
+        $this->showSpinner($why ?? ($reasoning ? 'Sherpa is reasoning…' : 'Sherpa is thinking…'));
     }
 
     private function endWaiting(): void

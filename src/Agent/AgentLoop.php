@@ -177,7 +177,7 @@ class AgentLoop
                 $this->chat->appendToken($token);
                 $buffer .= $token;
             },
-            onWait: fn(bool $reasoning) => $this->chat->showWaiting($reasoning),
+            onWait: fn(bool $reasoning, ?string $why = null) => $this->chat->showWaiting($reasoning, $why),
         );
 
         $this->learnFrom($bag, $toolSchemas);

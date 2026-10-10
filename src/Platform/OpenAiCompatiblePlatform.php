@@ -37,6 +37,15 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
     /** Longest wait between those attempts, whatever Retry-After asks for. */
     private const MAX_BACKOFF_SECONDS = 20;
 
+    /**
+     * A rate limit counts requests over a window, a minute on most free tiers:
+     * three tries within half a minute all land in the same window, and the
+     * turn is lost for want of waiting. More tries, longer waits, for a 429 only.
+     */
+    private const RATE_LIMIT_ATTEMPTS = 5;
+
+    private const MAX_RATE_LIMIT_WAIT_SECONDS = 60;
+
     /** @var array{prompt: int, completion: int}|null */
     private ?array $lastUsage = null;
 
@@ -96,6 +105,8 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
         private readonly int $maxTokens = 4096,
         /** What to call this backend in a message; the host, by default. */
         private readonly ?string $label = null,
+        /** How a wait passes, in seconds; tests make it instant. */
+        private readonly ?\Closure $sleep = null,
     ) {
         $this->baseUrl = rtrim($this->baseUrl, '/');
     }
@@ -128,7 +139,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
      *
      * @param array<string, mixed>          $payload
      * @param (callable(string): void)|null $onToken
-     * @param (callable(bool): void)|null   $onWait
+     * @param (callable(bool, ?string=): void)|null $onWait
      *
      * @return array<string, mixed>
      */
@@ -296,29 +307,72 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
             }
 
             $status = $this->statusOf($response);
+            $limited = $status === 429;
 
-            if (!in_array($status, [429, 500, 502, 503, 504, 529], true) || $attempt >= self::MAX_ATTEMPTS) {
+            if (!in_array($status, [429, 500, 502, 503, 504, 529], true)
+                || $attempt >= ($limited ? self::RATE_LIMIT_ATTEMPTS : self::MAX_ATTEMPTS)) {
                 return $response;
             }
 
-            $wait = $this->retryAfter($response, $attempt);
+            $wait = $this->retryAfter($response, $attempt, $limited);
+            if ($wait === null) {
+                return $response;
+            }
             $response->cancel();
 
-            if ($this->interrupt?->requested()) {
+            if (!$this->pause($wait, $limited ? 'Rate limit reached' : $this->name() . ' is failing', $onWait)) {
                 return $response;
             }
-
-            sleep($wait);
         }
     }
 
-    private function retryAfter(\Symfony\Contracts\HttpClient\ResponseInterface $response, int $attempt): int
+    /**
+     * Seconds to wait before the next attempt: what Retry-After asks — a number
+     * or an HTTP date — or a doubling backoff, starting higher for a rate limit
+     * since its window is usually a minute. Null for a rate limit that asks for
+     * longer than that: a quota spent for the day, not worth waiting at a prompt.
+     */
+    private function retryAfter(\Symfony\Contracts\HttpClient\ResponseInterface $response, int $attempt, bool $limited): ?int
     {
-        $header = $response->getHeaders(throw: false)['retry-after'][0] ?? null;
+        $header = trim((string) ($response->getHeaders(throw: false)['retry-after'][0] ?? ''));
 
-        $asked = is_numeric($header) ? (int) $header : 2 ** $attempt;
+        $asked = match (true) {
+            is_numeric($header)                       => (int) ceil((float) $header),
+            $header !== '' && strtotime($header) > 0  => strtotime($header) - time(),
+            default                                   => null,
+        };
+        $cap = $limited ? self::MAX_RATE_LIMIT_WAIT_SECONDS : self::MAX_BACKOFF_SECONDS;
 
-        return max(1, min(self::MAX_BACKOFF_SECONDS, $asked));
+        if ($asked === null) {
+            return min($cap, ($limited ? 5 : 1) * 2 ** $attempt);
+        }
+
+        return $limited && $asked > $cap ? null : max(1, min($cap, $asked));
+    }
+
+    /**
+     * Wait, half a second at a time: the spinner says what is awaited and for
+     * how long, and Ctrl+C is heard — a minute is too long to be deaf.
+     *
+     * @return bool false when the user cut it short
+     */
+    private function pause(int $seconds, string $why, ?callable $onWait): bool
+    {
+        $sleep = $this->sleep ?? static fn(float $s) => usleep((int) ($s * 1_000_000));
+
+        for ($left = (float) $seconds; $left > 0; $left -= self::POLL_SECONDS) {
+            if ($this->interrupt?->requested()) {
+                return false;
+            }
+
+            if ($onWait !== null) {
+                $onWait(false, sprintf('%s, trying again in %d s…', $why, (int) ceil($left)));
+            }
+
+            $sleep(min(self::POLL_SECONDS, $left));
+        }
+
+        return !$this->interrupt?->requested();
     }
 
     /**
@@ -404,7 +458,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
             $status === 401 => 'Key refused by ' . $this->name(),
             $status === 403 => 'Access refused by ' . $this->name(),
             $status === 404 => 'Model or address unknown to ' . $this->name(),
-            $status === 429 => 'Quota or rate exceeded on ' . $this->name(),
+            $status === 429 => 'Rate limit or quota reached on ' . $this->name(),
             $status >= 500  => 'Failure on ' . $this->name() . "'s side",
             $status === 0   => $this->name() . ' unreachable',
             default         => 'Request refused by ' . $this->name(),

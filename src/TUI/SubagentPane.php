@@ -30,7 +30,7 @@ final class SubagentPane extends ChatPane
         $this->stopSpinning();
     }
 
-    public function showWaiting(bool $reasoning = false): void
+    public function showWaiting(bool $reasoning = false, ?string $why = null): void
     {
         if (microtime(true) - $this->lastFrame < self::SPINNER_EVERY) {
             return;

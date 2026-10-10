@@ -348,6 +348,69 @@ $msg = $rateLimited->stream([]);
 check('a rate limit is waited out and the request repeated', ($msg['content'] ?? '') === 'enfin', json_encode($msg));
 check('and the wait was the one the server asked for', microtime(true) - $started >= 1.0);
 
+// A rate limit counts requests over a window, a minute on most free tiers:
+// waited out with more patience than a server error, and without the 20 s cap.
+// A platform whose waits are noted rather than slept.
+function patient(array $responses, array &$sent, array &$waits, array &$said, ?Interrupt $interrupt = null): array
+{
+    $client = new MockHttpClient(function ($method, $url, $options) use (&$responses, &$sent) {
+        $sent[] = $url;
+
+        return array_shift($responses) ?? new MockResponse('data: [DONE]' . "\n");
+    });
+    $platform = new OpenAiCompatiblePlatform($client, 'https://api.example.com/v1/', 'un-modele', 'k', 64000, 30.0, $interrupt,
+        sleep: function (float $seconds) use (&$waits) { $waits[] = $seconds; });
+
+    try {
+        return $platform->stream([['role' => 'user', 'content' => 'x']], [], fn() => null,
+            function (bool $reasoning, ?string $why = null) use (&$said) { if ($why !== null) { $said[] = $why; } });
+    } catch (RuntimeException $e) {
+        return ['error' => $e->getMessage()];
+    }
+}
+$limit = fn(array $headers = []) => new MockResponse('{"error":{"message":"Too Many Requests"}}', ['http_code' => 429, 'response_headers' => $headers]);
+$ok = fn() => sse([textChunk('passé'), 'data: [DONE]' . "\n\n"]);
+
+[$sent, $waits, $said] = [[], [], []];
+$reply = patient([$limit(), $limit(), $limit(), $limit(), $ok()], $sent, $waits, $said);
+check('four rate limits in a row are waited out, where three tries gave up', ($reply['content'] ?? '') === 'passé' && count($sent) === 5, json_encode($reply));
+check('with a backoff that reaches past a minute in all', array_sum($waits) >= 60, (string) array_sum($waits));
+
+[$sent, $waits, $said] = [[], [], []];
+$reply = patient([$limit(), $limit(), $limit(), $limit(), $limit()], $sent, $waits, $said);
+check('five are reported, not retried forever', count($sent) === 5 && str_contains($reply['error'] ?? '', 'Rate limit or quota reached'), json_encode($reply));
+
+[$sent, $waits, $said] = [[], [], []];
+$reply = patient([$limit(['retry-after' => '45']), $ok()], $sent, $waits, $said);
+check('a Retry-After of 45 s is honoured, not cut to 20', abs(array_sum($waits) - 45) < 0.01, (string) array_sum($waits));
+check('and the wait is said, with what is left', ($said[0] ?? '') === 'Rate limit reached, trying again in 45 s…' && in_array('Rate limit reached, trying again in 1 s…', $said, true), json_encode(array_slice($said, 0, 2)));
+
+[$sent, $waits, $said] = [[], [], []];
+$reply = patient([$limit(['retry-after' => gmdate('D, d M Y H:i:s', time() + 30) . ' GMT']), $ok()], $sent, $waits, $said);
+check('a Retry-After given as a date is read too', ($reply['content'] ?? '') === 'passé' && array_sum($waits) >= 28 && array_sum($waits) <= 31, (string) array_sum($waits));
+
+// A quota spent for the day says so at once: an hour is not waited at a prompt.
+[$sent, $waits, $said] = [[], [], []];
+$reply = patient([$limit(['retry-after' => '3600']), $ok()], $sent, $waits, $said);
+check('a rate limit asking for an hour is reported at once', count($sent) === 1 && $waits === [] && str_contains($reply['error'] ?? '', 'Rate limit or quota reached'), json_encode($reply));
+
+// A minute is too long to be deaf: Ctrl+C during the wait ends it.
+$interrupt = new Interrupt();
+$interrupt->beginTurn();
+[$sent, $waits, $said] = [[], [], []];
+$client = new MockHttpClient(function () use (&$sent) { $sent[] = 1; return new MockResponse('{}', ['http_code' => 429, 'response_headers' => ['retry-after' => '60']]); });
+$platform = new OpenAiCompatiblePlatform($client, 'https://api.example.com/v1/', 'm', 'k', 64000, 30.0, $interrupt,
+    sleep: function (float $seconds) use (&$waits, $interrupt) { $waits[] = $seconds; if (count($waits) === 3) { $interrupt->request(); } });
+$reply = $platform->stream([['role' => 'user', 'content' => 'x']], [], fn() => null);
+check('Ctrl+C during a rate-limit wait stops it there', count($waits) === 3 && count($sent) === 1 && ($reply['content'] ?? null) === '', json_encode([$waits, $reply]));
+$interrupt->endTurn();
+
+// A server error keeps its shorter patience: three tries, 20 s at most.
+[$sent, $waits, $said] = [[], [], []];
+$down = fn() => new MockResponse('{"error":{"message":"down"}}', ['http_code' => 503, 'response_headers' => ['retry-after' => '45']]);
+$reply = patient([$down(), $down(), $down(), $ok()], $sent, $waits, $said);
+check('a 503 is still tried three times, each wait capped at 20 s', count($sent) === 3 && abs(array_sum($waits) - 40) < 0.01, json_encode([count($sent), array_sum($waits)]));
+
 // ---- 7. Ctrl+C -------------------------------------------------------------
 $interrupt = new Interrupt();
 $interrupt->beginTurn();

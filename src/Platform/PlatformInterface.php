@@ -32,13 +32,15 @@ interface PlatformInterface
      * One request, delivered as it is produced. $onToken takes each text
      * fragment, the return value is the whole assistant message, and $onWait
      * fires while no text arrives — a silence of a second on a hosted API and
-     * of minutes on a laptop CPU. No $onToken makes it blocking, as the
+     * of minutes on a laptop CPU. Its first argument says whether the model is
+     * reasoning; a second, when given, says what else is awaited — a rate
+     * limit, and for how long. No $onToken makes it blocking, as the
      * background passes want; this path is the only one that polls for Ctrl+C.
      *
      * @param array<int, array<string, mixed>> $messages
      * @param array<int, array<string, mixed>> $tools
      * @param (callable(string): void)|null    $onToken
-     * @param (callable(bool): void)|null      $onWait
+     * @param (callable(bool, ?string=): void)|null $onWait
      *
      * @return array<string, mixed>
      */
