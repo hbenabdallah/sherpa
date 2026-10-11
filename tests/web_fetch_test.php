@@ -41,6 +41,12 @@ $web = new MockHttpClient(function (string $method, string $url) use (&$requests
         'https://example.test/logo.png' => $page("\x89PNG....", 'image/png'),
         'https://example.test/missing' => $page('not here', 'text/html', 404),
         'https://example.test/long' => $page('<p>' . str_repeat('word ', 5000) . '</p>'),
+        'https://example.test/moved' => new MockResponse('', ['http_code' => 301, 'response_headers' => ['location' => '/notes.txt']]),
+        'https://example.test/to-metadata' => new MockResponse('', ['http_code' => 302, 'response_headers' => ['location' => 'http://169.254.169.254/latest/meta-data/']]),
+        'https://example.test/to-localhost' => new MockResponse('', ['http_code' => 302, 'response_headers' => ['location' => 'http://localhost:8080/admin']]),
+        'https://example.test/loop' => new MockResponse('', ['http_code' => 302, 'response_headers' => ['location' => 'https://example.test/loop']]),
+        'http://localhost:8080/start' => new MockResponse('', ['http_code' => 302, 'response_headers' => ['location' => '/admin']]),
+        'http://localhost:8080/admin', 'http://169.254.169.254/latest/meta-data/' => $page('SECRET_INTERNAL', 'text/plain'),
         'https://example.test/latin1' => $page(mb_convert_encoding('<p>Café crème</p>', 'ISO-8859-1', 'UTF-8'), 'text/html; charset=ISO-8859-1'),
         default => $page('?', 'text/plain', 500),
     };
@@ -72,6 +78,32 @@ foreach ([
     }
     check($label, $message !== null && str_contains($message, $expected), (string) $message);
 }
+
+// ---- redirections ----------------------------------------------------------------
+// The user approves one address. A public page redirecting to the machine's own
+// services, or to a cloud's metadata endpoint, had that read instead — and sent
+// on to the model's provider.
+check('a redirect is followed', str_contains($fetch('https://example.test/moved'), 'line one'));
+foreach ([
+    'a redirect from the web to a cloud metadata address is refused' => 'https://example.test/to-metadata',
+    'and to localhost'                                                => 'https://example.test/to-localhost',
+] as $label => $url) {
+    $message = null;
+    try {
+        $fetch($url);
+    } catch (RuntimeException $e) {
+        $message = $e->getMessage();
+    }
+    check($label, $message !== null && str_contains($message, 'redirect') && !str_contains($message, 'SECRET_INTERNAL'), (string) $message);
+}
+check('while a local address the user asked for may redirect within itself', str_contains($fetch('http://localhost:8080/start'), 'SECRET_INTERNAL'));
+$message = null;
+try {
+    $fetch('https://example.test/loop');
+} catch (RuntimeException $e) {
+    $message = $e->getMessage();
+}
+check('a redirect loop ends', $message !== null && str_contains($message, 'redirect'), (string) $message);
 
 // ---- a long page, read in parts -------------------------------------------------
 $before = $requests;

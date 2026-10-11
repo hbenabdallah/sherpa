@@ -170,6 +170,20 @@ check('nor pages and text that belong to the application — public/, templates/
     !in_array('public/index.html', $listed, true) && !in_array('templates/mail.html', $listed, true) && !in_array('app/assets/aide.txt', $listed, true),
     json_encode($listed));
 check('nor other people\'s documents, nor test fixtures', !in_array('vendor/lib/README.md', $listed, true) && !in_array('tests/fixtures/faux/README.md', $listed, true));
+
+// A symlink named like documentation is indexed for what it points to: a
+// repository's docs/notes.md -> ~/.aws/credentials went into the index, and
+// doc_search — which asks nobody — handed it to the model.
+$secret = sys_get_temp_dir() . '/sherpa-outside-' . bin2hex(random_bytes(4));
+file_put_contents($secret, "aws_secret_access_key = OUTSIDE_SECRET\n");
+symlink($secret, $tree . '/docs/credentials.md');
+symlink($tree . '/README.md', $tree . '/docs/readme-lien.md');
+$listed = (new App\Rag\DocSource())->files($tree);
+check('a symlink to a file outside the project is not documentation', !in_array('docs/credentials.md', $listed, true), json_encode($listed));
+check('one to a file inside it still is', in_array('docs/readme-lien.md', $listed, true), json_encode($listed));
+exec('git -C ' . escapeshellarg($tree) . ' init -q 2>&1 && git -C ' . escapeshellarg($tree) . ' add -A 2>&1');
+check('git listing it changes nothing', !in_array('docs/credentials.md', (new App\Rag\DocSource())->files($tree), true));
+unlink($secret);
 exec('rm -rf ' . escapeshellarg($tree));
 
 printf("\n%d passed, %d failed\n", $pass, $fail);

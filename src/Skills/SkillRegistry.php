@@ -9,6 +9,7 @@ class SkillRegistry
 
     private string $globalDir;
     private ?string $projectDir = null;
+    private ?string $projectRoot = null;
 
     public function __construct()
     {
@@ -18,6 +19,7 @@ class SkillRegistry
     public function setProjectPath(string $projectPath): void
     {
         $this->projectDir = $projectPath . '/.sherpa/skills';
+        $this->projectRoot = $projectPath;
     }
 
     public function load(): void
@@ -25,18 +27,31 @@ class SkillRegistry
         $this->skills = [];
         $this->loadDir($this->globalDir);
         if ($this->projectDir !== null) {
-            $this->loadDir($this->projectDir);
+            $this->loadDir($this->projectDir, $this->projectRoot);
         }
     }
 
-    private function loadDir(string $dir): void
+    /**
+     * @param string|null $within the project, for its skills: skill_load hands
+     *                            a skill's text to the model without asking,
+     *                            and a symlink in .sherpa/skills/ pointing at
+     *                            ~/.ssh/id_rsa was a skill like any other
+     */
+    private function loadDir(string $dir, ?string $within = null): void
     {
         if (!is_dir($dir)) {
             return;
         }
 
-        foreach (glob($dir . '/*.md') as $file) {
-            $content = file_get_contents($file);
+        $root = $within === null ? null : realpath($within);
+
+        foreach (glob($dir . '/*.md') ?: [] as $file) {
+            $real = realpath($file);
+            if ($within !== null && ($real === false || $root === false || !str_starts_with($real, $root . '/'))) {
+                continue;
+            }
+
+            $content = (string) file_get_contents($file);
             $name = basename($file, '.md');
             $description = $this->extractFirstLine($content);
 

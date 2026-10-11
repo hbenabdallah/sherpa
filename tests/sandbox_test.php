@@ -123,6 +123,20 @@ $target = $outside . '/pwned.txt';
 $exec('file_write', ['path' => $target, 'content' => 'pwned']);
 check('file_write did not create a file outside', !file_exists($target));
 
+// A symlink whose target does not exist yet looked missing, so its parent was
+// checked instead — and the write then followed the link out of the project.
+symlink($outside . '/authorized_keys', $project . '/notes');
+$exec('file_write', ['path' => 'notes', 'content' => 'ssh-ed25519 AAAA attacker']);
+check('file_write does not follow a dangling symlink out of the project', !file_exists($outside . '/authorized_keys'));
+check('such a link is refused as outside', blocked($r, 'notes'));
+symlink($outside . '/nouveau', $project . '/vers_dehors');
+check('so is a path through a dangling link to a directory', blocked($r, 'vers_dehors/fichier.txt'));
+symlink('boucle_b', $project . '/boucle_a');
+symlink('boucle_a', $project . '/boucle_b');
+check('a symlink loop is refused rather than followed forever', blocked($r, 'boucle_a'));
+symlink('src/Pas_encore.php', $project . '/lien_interne');
+check('a dangling link that stays inside is still allowed', allowed($r, 'lien_interne') === $project . '/src/Pas_encore.php', (string) allowed($r, 'lien_interne'));
+
 $res = $exec('file_write', ['path' => 'src/Created.php', 'content' => "<?php\n"]);
 check('file_write still works inside the project', file_exists($project . '/src/Created.php'), $res->content);
 

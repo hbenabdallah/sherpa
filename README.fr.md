@@ -215,8 +215,8 @@ au-delà de cinq lignes ou de mille caractères, il s'affiche comme
 | `todo_write` | tenir un plan pour une tâche en plusieurs étapes, affiché à chaque mise à jour | non |
 
 Une confirmation propose **[a]** une fois, **[s]** pour la session, **[p]**
-toujours pour ce projet, **[r]** refuser. `/permissions` liste les autorisations
-permanentes et les retire.
+toujours pour ce projet, **[r]** refuser. `/permissions` liste les autorisations,
+permanentes et de la session, et les retire.
 
 ### Commandes
 
@@ -234,7 +234,7 @@ permanentes et les retire.
 | `/todo` | le plan que le modèle tient pour la tâche en cours |
 | `/jobs` · `/jobs stop <id>` | les commandes laissées en arrière-plan, et en arrêter une |
 | `/project`, `/project edit`, `/project forget` | le projet courant |
-| `/permissions` · `/permissions revoke <outil>` · `/permissions clear` | les autorisations permanentes, et les retirer |
+| `/permissions` · `/permissions revoke <outil>` · `/permissions clear` | les autorisations, permanentes et de la session, et les retirer |
 | `/mcp` · `/mcp add` · `/mcp disable\|enable\|remove <nom>` · `/<serveur>:<prompt>` | les serveurs MCP avec leurs resources et prompts · en déclarer un, essayé aussitôt · en couper un, le rallumer ou l'oublier · lancer un de leurs prompts |
 | `/skills`, `/tools` | ce que le modèle peut charger, et ce qu'il peut appeler |
 | `/reset`, `/exit` | une conversation vide · quitter (Ctrl+C à une invite vide aussi) |

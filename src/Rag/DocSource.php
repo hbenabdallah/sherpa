@@ -45,8 +45,9 @@ final class DocSource
     public function files(string $root): array
     {
         $listed = $this->fromGit($root) ?? $this->walk($root);
+        $realRoot = realpath($root);
 
-        $files = array_values(array_filter($listed, function (string $path) use ($root): bool {
+        $files = array_values(array_filter($listed, function (string $path) use ($root, $realRoot): bool {
             $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
             if (!in_array($extension, self::EXTENSIONS, true) || preg_match(self::NOT_DOCUMENTATION, basename($path)) === 1) {
                 return false;
@@ -62,7 +63,15 @@ final class DocSource
             }
             $full = $root . '/' . $path;
 
-            return is_file($full) && filesize($full) <= self::MAX_BYTES;
+            // Where it is, not what it is called: a symlink named notes.md
+            // pointing at ~/.aws/credentials was indexed, and doc_search —
+            // which asks nobody — handed it to the model.
+            $real = realpath($full);
+            if ($real === false || $realRoot === false || !str_starts_with($real, $realRoot . '/')) {
+                return false;
+            }
+
+            return is_file($real) && filesize($real) <= self::MAX_BYTES;
         }));
 
         sort($files);

@@ -104,7 +104,7 @@ final class SlashCommands
             ['/forget', '<key>', 'Drop a fact'],
             ['/docs', '[reindex|eval|<question>]', 'The documentation index'],
             ['/project', '[edit|forget]', 'The current project'],
-            ['/permissions', '[revoke <tool>|clear]', "The project's standing grants"],
+            ['/permissions', '[revoke <tool>|clear]', "Grants, for the project and this session"],
             ['/skills', '', 'The available skills'],
             ['/mcp', '[add|enable|disable|remove]', 'MCP servers: list, add, turn on or off'],
             ['/tools', '', 'The available tools'],
@@ -136,7 +136,7 @@ final class SlashCommands
     /mcp                The MCP servers, their resources and prompts (each prompt runs as /<server>:<prompt>)
     /mcp add            Declare an MCP server: a command or an address, tried at once
     /mcp disable|enable|remove <name>   Turn a server off, back on, or forget it
-    /permissions        List the project's standing grants
+    /permissions        List the grants, standing and for this session
     /permissions revoke <tool>   Withdraw one grant
     /permissions clear  Withdraw every grant
     /context            Break down what fills the context
@@ -485,8 +485,11 @@ HELP . Terminal::RESET;
         $action = $parts[0] ?? '';
         $target = trim($parts[1] ?? '');
 
+        // Both scopes at once: "[p] Always" grants for the session too, and a
+        // grant withdrawn from the project alone went on running unasked until
+        // the session ended — after being told it would be asked about again.
         if ($action === 'clear') {
-            $count = $this->projectPermissions->revokeAll();
+            $count = $this->projectPermissions->revokeAll() + $this->sessionPermissions->clear();
             echo $count === 0
                 ? Terminal::GRAY . "  No grant to withdraw.\n" . Terminal::RESET
                 : Terminal::GREEN . "✓ {$count} grant(s) withdrawn.\n" . Terminal::RESET;
@@ -497,10 +500,10 @@ HELP . Terminal::RESET;
         if ($action === 'revoke') {
             if ($target === '') {
                 echo Terminal::RED . "Usage: /permissions revoke <tool>\n" . Terminal::RESET;
-            } elseif ($this->projectPermissions->revoke($target)) {
+            } elseif ($this->projectPermissions->revoke($target) | $this->sessionPermissions->revoke($target)) {
                 echo Terminal::GREEN . "✓ Withdrawn: {$target}. It will be asked about again.\n" . Terminal::RESET;
             } else {
-                echo Terminal::RED . "Not a standing grant: {$target}\n" . Terminal::RESET;
+                echo Terminal::RED . "Not a grant: {$target}\n" . Terminal::RESET;
             }
 
             return;
@@ -527,7 +530,7 @@ HELP . Terminal::RESET;
             echo Terminal::CYAN . "    • {$tool}\n" . Terminal::RESET;
         }
 
-        if ($standing !== []) {
+        if ($standing !== [] || $session !== []) {
             echo Terminal::GRAY . "\n  /permissions revoke <tool> · /permissions clear\n" . Terminal::RESET;
         }
     }

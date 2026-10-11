@@ -23,6 +23,23 @@ class SessionPermissions
         return isset($this->sessionAllowed[$toolName]);
     }
 
+    public function revoke(string $toolName): bool
+    {
+        $held = isset($this->sessionAllowed[$toolName]);
+        unset($this->sessionAllowed[$toolName]);
+
+        return $held;
+    }
+
+    /** @return int how many went */
+    public function clear(): int
+    {
+        $count = count($this->sessionAllowed);
+        $this->sessionAllowed = [];
+
+        return $count;
+    }
+
     /** @return array<int, string> */
     public function all(): array
     {

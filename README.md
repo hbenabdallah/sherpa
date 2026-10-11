@@ -207,8 +207,8 @@ still gets all of it.
 | `todo_write` | keep a plan for a task of several steps, shown as it changes | no |
 
 A confirmation offers **[a]** allow once, **[s]** for the session, **[p]** always
-for this project, **[r]** refuse. `/permissions` lists the standing grants and
-withdraws them.
+for this project, **[r]** refuse. `/permissions` lists the grants, standing and
+for this session, and withdraws them.
 
 ### Commands
 
@@ -226,7 +226,7 @@ withdraws them.
 | `/todo` | the plan the model keeps for the current task |
 | `/jobs` · `/jobs stop <id>` | commands left running in the background, and stopping one |
 | `/project`, `/project edit`, `/project forget` | the current project |
-| `/permissions` · `/permissions revoke <tool>` · `/permissions clear` | the standing grants, and withdrawing them |
+| `/permissions` · `/permissions revoke <tool>` · `/permissions clear` | the grants, standing and for this session, and withdrawing them |
 | `/mcp` · `/mcp add` · `/mcp disable\|enable\|remove <name>` · `/<server>:<prompt>` | the MCP servers with their resources and prompts · declare one, tried at once · turn one off, back on, or forget it · run one of their prompts |
 | `/skills`, `/tools` | what the model can load, and what it can call |
 | `/reset`, `/exit` | an empty conversation · leave (Ctrl+C at an empty prompt too) |

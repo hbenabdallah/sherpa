@@ -23,6 +23,8 @@ class WebFetchTool
 
     private const TIMEOUT_SECONDS = 20;
 
+    private const MAX_REDIRECTS = 5;
+
     /** Share of the window one read may take, with a floor and a ceiling. */
     private const SHARE = 0.25;
     private const MIN_CHARS = 8_000;
@@ -68,15 +70,46 @@ class WebFetchTool
             . ($next < $total ? "\n\n… " . number_format($total - $next) . " more characters: call web_fetch with offset={$next} to read on." : '');
     }
 
-    /** @return array{type: string, text: string} */
+    /**
+     * Redirects are followed here rather than by the client, so each one is
+     * seen: the user approved one address, and a public page redirecting to
+     * localhost or to a cloud's metadata endpoint had that read instead — and
+     * sent on to the model's provider. From the web, a local or private
+     * address is refused; one the user asked for may move within itself.
+     *
+     * @return array{type: string, text: string}
+     */
     private function fetch(string $url): array
     {
+        $public = !self::isLocal($url);
+
         try {
-            $response = $this->http->request('GET', $url, [
-                'headers'       => ['User-Agent' => 'Sherpa (+https://github.com/hbenabdallah/sherpa)', 'Accept' => 'text/html, text/plain, application/json, */*;q=0.5'],
-                'max_redirects' => 5,
-                'timeout'       => self::TIMEOUT_SECONDS,
-            ]);
+            for ($hops = 0; ; $hops++) {
+                $response = $this->http->request('GET', $url, [
+                    'headers'       => ['User-Agent' => 'Sherpa (+https://github.com/hbenabdallah/sherpa)', 'Accept' => 'text/html, text/plain, application/json, */*;q=0.5'],
+                    'max_redirects' => 0,
+                    'timeout'       => self::TIMEOUT_SECONDS,
+                ]);
+
+                $status = $response->getStatusCode();
+                $location = $response->getHeaders(false)['location'][0] ?? null;
+                if ($status < 300 || $status >= 400 || $location === null) {
+                    break;
+                }
+                $response->cancel();
+
+                $next = self::absolute($location, $url);
+                if ($hops + 1 > self::MAX_REDIRECTS) {
+                    throw new \RuntimeException("{$url}: too many redirects, stopped after " . self::MAX_REDIRECTS . '.');
+                }
+                if (!in_array(strtolower((string) parse_url($next, PHP_URL_SCHEME)), ['http', 'https'], true)) {
+                    throw new \RuntimeException("{$url} redirects to {$next}: not a web address, not followed.");
+                }
+                if ($public && self::isLocal($next)) {
+                    throw new \RuntimeException("{$url} redirects to {$next}, a local or private address: not followed. Ask the user if that address is wanted.");
+                }
+                $url = $next;
+            }
 
             $body = '';
             foreach ($this->http->stream($response) as $chunk) {
@@ -86,7 +119,6 @@ class WebFetchTool
                     break;
                 }
             }
-            $status = $response->getStatusCode();
             $type = strtolower(trim(explode(';', $response->getHeaders(false)['content-type'][0] ?? 'text/plain')[0]));
             $charset = preg_match('/charset=([\w-]+)/i', $response->getHeaders(false)['content-type'][0] ?? '', $m) === 1 ? $m[1] : null;
         } catch (\Symfony\Contracts\HttpClient\Exception\ExceptionInterface $e) {
@@ -107,6 +139,45 @@ class WebFetchTool
             str_starts_with($type, 'text/') || str_contains($type, 'xml') => trim($body),
             default => throw new \RuntimeException("{$url} is {$type}, not text: nothing to read."),
         }];
+    }
+
+    /** Whether an address names this machine or a private network. */
+    private static function isLocal(string $url): bool
+    {
+        $host = strtolower(trim((string) parse_url($url, PHP_URL_HOST), '[]'));
+
+        if ($host === 'localhost' || str_ends_with($host, '.localhost') || str_ends_with($host, '.local')) {
+            return true;
+        }
+
+        $addresses = filter_var($host, FILTER_VALIDATE_IP) !== false ? [$host] : (@gethostbynamel($host) ?: []);
+        foreach ($addresses as $address) {
+            if (filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** A Location header, absolute or relative, as a full address. */
+    private static function absolute(string $location, string $from): string
+    {
+        if (preg_match('#^[a-z][a-z0-9+.-]*://#i', $location) === 1) {
+            return $location;
+        }
+
+        $parts = parse_url($from);
+        $origin = ($parts['scheme'] ?? 'https') . '://' . ($parts['host'] ?? '') . (isset($parts['port']) ? ':' . $parts['port'] : '');
+
+        if (str_starts_with($location, '//')) {
+            return ($parts['scheme'] ?? 'https') . ':' . $location;
+        }
+        if (str_starts_with($location, '/')) {
+            return $origin . $location;
+        }
+
+        return $origin . rtrim(dirname($parts['path'] ?? '/') , '/') . '/' . $location;
     }
 
     /** Sections as Markdown: the heading, then its text. */

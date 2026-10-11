@@ -59,7 +59,7 @@ final class ProjectPathResolver
         $candidate = str_starts_with($path, '/') ? $path : $root . '/' . $path;
         $resolved = $this->realpathAllowingMissing($this->normalize($candidate));
 
-        if ($resolved !== $root && !str_starts_with($resolved, $root . '/')) {
+        if ($resolved === null || $resolved !== $root && !str_starts_with($resolved, $root . '/')) {
             throw new PathOutsideProjectException($path, $root);
         }
 
@@ -105,19 +105,39 @@ final class ProjectPathResolver
         return '/' . implode('/', $segments);
     }
 
+    /** As many links as Linux follows before it calls it a loop. */
+    private const MAX_LINKS = 40;
+
     /**
      * realpath() that tolerates a path whose tail does not exist yet: resolve
      * the deepest existing ancestor, then re-attach the remaining segments.
+     *
+     * A symlink whose target does not exist yet is followed, not skipped. It
+     * looks missing to file_exists(), so its parent used to be checked in its
+     * place — inside the project — and the write then went where it pointed:
+     * a repository's `notes -> ~/.ssh/authorized_keys` was a new file here.
+     *
+     * @return string|null null for a loop of links, which leads nowhere
      */
-    private function realpathAllowingMissing(string $path): string
+    private function realpathAllowingMissing(string $path, int $links = 0): ?string
     {
         $segments = explode('/', ltrim($path, '/'));
 
         for ($i = count($segments); $i > 0; $i--) {
             $prefix = '/' . implode('/', array_slice($segments, 0, $i));
 
-            // Use lstat semantics via file_exists on the ancestor; a broken
-            // symlink is treated as non-existent and we keep walking up.
+            if (is_link($prefix) && !file_exists($prefix)) {
+                if ($links >= self::MAX_LINKS || ($target = readlink($prefix)) === false) {
+                    return null;
+                }
+
+                $tail = array_slice($segments, $i);
+                $followed = (str_starts_with($target, '/') ? $target : dirname($prefix) . '/' . $target)
+                    . ($tail === [] ? '' : '/' . implode('/', $tail));
+
+                return $this->realpathAllowingMissing($this->normalize($followed), $links + 1);
+            }
+
             if (!file_exists($prefix)) {
                 continue;
             }

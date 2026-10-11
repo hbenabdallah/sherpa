@@ -214,6 +214,22 @@ check('/skills is honest about having none', str_contains($out, 'No skills avail
 [, $out] = $slash('/mcp');
 check('/mcp says where servers would be declared', str_contains($out, 'mcp.json'), $out);
 
+// ---- a project's skills are the project's files ----------------------------
+// skill_load hands a skill's whole text to the model without asking: a symlink
+// in .sherpa/skills/ pointing at ~/.ssh/id_rsa was a skill like any other.
+$skillDir = $root . '/projet/.sherpa/skills';
+@mkdir($skillDir, 0777, true);
+file_put_contents($skillDir . '/deploiement.md', "# Déploiement\n\nComment déployer.\n");
+$outsideSkill = $root . '/cle-privee';
+file_put_contents($outsideSkill, "-----BEGIN OPENSSH PRIVATE KEY-----\nOUTSIDE\n");
+symlink($outsideSkill, $skillDir . '/aide.md');
+$confined = new SkillRegistry();
+$confined->setProjectPath($root . '/projet');
+$confined->load();
+check('a project skill is loaded', $confined->get('deploiement') !== null);
+check('but not a symlink in its skills pointing outside the project', $confined->get('aide') === null, (string) $confined->get('aide')?->content);
+unlink($skillDir . '/aide.md');
+
 // ---- permissions -----------------------------------------------------------
 [, $out] = $slash('/permissions');
 check('/permissions shows none when none were granted', str_contains($out, '— none'), $out);
@@ -227,7 +243,23 @@ check('and a session one apart from it', str_contains($out, 'file_write') && str
 [, $out] = $slash('/permissions revoke shell_exec');
 check('/permissions revoke withdraws it', str_contains($out, 'Withdrawn') && !$permissions->isAllowed('shell_exec'), $out);
 [, $out] = $slash('/permissions revoke jamais');
-check('revoking what was never granted says so', str_contains($out, 'Not a standing grant'), $out);
+check('revoking what was never granted says so', str_contains($out, 'Not a grant'), $out);
+
+// "[p] Always" grants for the session too. Withdrawn from the project only, it
+// went on running unasked for the rest of the session — after being told it
+// would be asked about again.
+$permissions->allow('shell_exec');
+$session->allowForSession('shell_exec');
+[, $out] = $slash('/permissions revoke shell_exec');
+check('a grant made "always" in this session is withdrawn from the session too',
+    !$permissions->isAllowed('shell_exec') && !$session->isSessionAllowed('shell_exec'), $out);
+[, $out] = $slash('/permissions revoke file_write');
+check('a grant for this session only can be withdrawn as well', str_contains($out, 'Withdrawn') && !$session->isSessionAllowed('file_write'), $out);
+$permissions->allow('file_patch');
+$session->allowForSession('project_grep');
+[, $out] = $slash('/permissions clear');
+check('/permissions clear withdraws the session\'s grants with the project\'s',
+    $permissions->all() === [] && $session->all() === [] && str_contains($out, '2 grant'), $out);
 
 // ---- what the session is spending ------------------------------------------
 [, $out] = $slash('/context');
