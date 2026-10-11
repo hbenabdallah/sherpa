@@ -112,6 +112,13 @@ check('a damaged file is skipped, and costs no other session',
     count($store->all()) === 2, (string) count($store->all()));
 unlink($store->directory() . '/20260101-000000-dead.json');
 
+// The id inside a file names what pruning removes: one that is not the file's
+// own name is not a session of this store.
+file_put_contents($store->directory() . '/20260101-000000-beef.json',
+    json_encode(['id' => '../victime', 'messages' => [['role' => 'user', 'content' => 'x']]]));
+check('a file whose id is not its own name is skipped', $store->load('20260101-000000-beef') === null && count($store->all()) === 2, (string) count($store->all()));
+unlink($store->directory() . '/20260101-000000-beef.json');
+
 // ---- only the most recent are kept -----------------------------------------
 for ($i = 0; $i < SessionStore::KEEP + 3; $i++) {
     $store->startNew();

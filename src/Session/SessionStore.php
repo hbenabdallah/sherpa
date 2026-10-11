@@ -23,6 +23,9 @@ final class SessionStore
 
     private const FORMAT = 1;
 
+    /** What an id looks like: the shape save() gives it, and nothing a path could hide in. */
+    private const ID = '/^\d{8}-\d{6}-[0-9a-f]{4}$/';
+
     /**
      * To the microsecond. "Most recently active" is what orders the list and
      * decides what pruning removes, and two saves inside one second are
@@ -217,7 +220,7 @@ final class SessionStore
         // The id comes from what the user typed. It names a file, so anything
         // that is not the shape this class writes is refused before it gets
         // near a path: "../../projects.yaml" is not a session.
-        if ($this->dir === null || preg_match('/^\d{8}-\d{6}-[0-9a-f]{4}$/', $id) !== 1) {
+        if ($this->dir === null || preg_match(self::ID, $id) !== 1) {
             return null;
         }
 
@@ -250,6 +253,12 @@ final class SessionStore
         // A file this class did not write, or one cut short: skipped rather
         // than fatal. One unreadable session must not cost the list of others.
         if (!is_array($data) || !is_string($data['id'] ?? null) || !is_array($data['messages'] ?? null)) {
+            return null;
+        }
+
+        // The id names the file pruning removes: one that is not this file's
+        // own name — "../../x", say — would have it remove something else.
+        if ($data['id'] !== basename($file, '.json') || preg_match(self::ID, $data['id']) !== 1) {
             return null;
         }
 

@@ -348,14 +348,52 @@ class MachineConfig
             return false;
         }
 
-        // Closed before a byte of a key is in it.
-        if (!is_file($path) && @touch($path) === false) {
+        return self::replace($path, "# Sherpa's API keys, by provider. Readable by you only; never share this file.\n"
+            . Yaml::dump($keys, 2, 2), 0600);
+    }
+
+    /** A file that is there but does not parse: Sherpa writes nothing over it. */
+    public static function isDamaged(string $path): bool
+    {
+        if (!is_file($path)) {
             return false;
         }
-        @chmod($path, 0600);
 
-        return @file_put_contents($path, "# Sherpa's API keys, by provider. Readable by you only; never share this file.\n"
-            . Yaml::dump($keys, 2, 2)) !== false;
+        try {
+            Yaml::parseFile($path);
+        } catch (\Throwable) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Write a file whole or not at all, and never over one that no longer
+     * parses. In place, a session reading during the write found it empty;
+     * read with a typo in it, it counted as empty. Either way the next save
+     * wrote back only what it knew — every other provider, or key, gone.
+     *
+     * @param int|null $mode set before a byte is written: keys.yaml is closed
+     *                       before a key is in it
+     */
+    private static function replace(string $path, string $content, ?int $mode = null): bool
+    {
+        if (self::isDamaged($path)) {
+            return false;
+        }
+
+        $tmp = $path . '.' . getmypid() . '.tmp';
+        $written = @touch($tmp)
+            && ($mode === null || @chmod($tmp, $mode))
+            && @file_put_contents($tmp, $content) !== false
+            && @rename($tmp, $path);
+
+        if (!$written) {
+            @unlink($tmp);
+        }
+
+        return $written;
     }
 
     /** Forget a provider. The one in force cannot go: the session is using it. */
@@ -462,7 +500,7 @@ class MachineConfig
             . "# only), in the variable a provider names (key_env), or else in SHERPA_API_KEY.\n"
             . "# Edit by hand, or from Sherpa with /model, /backend and /provider.\n";
 
-        return @file_put_contents($path, $header . Yaml::dump($data, 4, 2)) !== false;
+        return self::replace($path, $header . Yaml::dump($data, 4, 2));
     }
 
     /**

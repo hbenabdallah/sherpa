@@ -327,6 +327,28 @@ if (posix_getuid() !== 0) {
 }
 $writer->delete('atomique');
 
+// ---- forgetting a project removes its own directory, and nothing else -----
+// The directory is named after the slug, and the slug is a key of projects.yaml:
+// edited by hand into "..", forgetting the project removed the whole of
+// ~/.config/sherpa, keys included; "../../.." the home directory.
+$config = $home . '/.config/sherpa';
+file_put_contents($config . '/keys.yaml', "groq: k-groq\n");
+mkdir($home . '/precieux', 0777, true);
+file_put_contents($home . '/precieux/travail.txt', 'ne pas perdre');
+$yaml = Symfony\Component\Yaml\Yaml::parseFile($config . '/projects.yaml') ?? [];
+foreach (['..', '../../..', ''] as $i => $slug) {
+    $yaml['projects'][$slug] = ['name' => "piégé {$i}", 'path' => $fresh()];
+}
+file_put_contents($config . '/projects.yaml', Symfony\Component\Yaml\Yaml::dump($yaml, 4, 2));
+$trap = new ProjectStore(new StackDetector());
+foreach (['..', '../../..', ''] as $slug) {
+    $trap->delete($slug);
+}
+check('a slug edited into ".." does not take the configuration with it', is_file($config . '/keys.yaml'));
+check('nor one into "../../.." the home directory', is_file($home . '/precieux/travail.txt'));
+check('nor an empty one every project\'s memory', is_dir($config . '/projects'));
+check('the entries themselves are forgotten all the same', !array_intersect(['..', '../../..', ''], array_map(fn($p) => $p->slug, (new ProjectStore(new StackDetector()))->all())));
+
 // ---- reload ----------------------------------------------------------------
 $reopened = new ProjectStore(new StackDetector());
 check('projects survive a reload with their slugs intact', $reopened->get('editeur-d-essai')?->name === "Éditeur d'essai", json_encode(array_map(fn($p) => $p->slug, $reopened->all())));

@@ -11,6 +11,7 @@ use App\Agent\SystemPromptBuilder;
 use App\Agent\Tool\Toolbox;
 use App\Config\ApiEndpoint;
 use App\Config\Backend;
+use App\Config\MachineConfig;
 use App\Config\ModelProfile;
 use App\Config\ModelResolver;
 use App\Config\ProviderName;
@@ -100,7 +101,7 @@ final class ModelSession
             echo Terminal::GREEN . '✓ Choice saved in ' . Terminal::RESET
                 . Terminal::GRAY . $this->models->configPath() . "\n" . Terminal::RESET;
         } else {
-            echo Terminal::YELLOW . '⚠ Cannot write ' . $this->models->configPath()
+            echo Terminal::YELLOW . '⚠ ' . $this->cannotWrite($this->models->configPath())
                 . " — the choice holds for this session only.\n" . Terminal::RESET;
         }
 
@@ -297,13 +298,13 @@ final class ModelSession
 
         echo $this->models->rememberApiUrl($url)
             ? Terminal::GREEN . '✓ Address saved in ' . Terminal::RESET . Terminal::GRAY . $this->models->configPath() . "\n" . Terminal::RESET
-            : Terminal::YELLOW . '⚠ Cannot write ' . $this->models->configPath() . " — the address holds for this session only.\n" . Terminal::RESET;
+            : Terminal::YELLOW . '⚠ ' . $this->cannotWrite($this->models->configPath()) . " — the address holds for this session only.\n" . Terminal::RESET;
 
         $provider = $this->models->activeProvider();
         if ($typedKey !== '' && $provider !== null) {
             echo $this->models->saveKey($provider, $typedKey)
                 ? Terminal::GREEN . '✓ Key saved in ' . Terminal::RESET . Terminal::GRAY . $this->models->keysPath() . " (readable by you only)\n" . Terminal::RESET
-                : Terminal::YELLOW . '⚠ Cannot write ' . $this->models->keysPath() . " — the key holds for this session only.\n" . Terminal::RESET;
+                : Terminal::YELLOW . '⚠ ' . $this->cannotWrite($this->models->keysPath()) . " — the key holds for this session only.\n" . Terminal::RESET;
         }
 
         return true;
@@ -455,7 +456,7 @@ final class ModelSession
 
         echo $this->models->remember($profile)
             ? Terminal::GREEN . '  ✓ Saved in ' . $this->models->configPath() . "\n" . Terminal::RESET
-            : Terminal::YELLOW . '  ⚠ Cannot write ' . $this->models->configPath() . "\n" . Terminal::RESET;
+            : Terminal::YELLOW . '  ⚠ ' . $this->cannotWrite($this->models->configPath()) . "\n" . Terminal::RESET;
 
         return true;
     }
@@ -625,7 +626,7 @@ final class ModelSession
         }
 
         if (!$this->models->addProvider($name, $url, null) || !$this->models->saveKey($name, $key)) {
-            echo Terminal::YELLOW . '⚠ Cannot write ' . $this->models->configPath() . ' or ' . $this->models->keysPath() . "\n" . Terminal::RESET;
+            echo Terminal::YELLOW . '⚠ ' . $this->cannotWrite($this->models->configPath(), $this->models->keysPath()) . "\n" . Terminal::RESET;
 
             return;
         }
@@ -657,7 +658,7 @@ final class ModelSession
         }
 
         if (!$this->models->saveKey($name, $key)) {
-            echo Terminal::YELLOW . '⚠ Cannot write ' . $this->models->keysPath() . "\n" . Terminal::RESET;
+            echo Terminal::YELLOW . '⚠ ' . $this->cannotWrite($this->models->keysPath()) . "\n" . Terminal::RESET;
 
             return;
         }
@@ -741,7 +742,7 @@ final class ModelSession
 
         echo $this->models->removeProvider($name)
             ? Terminal::GREEN . "✓ Provider {$name} forgotten. /provider add to record it again.\n" . Terminal::RESET
-            : Terminal::YELLOW . '⚠ Cannot write ' . $this->models->configPath() . "\n" . Terminal::RESET;
+            : Terminal::YELLOW . '⚠ ' . $this->cannotWrite($this->models->configPath()) . "\n" . Terminal::RESET;
     }
 
     /**
@@ -866,5 +867,20 @@ final class ModelSession
         echo Terminal::GRAY . "  Kept: the project's memory, its grants, the MCP servers."
             . ($discarded > 0 ? "\n  The conversation dropped is still resumable with /resume." : '')
             . "\n" . Terminal::RESET;
+    }
+
+    /**
+     * "Cannot write" and why, when the reason is one the user can fix: a file
+     * with a typo in it is not written over, and was otherwise left a mystery.
+     */
+    private function cannotWrite(string ...$paths): string
+    {
+        foreach ($paths as $path) {
+            if (MachineConfig::isDamaged($path)) {
+                return "Cannot write {$path}: it no longer parses as YAML. Fix it by hand, or move it aside";
+            }
+        }
+
+        return 'Cannot write ' . implode(' or ', $paths);
     }
 }

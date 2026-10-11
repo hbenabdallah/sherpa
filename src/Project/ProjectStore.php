@@ -304,7 +304,17 @@ class ProjectStore
         // saved conversations always — and nothing else: a memory database the
         // YAML file points somewhere else is not Sherpa's to remove, and is left
         // where it is. Only the directory it would have lived in goes.
+        //
+        // Only a slug of the shape slugify() makes, and only a directory right
+        // under projects/: the slug is a key of a file anyone may edit, and
+        // "..", made a slug, removed the whole of ~/.config/sherpa — keys
+        // included; "../../.." the home directory; "" every project's memory.
         $own = dirname(Project::defaultMemoryDb($slug));
+        $parent = realpath(Project::configDir() . '/projects');
+        if (preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) !== 1
+            || $parent === false || realpath(dirname($own)) !== $parent) {
+            return;
+        }
 
         try {
             (new Filesystem())->remove($own);

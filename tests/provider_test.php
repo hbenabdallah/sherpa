@@ -223,6 +223,42 @@ check('and its key with it', Yaml::parseFile($dir . '/keys.yaml') === ['one' => 
 $refused = provider(twoProviders($dir . '/remove-active.yaml'), 'remove one');
 check('but not the one in force', str_contains($refused['shown'] ?? '', 'is the provider in force'), $refused['shown'] ?? '');
 
+// ---- writing config.yaml and keys.yaml -----------------------------------------
+// Rewritten in place, a session reading during the write found an empty file;
+// read with a typo in it, a file counted as empty. Either way the next save
+// wrote back only what it knew: every other provider, or key, gone.
+$safe = configAt($dir . '/safe/config.yaml');
+$safe->addProvider('one', 'https://api.one.test/v1', null);
+$safe->saveKey('one', 'k-one');
+$inode = fileinode($dir . '/safe/keys.yaml');
+$safe->saveKey('two', 'k-two');
+clearstatcache();
+check('keys.yaml is replaced whole, not rewritten in place', fileinode($dir . '/safe/keys.yaml') !== $inode);
+check('and stays readable by its owner only', (fileperms($dir . '/safe/keys.yaml') & 0777) === 0600, decoct(fileperms($dir . '/safe/keys.yaml') & 0777));
+$inode = fileinode($dir . '/safe/config.yaml');
+$safe->addProvider('three', 'https://api.three.test/v1', null);
+clearstatcache();
+check('config.yaml is replaced whole too', fileinode($dir . '/safe/config.yaml') !== $inode);
+check('and no temporary file is left behind', glob($dir . '/safe/*.tmp') === []);
+
+file_put_contents($dir . '/safe/keys.yaml', "one: k-one
+two: [unclosed\n");
+$typo = (string) file_get_contents($dir . '/safe/keys.yaml');
+check('a keys.yaml that does not parse is not overwritten by the next key', !$safe->saveKey('three', 'k-three')
+    && file_get_contents($dir . '/safe/keys.yaml') === $typo);
+file_put_contents($dir . '/safe/config.yaml', "api:\n  providers: [unclosed\n");
+$typo = (string) file_get_contents($dir . '/safe/config.yaml');
+check('nor a config.yaml, by the next change', !$safe->addProvider('four', 'https://api.four.test/v1', null)
+    && file_get_contents($dir . '/safe/config.yaml') === $typo);
+
+// Refused, the save used to say only "Cannot write": the user was left to
+// guess that a typo, not the disk, stood in the way.
+mkdir($dir . '/typo');
+file_put_contents($dir . '/typo/keys.yaml', "two: [unclosed\n");
+$told = provider(twoProviders($dir . '/typo/config.yaml'), 'key two', "k-new\n");
+check('and the user is told why the key could not be saved',
+    str_contains($told['shown'] ?? '', 'no longer parses as YAML'), json_encode($told));
+
 exec('rm -rf ' . escapeshellarg($dir));
 
 printf("\n%d passed, %d failed\n", $pass, $fail);
