@@ -80,15 +80,7 @@ class ShellExecTool
     ): string {
         $workDir = $this->workDir($cwd);
 
-        if ($this->dockerContainer !== null && $this->containers->inspect($this->dockerContainer) === null) {
-            // Saying this plainly matters: the alternative is a Symfony Process
-            // exception about a missing binary, or an OCI runtime error, for a
-            // configuration problem the user can actually fix.
-            return "Cannot run in container \"{$this->dockerContainer}\": "
-                . "docker is not reachable from Sherpa, or the container is not running.\n"
-                . 'Check that the container is started. If Sherpa itself runs in Docker, '
-                . 'it has neither a docker client nor a socket: run it on the machine (make php).';
-        }
+        $this->assertContainerRuns();
 
         if ($background) {
             return $this->startJob($command, $workDir);
@@ -126,6 +118,47 @@ class ShellExecTool
         $status = $code === 0 ? '' : "(exit code {$code})\n";
 
         return $status . $this->trim($output);
+    }
+
+    /**
+     * Every command of a containerised project runs in its container. When
+     * that cannot happen, nothing is run, and the model is told it is the
+     * user's to fix: given "container … is not running" after each command, it
+     * went on trying others — docker compose up, php -v, echo — in the same
+     * stopped container, twenty times over.
+     *
+     * Saying this plainly matters as much: the alternative is a Symfony
+     * Process exception about a missing binary, or a daemon error, for a
+     * configuration problem the user can actually fix.
+     *
+     * @throws \RuntimeException
+     */
+    private function assertContainerRuns(): void
+    {
+        if ($this->dockerContainer === null) {
+            return;
+        }
+
+        $container = $this->dockerContainer;
+        $inspected = $this->containers->inspect($container);
+        $after = ' No command of this project can run until then, whatever the command: do not try others, '
+            . 'tell the user and wait for them.';
+
+        if ($inspected === null) {
+            throw new \RuntimeException("Not run: this project's commands run in the container \"{$container}\", "
+                . 'and docker cannot reach it — not started, removed, or no docker client here. '
+                . "The user has to start it, or turn the project's Docker setting off with /project edit. "
+                . 'If Sherpa itself runs in Docker, it has neither a docker client nor a socket: run it on the machine (make php).'
+                . $after);
+        }
+
+        if (($inspected['running'] ?? true) === false) {
+            $status = ($inspected['status'] ?? '') !== '' ? " ({$inspected['status']})" : '';
+            throw new \RuntimeException("Not run: this project's commands run in the container \"{$container}\", "
+                . "which is stopped{$status}. The user has to start it on their machine (docker start {$container}, "
+                . "or docker compose up -d), or turn the project's Docker setting off with /project edit."
+                . $after);
+        }
     }
 
     /**

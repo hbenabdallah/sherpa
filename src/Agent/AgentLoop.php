@@ -29,14 +29,31 @@ class AgentLoop
      */
     private const REPEATED_CALL_LIMIT = 3;
 
+    /**
+     * The same error this many results running, whatever the calls: the model
+     * is trying things against a wall — a stopped container answered every
+     * command, docker compose up and echo alike, with the same line.
+     */
+    private const REPEATED_ERROR_LIMIT = 3;
+
     private const INTERRUPTED = 'Interrupted by the user.';
+    private const REFUSED = 'Refused by the user.';
     private const STUCK = 'Stopped: the model repeated the same tool call without getting anywhere.';
+    private const WALLED = 'Stopped: every call came back with the same error, %d times running: %s';
     private const ABANDONED = 'Not run: the turn stopped on an error before this call.';
     private const EMPTY_RETRY = 'Empty reply from the model: trying again.';
     /** Longer than this, a reply is an answer, whatever it says about tools. */
     private const ANNOUNCEMENT_MAX_CHARS = 800;
 
     private const NUDGE_SHOWN = 'The model described a tool call without making it: asking it to go ahead.';
+    /** Said for a call whose arguments did not arrive whole. */
+    private const CUT_OFF = 'Not run: the arguments of this call were not valid JSON (%s characters arrived), '
+        . 'most likely cut off by the output limit. Send it again in smaller pieces: a file in parts, '
+        . 'file_write for the first and file_patch to add the rest.';
+
+    /** @var array<string, int> calls of this reply whose arguments were cut off, by id: how much arrived */
+    private array $cutOff = [];
+
     private const NUDGE = 'You described what you are going to do but did not call the tool. Call it now, through the tool interface, rather than describing it.';
     private const EMPTY = 'The model returned two empty replies in a row. Rephrase the request, or change model with /model.';
 
@@ -143,10 +160,16 @@ class AgentLoop
                 return $stuck;
             }
 
-            $this->runCalls($bag, $message['tool_calls']);
+            $this->runCalls($bag, $message['tool_calls'], $state);
 
             if ($this->interrupt->requested()) {
                 return new Result(self::INTERRUPTED, iterations: $iteration, interrupted: true);
+            }
+
+            if ($state->sameErrors >= self::REPEATED_ERROR_LIMIT) {
+                $error = (string) $state->lastError;
+
+                return new Result(sprintf(self::WALLED, $state->sameErrors, $error), iterations: $iteration, repeatedError: $error);
             }
         }
 
@@ -372,7 +395,7 @@ class AgentLoop
     }
 
     /** @param array<int, array<string, mixed>> $calls */
-    private function runCalls(MessageBag $bag, array $calls): void
+    private function runCalls(MessageBag $bag, array $calls, TurnState $state): void
     {
         foreach ($calls as $rawCall) {
             $call = new ToolCall(
@@ -388,26 +411,73 @@ class AgentLoop
                 continue;
             }
 
-            $this->runCall($bag, $call);
+            $this->noteError($state, $this->runCall($bag, $call));
         }
     }
 
-    /** One call: shown, asked for when it must be, run, its result into history. */
-    private function runCall(MessageBag $bag, ToolCall $call): void
+    /**
+     * Count the same error coming back. Any other result — a success, or a
+     * different failure — means the model is still learning something.
+     */
+    private function noteError(TurnState $state, ToolResult $result): void
     {
+        $error = self::errorOf($result);
+
+        if ($error === null) {
+            $state->lastError = null;
+            $state->sameErrors = 0;
+
+            return;
+        }
+
+        $state->sameErrors = $error === $state->lastError ? $state->sameErrors + 1 : 1;
+        $state->lastError = $error;
+    }
+
+    /** The error a result reports, on one line, or null for one that is not an error. */
+    private static function errorOf(ToolResult $result): ?string
+    {
+        $content = trim($result->content);
+        $failed = preg_match('/^\((?:exit code [1-9]\d*|command failed[^)]*)\)\s*/', $content, $status) === 1;
+
+        // The user's answer, or plan mode's: neither is a wall to report.
+        if (!$result->isError && !$failed || in_array($content, [self::REFUSED, PlanMode::BLOCKED], true)) {
+            return null;
+        }
+
+        // The status line says it failed; the line after it says why.
+        $why = trim(substr($content, $failed ? strlen($status[0]) : 0));
+        $line = trim(explode("\n", $why === '' ? $content : $why)[0]);
+
+        return mb_substr(str_starts_with($line, 'Error: ') ? substr($line, 7) : $line, 0, 300);
+    }
+
+    /** One call: shown, asked for when it must be, run, its result into history. */
+    private function runCall(MessageBag $bag, ToolCall $call): ToolResult
+    {
+        if (isset($this->cutOff[$call->id])) {
+            $result = new ToolResult($call->id, sprintf(self::CUT_OFF, number_format($this->cutOff[$call->id])), isError: true);
+            $bag->tool($call->name, $result->content, $call->id);
+            $this->chat->showToolResult($call->name, 'arguments cut off: not run', true);
+
+            return $result;
+        }
+
         $def = $this->toolbox->find($call->name);
         $this->chat->showToolCall($call->name, $call->arguments);
 
         $result = match (true) {
             $this->planMode?->blocks($def) === true => new ToolResult($call->id, PlanMode::BLOCKED, isError: true),
             $this->permissions->check($call, $def)  => $this->toolbox->execute($call),
-            default                                 => new ToolResult($call->id, 'Refused by the user.', isError: true),
+            default                                 => new ToolResult($call->id, self::REFUSED, isError: true),
         };
 
         $this->chat->showToolResult($call->name, $result->content, $result->isError);
         $this->trace?->observe($call->name, $result->isError);
 
         $bag->tool($call->name, $result->content, $call->id);
+
+        return $result;
     }
 
     /**
@@ -472,16 +542,26 @@ class AgentLoop
     private function normaliseToolCalls(array $toolCalls): array
     {
         $normalised = [];
+        $this->cutOff = [];
 
         foreach (array_values($toolCalls) as $call) {
             $arguments = $call['function']['arguments'] ?? [];
+            $raw = null;
             if (is_string($arguments)) {
-                $arguments = json_decode($arguments, true);
+                $raw = $arguments;
+                $arguments = trim($raw) === '' ? [] : json_decode($raw, true);
             }
 
             $id = $call['id'] ?? null;
 
             $call['id'] = is_string($id) && $id !== '' ? $id : self::newCallId();
+
+            // Not an object: half of one, as a reply cut by the output limit
+            // leaves it. Run with [] instead, a tool went ahead with nothing —
+            // or with its defaults — and the model learnt nothing of why.
+            if ($raw !== null && !is_array($arguments)) {
+                $this->cutOff[$call['id']] = strlen($raw);
+            }
             $call['function']['name'] = (string) ($call['function']['name'] ?? '');
             $call['function']['arguments'] = is_array($arguments) ? $arguments : [];
 

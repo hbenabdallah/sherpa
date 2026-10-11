@@ -142,12 +142,34 @@ $tool4->setDockerContainer('c');
 check('with no workdir either, it says so rather than inventing one', str_contains($tool4->describe('ls'), "container's default"), $tool4->describe('ls'));
 
 // Docker unreachable: a legible sentence, not a Process exception about a
-// missing binary or an OCI runtime error.
+// missing binary or an OCI runtime error. Raised, so the call reads as failed
+// on screen and to the model; the toolbox hands the model the sentence.
+function refusal(ShellExecTool $tool, string $command, bool $background = false): string
+{
+    try {
+        return 'ran: ' . $tool($command, background: $background);
+    } catch (\RuntimeException $e) {
+        return $e->getMessage();
+    }
+}
+
 $broken = new ShellExecTool($paths, new FakeInspector(null));
 $broken->setDockerContainer('absent-app-1');
-$message = $broken('echo bonjour');
-check('an unreachable container is explained, not thrown', str_contains($message, 'absent-app-1') && str_contains($message, 'docker'), $message);
+$message = refusal($broken, 'echo bonjour');
+check('an unreachable container is explained, as an error', str_starts_with($message, 'Not run:') && str_contains($message, 'absent-app-1') && str_contains($message, 'docker'), $message);
 check('and nothing was run on the host instead', !str_contains($message, 'bonjour'), $message);
+
+// Stopped: docker inspect answers for it all the same, and every command then
+// came back "container … is not running". The model, told nothing more, tried
+// docker compose up, php -v, echo — twenty calls in the same stopped container.
+$stopped = new ShellExecTool($paths, new FakeInspector(['workdir' => '/srv/app', 'mounts' => [], 'running' => false, 'status' => 'exited']));
+$stopped->setDockerContainer('sherpa-app-1');
+$message = refusal($stopped, 'echo bonjour');
+check('a stopped container is named as stopped, and nothing runs', str_starts_with($message, 'Not run:')
+    && str_contains($message, 'stopped (exited)') && !str_contains($message, 'bonjour'), $message);
+check('with how the user starts it', str_contains($message, 'docker start sherpa-app-1') && str_contains($message, '/project edit'), $message);
+check('and the model is told no other command will do better', str_contains($message, 'do not try others'), $message);
+check('a background job is refused the same way', str_contains(refusal($stopped, 'sleep 30', true), 'stopped (exited)'));
 
 // ---- the path translator on its own ----------------------------------------
 $inspector = new ContainerInspector();

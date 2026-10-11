@@ -20,6 +20,10 @@ final class TurnState
     /** Text written alongside the repeated calls — an answer, often. */
     public string $saidWhileRepeating = '';
 
+    /** The last tool error, and how many results running have been exactly it. */
+    public ?string $lastError = null;
+    public int $sameErrors = 0;
+
     /** An empty reply has already been asked again. */
     public bool $retriedEmpty = false;
 

@@ -22,7 +22,7 @@ class ContainerInspector
     private array $homes = [];
 
     /**
-     * @return array{workdir: ?string, mounts: array<int, array{source: string, destination: string}>}|null
+     * @return array{workdir: ?string, mounts: array<int, array{source: string, destination: string}>, running?: bool, status?: string}|null
      *         null when the container cannot be inspected at all
      */
     public function inspect(string $container): ?array
@@ -31,7 +31,15 @@ class ContainerInspector
             return $this->cache[$container];
         }
 
-        return $this->cache[$container] = $this->run($container);
+        $inspected = $this->run($container);
+
+        // A stopped container is looked at again next time: the user starts
+        // it, and the session carries on without being restarted.
+        if ($inspected !== null && ($inspected['running'] ?? true) === false) {
+            return $inspected;
+        }
+
+        return $this->cache[$container] = $inspected;
     }
 
     private function run(string $container): ?array
@@ -66,6 +74,10 @@ class ContainerInspector
                 ? $data['Config']['WorkingDir']
                 : null,
             'mounts' => $mounts,
+            // docker inspect answers for a stopped container too, and every
+            // `docker exec` into it then fails with "is not running".
+            'running' => ($data['State']['Running'] ?? true) !== false,
+            'status'  => is_string($data['State']['Status'] ?? null) ? $data['State']['Status'] : '',
         ];
     }
 

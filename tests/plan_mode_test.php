@@ -168,5 +168,21 @@ ob_start();
 $bar->render($project, 'm', planning: true);
 check('the status bar says plan mode is on', str_contains(Terminal::plain(ob_get_clean()), 'plan mode'));
 
+// ---- arguments cut off ---------------------------------------------------------------
+// A reply cut by the output limit leaves a tool call's arguments as half a JSON
+// object. They became [], the tool ran with nothing, and PHP's "too few
+// arguments" told the model nothing about why: it sent the same write again.
+$write = new WriteIt();
+$broker = new YesBroker();
+$model = new Scripted([
+    ['role' => 'assistant', 'content' => '', 'tool_calls' => [['id' => 'cut1', 'function' => ['name' => 'write_it', 'arguments' => '{"what": "a very long file that never clo']]]],
+    ['role' => 'assistant', 'content' => 'Done in parts.'],
+]);
+[$result, $bag, $screen] = run($model, [$write], new PlanMode(), $broker);
+$history = json_encode($bag->all());
+check('a call whose arguments were cut off is not run', $write->ran === 0, (string) $write->ran);
+check('nor put to the user for approval', $broker->asked === 0, (string) $broker->asked);
+check('the model is told they were cut, and how to go on', str_contains($history, 'not valid JSON') && str_contains($history, 'smaller'), $history);
+
 printf("\n%d passed, %d failed\n", $pass, $fail);
 exit($fail === 0 ? 0 : 1);

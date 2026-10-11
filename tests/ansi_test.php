@@ -197,6 +197,32 @@ $out = captured(function () {
 });
 check('a tool-only turn prints no orphan label', !str_contains(settled($out), 'Sherpa'), bin2hex($out));
 
+// Some models send "\n" as the content of every tool-calling reply.
+$out = captured(function () {
+    $p = pane();
+    $p->beginAssistantMessage();
+    $p->appendToken("\n");
+    $p->appendToken("\n");
+    $p->flushBuffer();
+});
+check('a reply of blank lines prints no orphan label either', !str_contains(settled($out), 'Sherpa'), bin2hex($out));
+
+$out = captured(function () {
+    $p = pane();
+    $p->beginAssistantMessage();
+    $p->appendToken("\n\n");
+    $p->appendToken("Voici la réponse.\n\nSuite.");
+    $p->flushBuffer();
+});
+check('but text after them is labelled, its own blank lines kept', str_contains($out, 'Sherpa') && str_contains($out, 'Voici la réponse.') && str_contains($out, 'Suite.'), bin2hex($out));
+
+$out = captured(fn() => pane()->showToolResult('shell_exec', "(exit code 1)\nError response from daemon"));
+check('a command that exited non-zero is not marked as a success', !str_contains($out, '✓') && str_contains($out, '✗'), $out);
+$out = captured(fn() => pane()->showToolResult('shell_exec', "(command failed, code 2, no output)"));
+check('nor one that failed silently', !str_contains($out, '✓'), $out);
+$out = captured(fn() => pane()->showToolResult('shell_exec', "OK (12 tests)"));
+check('one that succeeded still is', str_contains($out, '✓'), $out);
+
 $out = captured(function () {
     $p = pane();
     $p->beginAssistantMessage();

@@ -141,6 +141,27 @@ final class CountTool
     }
 }
 
+/** Fails the same way whatever it is asked: a stopped container, say. */
+#[AsTool(name: 'wall', description: 'Essaie quelque chose', permission: Permission::AUTO)]
+final class WallTool
+{
+    public int $ran = 0;
+
+    public function __invoke(#[Param('what')] string $what = ''): string
+    {
+        $this->ran++;
+
+        if ($what === 'ok') {
+            return 'fine';
+        }
+        if (str_starts_with($what, 'shell')) {
+            return "(exit code 1)\nError response from daemon: container cf10 is not running";
+        }
+
+        throw new RuntimeException('container cf10 is not running');
+    }
+}
+
 /**
  * A toolbox whose every call fails outside the tool itself — where Toolbox's
  * own catch cannot turn it into an error result. Stands in for a confirmation
@@ -390,6 +411,40 @@ check('and the history ends on it as a plain reply',
     ($last['role'] ?? '') === 'assistant' && empty($last['tool_calls']) && ($last['content'] ?? '') === 'There are three sheep.',
     json_encode($last));
 check('with the history still well-formed', unpairedCalls($bag->all()) === [], json_encode(unpairedCalls($bag->all())));
+
+// Different calls, the same error every time: no call repeats, so the check
+// above never fired, and a model went through twenty commands against a
+// stopped container before the iteration cap.
+$walled = new ScriptedPlatform(array_map(fn(int $i) => [
+    'role' => 'assistant',
+    'content' => "\n",
+    'tool_calls' => [['function' => ['name' => 'wall', 'arguments' => ['what' => "essai {$i}"]]]],
+], range(1, 12)));
+$wall = new WallTool();
+[$result, $bag] = loopWith($walled, [$wall]);
+check('the same error, whatever the call, stops the turn', $result->repeatedError !== null && $wall->ran === 3, "{$wall->ran} runs: {$result->content}");
+check('and names the error for the user', str_contains((string) $result->repeatedError, 'container cf10 is not running'), (string) $result->repeatedError);
+check('with the history still well-formed', unpairedCalls($bag->all()) === [], json_encode(unpairedCalls($bag->all())));
+
+// shell_exec reports a failed command as its output, not as a tool error.
+$exiting = new ScriptedPlatform(array_map(fn(int $i) => [
+    'role' => 'assistant',
+    'content' => '',
+    'tool_calls' => [['function' => ['name' => 'wall', 'arguments' => ['what' => "shell {$i}"]]]],
+], range(1, 12)));
+[$result] = loopWith($exiting, [new WallTool()]);
+check('so does a command exiting with the same error every time, named past its exit code',
+    $result->repeatedError === 'Error response from daemon: container cf10 is not running', (string) $result->repeatedError);
+
+// A success in between means the model is getting somewhere.
+$progressing = new ScriptedPlatform(array_map(fn(int $i) => [
+    'role' => 'assistant',
+    'content' => '',
+    'tool_calls' => [['function' => ['name' => 'wall', 'arguments' => ['what' => $i % 2 === 0 ? 'ok' : "essai {$i}"]]]],
+], range(1, 8)) + [8 => ['role' => 'assistant', 'content' => 'fini']]);
+[$result] = loopWith($progressing, [new WallTool()]);
+check('errors broken up by a success do not stop it', $result->repeatedError === null && $result->content === 'fini', $result->content);
+
 
 // Varying arguments is work, not circling, and must not trip the guard.
 $working = new ScriptedPlatform([

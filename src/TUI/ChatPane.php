@@ -107,12 +107,22 @@ class ChatPane
     private function emitRendered(string $text): void
     {
         $rendered = $this->markdown->renderIncremental($this->streamBuffer, $text);
-        if ($rendered === '') {
+        if ($rendered === '' || $this->blankOpening($rendered)) {
             return;
         }
 
         $this->emitLabel();
         echo $rendered;
+    }
+
+    /**
+     * Blank lines before a reply has said anything. Some models open every
+     * tool call with a "\n" of content, and each one printed a "Sherpa:" with
+     * nothing after it.
+     */
+    private function blankOpening(string $rendered): bool
+    {
+        return $this->labelPending && trim(Terminal::plain($rendered)) === '';
     }
 
     /**
@@ -139,7 +149,7 @@ class ChatPane
         // being held, waiting for a line after it that will not come.
         $tail = $this->markdown->renderRemainder($this->streamBuffer);
         $this->streamBuffer = '';
-        if ($tail !== '') {
+        if ($tail !== '' && !$this->blankOpening($tail)) {
             $this->emitLabel();
             echo $tail;
         }
@@ -256,8 +266,12 @@ class ChatPane
         $first = explode("\n", $clean)[0] ?? '';
         $truncated = mb_strlen($clean) > mb_strlen($first) ? ' …' : '';
 
-        $color = $isError ? Terminal::RED : Terminal::GRAY;
-        echo $color . '     ' . ($isError ? '✗' : '✓') . ' '
+        // A command that ran and failed is not a tool error, but a check mark
+        // beside "(exit code 1)" read as success, twenty times in a row.
+        $failed = !$isError && preg_match('/^\((exit code [1-9]\d*|command failed|command interrupted)/', $first) === 1;
+
+        $color = $isError ? Terminal::RED : ($failed ? Terminal::YELLOW : Terminal::GRAY);
+        echo $color . '     ' . ($isError || $failed ? '✗' : '✓') . ' '
             . mb_substr($first, 0, 200) . $truncated . Terminal::RESET . "\n";
     }
 

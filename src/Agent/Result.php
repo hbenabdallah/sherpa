@@ -13,5 +13,8 @@ final class Result
         // Stopped for repetition, but the model had replied in the meantime:
         // $content is that reply, not the stop notice.
         public readonly bool $repliedBeforeStop = false,
+        // Stopped because every call came back with this same error: what is
+        // in the way is the user's to fix, and they are shown it.
+        public readonly ?string $repeatedError = null,
     ) {}
 }

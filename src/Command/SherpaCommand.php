@@ -389,6 +389,11 @@ class SherpaCommand extends Command
 
                 if ($result->interrupted) {
                     $this->chat->showInfo('Turn interrupted. The conversation is kept — Ctrl+C again to leave.');
+                } elseif ($result->repeatedError !== null) {
+                    $this->chat->showError(
+                        "Every call came back with the same error; turn stopped:\n  {$result->repeatedError}\n"
+                        . 'It is likely something only you can fix. Once it is, ask again.'
+                    );
                 } elseif ($result->repliedBeforeStop) {
                     $this->chat->showInfo('The model kept repeating a tool call after its reply; turn stopped there.');
                 } elseif ($result->repetitionDetected) {
