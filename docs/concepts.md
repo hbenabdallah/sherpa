@@ -50,12 +50,20 @@ ask for confirmation first:
 | **p** | this tool, always, in this project |
 | **r** | nothing: the model is told the call was refused |
 
-`/permissions` lists the grants that are in force and withdraws them.
+`/permissions` lists the grants that are in force and withdraws them. A tool
+revoked there asks again at its next call, whether it was granted for the
+project or for the session.
 
 The file tools are **confined to the project**, which is the directory Sherpa
 was started in. A path outside it is refused, whether it is absolute, starts
-with `../` or goes through a symbolic link. For the same reason, Sherpa refuses
-to start in your home directory or at `/`.
+with `../` or goes through a symbolic link, even one that points at a file not
+written yet. For the same reason, Sherpa refuses to start in your home directory
+or at `/`. The documentation index and the project's skills take only files
+inside the project too, so a link in a repository cannot hand the model a file
+from elsewhere without asking.
+
+`web_fetch` follows redirects one at a time, and refuses one that leads from a
+public address to `localhost`, a private network or a cloud metadata address.
 
 Edits come with two safety nets:
 

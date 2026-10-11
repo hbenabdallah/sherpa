@@ -116,7 +116,7 @@ dossier n'est pas dans votre `PATH`). Le relancer met à jour. Une version
 donnée, un autre dossier, ou la désinstallation :
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/hbenabdallah/sherpa/main/install.sh | sh -s -- --version 0.1.5
+curl -fsSL https://raw.githubusercontent.com/hbenabdallah/sherpa/main/install.sh | sh -s -- --version 1.0.0
 curl -fsSL https://raw.githubusercontent.com/hbenabdallah/sherpa/main/install.sh | sh -s -- --dir ~/bin
 curl -fsSL https://raw.githubusercontent.com/hbenabdallah/sherpa/main/install.sh | sh -s -- --uninstall
 ```
@@ -225,7 +225,7 @@ permanentes et de la session, et les retire.
 | `/help` | toutes les commandes |
 | `/model`, `/backend` | changer de modèle, ou passer du modèle en ligne au local |
 | `/provider` · `/provider add` · `/provider <nom>` · `/provider key <nom>` · `/provider remove <nom>` | les fournisseurs d'API : lister, ajouter, changer, changer de clé, oublier |
-| `/docs` · `/docs <question>` · `/docs eval` | l'index de la documentation · ce que le modèle recevrait · la qualité de la recherche sur vos propres questions |
+| `/docs` · `/docs reindex` · `/docs <question>` · `/docs eval` | l'index de la documentation · tout relire · ce que le modèle recevrait · la qualité de la recherche sur vos propres questions |
 | `/memory`, `/remember <k> <v>`, `/forget <k>` | la mémoire du projet |
 | `/sessions`, `/resume [n]` | les conversations enregistrées |
 | `/context`, `/compact` | ce qui remplit la fenêtre de contexte, les limites du fournisseur, et la compacter tout de suite |
@@ -354,6 +354,12 @@ ce qui a été rejeté, est dans [les choix de conception](https://github.com/hb
 Depuis les sources, les mêmes réglages peuvent aller dans `.env` (voir
 `.env.dist`).
 
+Ces fichiers, les variables et les options de la ligne de commande restent
+compatibles d'une version à l'autre : ce qu'une version précédente a écrit se
+lit toujours, et se met à jour la première fois que Sherpa l'enregistre. Un
+`config.yaml` ou un `keys.yaml` qui ne se lit plus (une faute de frappe faite à
+la main) n'est jamais écrasé : Sherpa dit pourquoi il ne peut pas enregistrer.
+
 ## FAQ
 
 **Où va mon code ?** Chez le fournisseur que vous avez configuré, et nulle part
@@ -365,7 +371,8 @@ ailleurs : son adresse est affichée au début de chaque session et dans
 Écrire un fichier, lancer une commande et lire une page web demandent toujours
 d'abord, sauf si vous avez autorisé cet outil pour la session ou le projet ;
 `/permissions` affiche et retire ces autorisations. Les outils de fichiers sont
-confinés au dossier du projet.
+confinés au dossier du projet, liens symboliques compris, et `web_fetch` ne
+suit pas une redirection du web vers votre machine ou votre réseau local.
 
 **Quels modèles fonctionnent ?** Tout modèle qui sait appeler des outils, en
 ligne ou par Ollama. Sherpa est une boucle d'appels d'outils, et le dit quand un

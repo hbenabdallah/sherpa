@@ -3,7 +3,7 @@
 # Releases, checked against its SHA-256 before it goes anywhere.
 #
 #   curl -fsSL https://raw.githubusercontent.com/hbenabdallah/sherpa/main/install.sh | sh
-#   curl -fsSL …/install.sh | sh -s -- --version 0.1.5
+#   curl -fsSL …/install.sh | sh -s -- --version 1.0.0
 #   curl -fsSL …/install.sh | sh -s -- --uninstall
 #
 # SHERPA_VERSION and SHERPA_INSTALL_DIR (default ~/.local/bin) do the same as
@@ -24,7 +24,7 @@ fail() { printf '✗ %s\n' "$*" >&2; exit 1; }
 
 while [ $# -gt 0 ]; do
     case $1 in
-        --version) [ $# -ge 2 ] || fail "--version needs a number, like 0.1.5"; version=$2; shift 2 ;;
+        --version) [ $# -ge 2 ] || fail "--version needs a number, like 1.0.0"; version=$2; shift 2 ;;
         --version=*) version=${1#--version=}; shift ;;
         --dir) [ $# -ge 2 ] || fail "--dir needs a directory"; dir=$2; shift 2 ;;
         --dir=*) dir=${1#--dir=}; shift ;;

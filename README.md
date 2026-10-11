@@ -112,7 +112,7 @@ its SHA-256, and puts it in `~/.local/bin` (it says so if that is not in your
 `PATH`). Run it again to update. A given version, another directory, or removing it:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/hbenabdallah/sherpa/main/install.sh | sh -s -- --version 0.1.5
+curl -fsSL https://raw.githubusercontent.com/hbenabdallah/sherpa/main/install.sh | sh -s -- --version 1.0.0
 curl -fsSL https://raw.githubusercontent.com/hbenabdallah/sherpa/main/install.sh | sh -s -- --dir ~/bin
 curl -fsSL https://raw.githubusercontent.com/hbenabdallah/sherpa/main/install.sh | sh -s -- --uninstall
 ```
@@ -217,7 +217,7 @@ for this session, and withdraws them.
 | `/help` | every command |
 | `/model`, `/backend` | change model, or move between online and local |
 | `/provider` · `/provider add` · `/provider <name>` · `/provider key <name>` · `/provider remove <name>` | the API providers: list, add, switch, change a key, forget |
-| `/docs` · `/docs <question>` · `/docs eval` | the documentation index · what the model would be given · search quality on your own questions |
+| `/docs` · `/docs reindex` · `/docs <question>` · `/docs eval` | the documentation index · read it all again · what the model would be given · search quality on your own questions |
 | `/memory`, `/remember <k> <v>`, `/forget <k>` | the project's memory |
 | `/sessions`, `/resume [n]` | saved conversations |
 | `/context`, `/compact` | what fills the context window, the provider's limits, and compacting it now |
@@ -335,6 +335,12 @@ was rejected, is in the [design choices](https://github.com/hbenabdallah/sherpa/
 
 From the source, the same settings can live in `.env` (see `.env.dist`).
 
+These files, the variables and the command-line options stay compatible from
+one version to the next: what an earlier Sherpa wrote still reads, and is
+brought up to date the first time Sherpa saves it. A `config.yaml` or
+`keys.yaml` that no longer parses — a typo made by hand — is never written
+over: Sherpa says why it cannot save.
+
 ## FAQ
 
 **Where does my code go?** To the provider you configured, and nowhere else:
@@ -345,7 +351,9 @@ nothing leaves your machine.
 **Can it change my files or run commands without asking?** No. Writing a file,
 running a command and fetching a web page always ask first, unless you granted
 that tool for the session or the project; `/permissions` shows and withdraws
-those grants. File tools are confined to the project directory.
+those grants. File tools are confined to the project directory, symbolic
+links included, and `web_fetch` does not follow a redirect from the web to
+your machine or your local network.
 
 **Which models work?** Any model that supports tool calling, online or through
 Ollama. Sherpa is a loop of tool calls, and says so when a model cannot make them.

@@ -202,6 +202,9 @@ edited by hand — [`mcp.json.dist`](../mcp.json.dist) is an example:
 ```
 
 A configuration written for another MCP client works as it is.
+A server started as a process gets the environment Sherpa runs in, with the
+variables of its `env` added — except Sherpa's own `SHERPA_*` settings, which
+include the API key. A server that needs one of them names it in `env`.
 `"enabled": false` turns a server off without deleting it — what
 `/mcp disable` writes. `/mcp` shows each server's state, its resources and its
 prompts, and why a server did not start.

@@ -1,0 +1,14 @@
+projects:
+  projet-ete:
+    name: 'Projet Été'
+    path: /tmp/compat-home/projet
+    memory_db: /tmp/compat-home/.config/sherpa/projects/projet-ete/memory.db
+    docker:
+      enabled: true
+      container: app
+      db_container: db
+    stack: 'PHP >=8.2'
+    created_at: '2026-10-10T19:11:15+00:00'
+    last_used_at: '2026-10-10T19:11:15+00:00'
+    allowed_tools:
+      - shell_exec

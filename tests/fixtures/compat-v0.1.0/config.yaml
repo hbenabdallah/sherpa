@@ -1,0 +1,14 @@
+# This machine's configuration.
+# Outside the repository: the same clone can aim at a different model here and there.
+# backend: api (an online provider) or ollama (a local model).
+# The API key is never written here: it comes from SHERPA_API_KEY.
+# Edit by hand, or from Sherpa with /model and /backend.
+backend: api
+api:
+  url: 'https://openrouter.ai/api/v1'
+  model: qwen/qwen3-coder
+  context: 65536
+  embedding_model: text-embedding-3-small
+ollama:
+  model: 'qwen2.5-coder:7b'
+  context: 32768

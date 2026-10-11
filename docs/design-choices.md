@@ -278,4 +278,5 @@ Sending code to a provider is your choice. Sherpa does not refuse, and does not
 ask for consent at every turn. It makes the destination visible instead: the
 address is shown when a session starts and in `/context`, and a key is only
 ever sent to the provider it was given for. A local model through Ollama
-keeps everything on the machine.
+keeps everything on the machine. An MCP server Sherpa starts does not inherit
+its `SHERPA_*` settings either: the API key is not another process's business.
