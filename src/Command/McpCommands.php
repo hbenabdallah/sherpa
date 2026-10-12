@@ -82,6 +82,15 @@ final class McpCommands
             }
         }
 
+        foreach ($this->mcp->templates() as $server => $templates) {
+            echo Terminal::BOLD . "\nResource templates of {$server}" . Terminal::RESET
+                . Terminal::GRAY . " (the model fills in each {parameter})\n" . Terminal::RESET;
+            foreach ($templates as $template) {
+                echo '  ' . Terminal::plain($template['uriTemplate'], singleLine: true)
+                    . Terminal::GRAY . '  ' . Terminal::plain($template['name'], singleLine: true) . "\n" . Terminal::RESET;
+            }
+        }
+
         $prompts = $this->mcp->promptCommands();
         if ($prompts !== []) {
             echo Terminal::BOLD . "\nPrompts" . Terminal::RESET . Terminal::GRAY . " (run as commands)\n" . Terminal::RESET;

@@ -206,7 +206,7 @@ The model only sees each skill's first paragraph, and loads the whole file with
 be a process Sherpa starts, or an address it reaches over HTTP. Their tools
 always ask before they run.
 
-A server can also offer two other things, which Sherpa picks up when it
+A server can also offer three other things, which Sherpa picks up when it
 starts:
 
 - **Resources**: data the server publishes under a URI, such as a database
@@ -214,10 +214,11 @@ starts:
   `mcp__<server>__read_resource`. Its description lists the resources, so the
   model knows what it can read. Like the server's other tools, it asks before
   it runs.
+- **Resource templates**: URIs with parameters, like `db://tables/{name}`.
+  They are listed in the same `read_resource` tool, and the model builds the
+  URI by filling in each parameter; the server says whether it exists.
 - **Prompts**: request templates the server fills in. Each one runs as a
   command, `/<server>:<prompt>`, and the server's text becomes your message.
-
-Resource templates (URIs with parameters) are not supported yet.
 
 ## Backends
 

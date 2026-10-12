@@ -50,14 +50,14 @@ return new class {
 
         // Resources and prompts only in "rich": every other mode is a
         // tools-only server, which answers those methods "unknown".
-        if ($mode === 'rich' && ($rich = $this->rich($method, $request['params'] ?? [], $id)) !== null) {
+        if (in_array($mode, ['rich', 'templates'], true) && ($rich = $this->rich($method, $request['params'] ?? [], $id, $mode)) !== null) {
             return $rich;
         }
 
         return match ($method) {
             'initialize' => ['jsonrpc' => '2.0', 'id' => $id, 'result' => [
                 'protocolVersion' => '2025-06-18',
-                'capabilities'    => $mode === 'rich'
+                'capabilities'    => in_array($mode, ['rich', 'templates'], true)
                     ? ['tools' => new stdClass(), 'resources' => new stdClass(), 'prompts' => new stdClass()]
                     : ['tools' => new stdClass()],
                 'serverInfo'      => ['name' => 'faux-serveur', 'version' => '1.0'],
@@ -74,16 +74,25 @@ return new class {
      *
      * @return array<string, mixed>|null
      */
-    private function rich(string $method, array $params, mixed $id): ?array
+    private function rich(string $method, array $params, mixed $id, string $mode = 'rich'): ?array
     {
         $ok = static fn(array $result) => ['jsonrpc' => '2.0', 'id' => $id, 'result' => $result];
+
+        // "templates": resource templates and nothing listed beside them.
+        if ($mode === 'templates' && $method === 'resources/list') {
+            return $ok(['resources' => []]);
+        }
 
         return match ($method) {
             'resources/list' => $ok(['resources' => [
                 ['uri' => 'db://schema', 'name' => 'schema', 'description' => 'The database schema', 'mimeType' => 'text/plain'],
                 ['uri' => 'file:///logo.png', 'name' => 'logo', 'mimeType' => 'image/png'],
             ]]),
+            'resources/templates/list' => $ok(['resourceTemplates' => [
+                ['uriTemplate' => 'db://tables/{name}', 'name' => 'table', 'description' => 'The columns of one table', 'mimeType' => 'text/plain'],
+            ]]),
             'resources/read' => match ($params['uri'] ?? '') {
+                'db://tables/users' => $ok(['contents' => [['uri' => 'db://tables/users', 'mimeType' => 'text/plain', 'text' => 'users: id INT, email TEXT']]]),
                 'db://schema'      => $ok(['contents' => [['uri' => 'db://schema', 'mimeType' => 'text/plain', 'text' => 'CREATE TABLE users (id INT, email TEXT);']]]),
                 'file:///logo.png' => $ok(['contents' => [['uri' => 'file:///logo.png', 'mimeType' => 'image/png', 'blob' => base64_encode('PNGDATA')]]]),
                 default            => ['jsonrpc' => '2.0', 'id' => $id, 'error' => ['code' => -32002, 'message' => 'resource not found']],

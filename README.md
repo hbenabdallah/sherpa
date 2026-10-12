@@ -284,7 +284,7 @@ sherpa mcp list          # and: disable, enable, remove <name>
 ```
 
 Both write `~/.config/sherpa/mcp.json`, in the `mcpServers` format other
-clients use, so a configuration from elsewhere can be copied in as it is. A server's resources are read by the
+clients use, so a configuration from elsewhere can be copied in as it is. A server's resources, templates included, are read by the
 model through one more tool, and its prompts run as `/<server>:<prompt>`
 commands. See [`mcp.json.dist`](https://github.com/hbenabdallah/sherpa/blob/main/mcp.json.dist).
 On a PHP project, [phpgraph](https://github.com/hbenabdallah/phpgraph) gives

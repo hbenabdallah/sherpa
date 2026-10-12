@@ -29,6 +29,9 @@ class McpRegistry
     /** @var array<string, array<int, array{uri: string, name: string, description: string, mimeType: string}>> by server */
     private array $resources = [];
 
+    /** @var array<string, array<int, array{uriTemplate: string, name: string, description: string, mimeType: string}>> by server */
+    private array $templates = [];
+
     /** @var array<string, array<int, array{name: string, description: string, arguments: array<int, array{name: string, description: string, required: bool}>}>> by server */
     private array $prompts = [];
 
@@ -118,7 +121,7 @@ class McpRegistry
         }
         ($this->clients[$name] ?? null)?->close();
 
-        unset($this->toolNames[$name], $this->clients[$name], $this->resources[$name], $this->prompts[$name], $this->instructions[$name]);
+        unset($this->toolNames[$name], $this->clients[$name], $this->resources[$name], $this->templates[$name], $this->prompts[$name], $this->instructions[$name]);
 
         if ($status === null) {
             unset($this->report[$name]);
@@ -176,18 +179,20 @@ class McpRegistry
         }
 
         $resources = $client->listResources();
-        if ($resources !== []) {
+        $templates = $client->listResourceTemplates();
+        if ($resources !== [] || $templates !== []) {
             try {
                 $toolbox->register(new ToolDefinition(
                     name: $this->localName($server->name, 'read_resource'),
-                    description: $this->describeResources($server->name, $resources),
-                    parameters: ['uri' => ['type' => 'string', 'description' => 'The URI of the resource, as listed', 'required' => true]],
+                    description: $this->describeResources($server->name, $resources, $templates),
+                    parameters: ['uri' => ['type' => 'string', 'description' => 'The URI of the resource, as listed or built from a template', 'required' => true]],
                     // What comes back is third-party content, like a tool's.
                     permission: Permission::CONFIRM,
                     handler: new McpResourceReader($client),
                 ));
                 $this->toolNames[$server->name][] = $this->localName($server->name, 'read_resource');
                 $this->resources[$server->name] = $resources;
+                $this->templates[$server->name] = $templates;
             } catch (\LogicException) {
                 $skipped[] = 'read_resource';
             }
@@ -207,6 +212,7 @@ class McpRegistry
 
         $line = "{$server->name}: " . $this->count($added, 'tool')
             . ($resources !== [] ? ', ' . $this->count(count($resources), 'resource') : '')
+            . ($templates !== [] ? ', ' . $this->count(count($templates), 'resource template') : '')
             . ($prompts !== [] ? ', ' . $this->count(count($prompts), 'prompt') : '')
             . ' · ' . $this->origin($server);
         if ($skipped !== []) {
@@ -310,22 +316,48 @@ class McpRegistry
      * The reader's description is where the model learns what there is to
      * read, so it lists the resources, up to a point.
      *
+     * A template is a URI with parameters: the model fills them in, and the
+     * server says whether what it built exists.
+     *
      * @param array<int, array{uri: string, name: string, description: string, mimeType: string}> $resources
+     * @param array<int, array{uriTemplate: string, name: string, description: string, mimeType: string}> $templates
      */
-    private function describeResources(string $server, array $resources): string
+    private function describeResources(string $server, array $resources, array $templates = []): string
     {
-        $lines = [];
-        foreach (array_slice($resources, 0, self::LISTED_RESOURCES) as $resource) {
-            $about = trim($resource['name'] . ($resource['description'] !== '' ? ': ' . $resource['description'] : ''));
-            $lines[] = '- ' . $resource['uri'] . ($about !== '' ? ' — ' . mb_strimwidth($about, 0, 120, '…') : '');
+        $text = "[MCP · {$server}] Read one of this server's resources by its URI.";
+
+        if ($resources !== []) {
+            $text .= " Available:\n" . implode("\n", $this->listed(array_column($resources, 'uri'), $resources));
         }
 
-        $more = count($resources) - self::LISTED_RESOURCES;
+        if ($templates !== []) {
+            $text .= ($resources !== [] ? "\n" : ' ') . "Or build the URI from a template, each {parameter} filled in:\n"
+                . implode("\n", $this->listed(array_column($templates, 'uriTemplate'), $templates));
+        }
+
+        return $text;
+    }
+
+    /**
+     * @param list<string> $uris
+     * @param array<int, array{name: string, description: string}> $entries
+     *
+     * @return list<string>
+     */
+    private function listed(array $uris, array $entries): array
+    {
+        $lines = [];
+        foreach (array_slice($entries, 0, self::LISTED_RESOURCES, true) as $i => $entry) {
+            $about = trim($entry['name'] . ($entry['description'] !== '' ? ': ' . $entry['description'] : ''));
+            $lines[] = '- ' . $uris[$i] . ($about !== '' ? ' — ' . mb_strimwidth($about, 0, 120, '…') : '');
+        }
+
+        $more = count($entries) - self::LISTED_RESOURCES;
         if ($more > 0) {
             $lines[] = "- and {$more} more";
         }
 
-        return "[MCP · {$server}] Read one of this server's resources by its URI. Available:\n" . implode("\n", $lines);
+        return $lines;
     }
 
     /**
@@ -335,7 +367,18 @@ class McpRegistry
      */
     public function resources(): array
     {
-        return $this->resources;
+        // A server with templates only has a reader and no listed resource.
+        return array_filter($this->resources);
+    }
+
+    /**
+     * Every resource template, by server, for /mcp.
+     *
+     * @return array<string, array<int, array{uriTemplate: string, name: string, description: string, mimeType: string}>>
+     */
+    public function templates(): array
+    {
+        return array_filter($this->templates);
     }
 
     /**

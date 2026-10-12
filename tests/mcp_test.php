@@ -304,6 +304,7 @@ check('a url that is not http(s) is caught at the file, not at the first call',
 $plain = McpClient::for(server('ok'));
 check('a tools-only server has no resources, and that is not an error', $plain->listResources() === []);
 check('nor prompts', $plain->listPrompts() === []);
+check('nor resource templates', $plain->listResourceTemplates() === []);
 $plain->close();
 
 $rich = McpClient::for(server('rich'));
@@ -312,6 +313,10 @@ check('resources are listed with their URI and description',
     array_column($resources, 'uri') === ['db://schema', 'file:///logo.png'] && $resources[0]['description'] === 'The database schema',
     json_encode($resources));
 check('a text resource is read as its text', $rich->readResource('db://schema') === 'CREATE TABLE users (id INT, email TEXT);');
+$templates = $rich->listResourceTemplates();
+check('resource templates are listed, the URI with its parameters',
+    array_column($templates, 'uriTemplate') === ['db://tables/{name}'] && $templates[0]['description'] === 'The columns of one table', json_encode($templates));
+check('and a URI built from one is read like any other', $rich->readResource('db://tables/users') === 'users: id INT, email TEXT');
 check('a binary one is named with its size, not decoded into the context',
     str_contains($rich->readResource('file:///logo.png'), 'image/png, 7 bytes'), $rich->readResource('file:///logo.png'));
 $threw = false;
@@ -359,15 +364,29 @@ check('which asks before it runs, like any remote tool', $reader?->permission ==
 check('and whose description lists what there is to read',
     str_contains($reader?->description ?? '', 'db://schema') && str_contains($reader?->description ?? '', 'The database schema'),
     $reader?->description ?? '');
+check('and the templates, with how to use them',
+    str_contains($reader?->description ?? '', 'db://tables/{name}') && str_contains($reader?->description ?? '', 'each {parameter} filled in'),
+    $reader?->description ?? '');
 check('a tools-only server gets no reader', $toolbox->find('mcp__plain__read_resource') === null);
+$result = $toolbox->execute(new ToolCall(id: 'r0', name: 'mcp__docs__read_resource', arguments: ['uri' => 'db://tables/users']));
+check('the model reads a URI it built from a template', !$result->isError && str_contains($result->content, 'email TEXT'), $result->content);
 $result = $toolbox->execute(new ToolCall(id: 'r1', name: 'mcp__docs__read_resource', arguments: ['uri' => 'db://schema']));
 check('the model reads a resource end to end', !$result->isError && str_contains($result->content, 'CREATE TABLE users'), $result->content);
 $result = $toolbox->execute(new ToolCall(id: 'r2', name: 'mcp__docs__read_resource', arguments: ['uri' => 'db://nothing']));
 check('and a bad URI comes back as an error it can act on', $result->isError && str_contains($result->content, 'db://nothing'), $result->content);
 
 $report = implode("\n", $registry->report());
-check('the report counts resources and prompts', str_contains($report, 'docs: 3 tools, 2 resources, 2 prompts'), $report);
+check('the report counts resources, templates and prompts', str_contains($report, 'docs: 3 tools, 2 resources, 1 resource template, 2 prompts'), $report);
 check('and says nothing of them for a server that has none', str_contains($report, 'plain: 3 tools · '), $report);
+
+// Templates and nothing listed: the reader is still there, and nothing shows
+// as an empty list of resources.
+[$templated, $templatedTools] = registryFor(writeConfig(['tables' => ['command' => PHP_BINARY, 'args' => $fixtureArgs('templates')]]));
+$templateReader = $templatedTools->find('mcp__tables__read_resource');
+check('a server with templates only still gets a reader', $templateReader !== null && str_contains($templateReader->description, 'db://tables/{name}'),
+    (string) $templateReader?->description);
+check('listed under its templates, not as resources', isset($templated->templates()['tables']) && !isset($templated->resources()['tables']),
+    json_encode([$templated->templates(), $templated->resources()]));
 check('the prompts become /<server>:<prompt> commands',
     array_column($registry->promptCommands(), 'command') === ['/docs:review', '/docs:standup'],
     json_encode(array_column($registry->promptCommands(), 'command')));

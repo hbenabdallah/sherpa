@@ -188,6 +188,44 @@ final class McpClient
     }
 
     /**
+     * The resource templates the server offers — URIs with parameters, like
+     * db://tables/{name} — or none. Optional, like resources: a server without
+     * them answers "unknown method".
+     *
+     * @return array<int, array{uriTemplate: string, name: string, description: string, mimeType: string}>
+     */
+    public function listResourceTemplates(): array
+    {
+        $this->connect();
+
+        $templates = [];
+        $cursor = null;
+
+        do {
+            try {
+                $page = $this->request(fn(Sdk $client) => $client->listResourceTemplates($cursor));
+            } catch (\Throwable) {
+                // Unknown method, or a template the SDK refuses to parse:
+                // either way there is nothing usable to offer.
+                return $templates;
+            }
+
+            foreach ($page?->resourceTemplates ?? [] as $template) {
+                $templates[] = [
+                    'uriTemplate' => $template->uriTemplate,
+                    'name'        => (string) ($template->title ?? $template->name),
+                    'description' => (string) ($template->description ?? ''),
+                    'mimeType'    => (string) ($template->mimeType ?? ''),
+                ];
+            }
+
+            $cursor = $page?->nextCursor;
+        } while ($cursor !== null && count($templates) < self::MAX_RESOURCES);
+
+        return $templates;
+    }
+
+    /**
      * A resource's content as text. Binary content is named, not decoded: the
      * model reads text.
      */

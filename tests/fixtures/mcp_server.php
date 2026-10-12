@@ -20,6 +20,7 @@
  *   toolerror   answers tools/call with isError
  *   protoerror  answers tools/call with a JSON-RPC error, having logged a token
  *   env         answers tools/call with the environment it was started with
+ *   templates   offers resource templates, and no resource listed
  */
 
 $protocol = require __DIR__ . '/mcp_protocol.php';
