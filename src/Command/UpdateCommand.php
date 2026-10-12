@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Command;
 
+use App\TUI\Terminal;
 use App\Update\Releases;
 use App\Update\SelfUpdater;
 use App\Update\UpdateFailed;
@@ -26,6 +27,7 @@ final class UpdateCommand extends Command
 {
     /** Asked for, so worth waiting for longer than the start-up notice does. */
     private const LATEST_TIMEOUT = 15.0;
+    private const NOTES_LINES = 40;
 
     public function __construct(
         private readonly Releases $releases,
@@ -85,12 +87,15 @@ final class UpdateCommand extends Command
         $output->writeln("Downloading Sherpa {$version} for {$platform}…");
 
         try {
-            $this->updater->install($version, $platform, $executable);
+            $notes = $this->updater->install($version, $platform, $executable);
         } catch (UpdateFailed $e) {
             return $this->fail($output, $e->getMessage() . '. Nothing was changed.');
         }
 
         $output->writeln("<info>✓</info> Sherpa {$version} installed in " . OutputFormatter::escape($executable) . " (was {$current}).");
+        if ($notes !== null) {
+            $output->writeln(['', ...self::shown($notes)]);
+        }
 
         // This process reads its classes from the archive it runs from, as it
         // needs them — and that file is now the new release, laid out
@@ -102,6 +107,24 @@ final class UpdateCommand extends Command
         }
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * The notes as plain lines: they come from the network, so no escape
+     * sequence nor console tag of theirs gets through, and a screenful at most.
+     *
+     * @return list<string>
+     */
+    private static function shown(string $notes): array
+    {
+        $lines = array_map(
+            fn(string $line) => OutputFormatter::escape(Terminal::plain($line, singleLine: true)),
+            explode("\n", trim($notes)),
+        );
+
+        return count($lines) > self::NOTES_LINES
+            ? [...array_slice($lines, 0, self::NOTES_LINES), '…the rest at ' . Releases::URL]
+            : $lines;
     }
 
     private function fail(OutputInterface $output, string $message): int

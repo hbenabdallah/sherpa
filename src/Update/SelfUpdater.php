@@ -19,8 +19,14 @@ final class SelfUpdater
         private readonly Releases $releases,
     ) {}
 
-    /** @throws UpdateFailed with the reason, the executable left as it was */
-    public function install(string $version, string $platform, string $target): void
+    /**
+     * @return string|null what the release changed, for a release that says
+     *                     so — fetched before the executable is replaced,
+     *                     since nothing may be loaded after
+     *
+     * @throws UpdateFailed with the reason, the executable left as it was
+     */
+    public function install(string $version, string $platform, string $target): ?string
     {
         $dir = dirname($target);
         if (!is_writable($dir) || (is_file($target) && !is_writable($target))) {
@@ -36,6 +42,13 @@ final class SelfUpdater
             throw new UpdateFailed('the SHA-256 of the download does not match the release\'s');
         }
 
+        // Optional: the releases before 1.0.2 have none.
+        try {
+            $notes = $this->fetch($this->releases->notes($version), 'no notes');
+        } catch (UpdateFailed) {
+            $notes = null;
+        }
+
         $tmp = $dir . '/.sherpa-update-' . getmypid();
         $written = @file_put_contents($tmp, $binary) === strlen($binary)
             && @chmod($tmp, 0755)
@@ -46,6 +59,8 @@ final class SelfUpdater
 
             throw new UpdateFailed("could not replace {$target}");
         }
+
+        return $notes;
     }
 
     private function fetch(string $url, string $missing): string

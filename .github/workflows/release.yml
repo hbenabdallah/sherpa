@@ -96,10 +96,19 @@ jobs:
     permissions:
       contents: write
     steps:
+      # The whole history and its tags: the notes are the commits since the
+      # release before this one.
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
       - uses: actions/download-artifact@v4
         with:
           name: release
           path: var/release/
+
+      - name: release notes
+        run: bin/release-notes.sh "$GITHUB_REF_NAME" > var/release/release-notes.md
 
       # A release drafted in GitHub's interface creates the tag itself, and so
       # starts this workflow with the release already there: then the files
@@ -110,11 +119,13 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           version="${GITHUB_REF_NAME#v}"
-          files=(var/release/sherpa-"$version"-* var/release/THIRD-PARTY-NOTICES.md)
+          # release-notes.md among the files too: `sherpa update` fetches it
+          # from beside the executable and shows it once installed.
+          files=(var/release/sherpa-"$version"-* var/release/THIRD-PARTY-NOTICES.md var/release/release-notes.md)
           if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber
           else
             gh release create "$GITHUB_REF_NAME" "${files[@]}" \
               --title "Sherpa ${version}" \
-              --notes "Single executable for Linux (x86_64, aarch64) and macOS (Apple Silicon) — nothing to install. See the README for setup, and THIRD-PARTY-NOTICES.md for the licences of what it bundles."
+              --notes-file var/release/release-notes.md
           fi

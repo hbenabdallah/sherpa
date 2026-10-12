@@ -47,6 +47,12 @@ final class Releases
         return "{$this->url}/download/v{$version}/sherpa-{$version}-{$platform}";
     }
 
+    /** What the release changed, published beside its executables. */
+    public function notes(string $version): string
+    {
+        return "{$this->url}/download/v{$version}/release-notes.md";
+    }
+
     /**
      * This machine, named as the releases name it, or null where there is no
      * executable for it — the platforms install.sh knows.

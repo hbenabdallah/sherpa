@@ -137,7 +137,7 @@ sherpa: ## Run php bin/console sherpa
 # through: "clean" locally, red on GitHub. Pinned, and run by both through this
 # target.
 SHELLCHECK_VERSION ?= v0.11.0
-SHELL_SCRIPTS := bin/env-sync.sh bin/doctor.sh bin/find-php.sh bin/install-php.sh bin/fetch-micro.sh bin/sherpa.tmpl tests/release/smoke.sh install.sh
+SHELL_SCRIPTS := bin/release-notes.sh bin/env-sync.sh bin/doctor.sh bin/find-php.sh bin/install-php.sh bin/fetch-micro.sh bin/sherpa.tmpl tests/release/smoke.sh install.sh
 
 lint: ## Check the shell scripts, with the same shellcheck CI uses
 	docker run --rm -v "$(CURDIR):/mnt" -w /mnt koalaman/shellcheck:$(SHELLCHECK_VERSION) $(SHELL_SCRIPTS)

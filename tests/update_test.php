@@ -112,7 +112,8 @@ $client = serving([$base => $binary, $base . '.sha256' => $sum], $requested);
 clearstatcache();
 check('the release takes the executable\'s place', file_get_contents($target) === $binary);
 check('executable', (fileperms($target) & 0777) === 0755, decoct(fileperms($target) & 0777));
-check('fetched from the release, checksum beside it', $requested === [$base, $base . '.sha256'], json_encode($requested));
+check('fetched from the release, checksum beside it, then its notes',
+    $requested === [$base, $base . '.sha256', Releases::URL . '/download/v1.0.2/release-notes.md'], json_encode($requested));
 check('and nothing is left beside it', glob(dirname($target) . '/.sherpa-update-*') === []);
 
 /** The reason an install failed, or null when it did not. */
@@ -157,11 +158,13 @@ function update(array $args, ?string $executable, string $current, MockHttpClien
 }
 
 $latest = Releases::URL . '/latest';
-$github = fn() => new MockHttpClient(function (string $method, string $url) use ($latest, $base, $binary, $sum) {
+$notesUrl = Releases::URL . '/download/v1.0.2/release-notes.md';
+$github = fn(?string $notes = null) => new MockHttpClient(function (string $method, string $url) use ($latest, $base, $binary, $sum, $notesUrl, $notes) {
     return match ($url) {
         $latest          => new MockResponse('', ['http_code' => 302, 'response_headers' => ['Location: ' . Releases::URL . '/tag/v1.0.2']]),
         $base            => new MockResponse($binary),
         $base . '.sha256' => new MockResponse($sum),
+        $notesUrl        => $notes === null ? new MockResponse('', ['http_code' => 404]) : new MockResponse($notes),
         default          => new MockResponse('', ['http_code' => 404]),
     };
 });
@@ -170,6 +173,18 @@ file_put_contents($target, "old sherpa\n");
 $run = update([], $target, '1.0.1', $github());
 check('sherpa update installs the latest release', $run->getStatusCode() === 0 && file_get_contents($target) === $binary, $run->getDisplay());
 check('and says what it replaced', str_contains($run->getDisplay(), 'Sherpa 1.0.2 installed') && str_contains($run->getDisplay(), 'was 1.0.1'), $run->getDisplay());
+
+// What changed, shown once installed. From the network: shown as text.
+file_put_contents($target, "old sherpa\n");
+$run = update([], $target, '1.0.1', $github("## What changed in Sherpa 1.0.2\n\n- Faster \e[2Jstartup\n- <error>tag</error> kept as text\n"));
+check('once installed, what the release changed is shown', str_contains($run->getDisplay(), 'What changed in Sherpa 1.0.2') && str_contains($run->getDisplay(), '- Faster'), $run->getDisplay());
+check('as text: no escape sequence, no console tag of its own', !str_contains($run->getDisplay(), "\e[2J") && str_contains($run->getDisplay(), '<error>tag</error>'), $run->getDisplay());
+file_put_contents($target, "old sherpa\n");
+$run = update([], $target, '1.0.1', $github(implode("\n", array_map(fn($i) => "- change {$i}", range(1, 100)))));
+check('a screenful at most, with where the rest is', !str_contains($run->getDisplay(), 'change 41') && str_contains($run->getDisplay(), 'the rest at'), $run->getDisplay());
+file_put_contents($target, "old sherpa\n");
+$run = update([], $target, '1.0.1', $github());
+check('a release without notes installs all the same', $run->getStatusCode() === 0 && file_get_contents($target) === $binary, $run->getDisplay());
 
 $run = update([], $target, '1.0.2', $github());
 check('on the latest already, it says so and downloads nothing', $run->getStatusCode() === 0 && str_contains($run->getDisplay(), 'is the latest'), $run->getDisplay());
@@ -186,6 +201,19 @@ check('from the source, it points at git instead', $run->getStatusCode() === 1 &
 
 $run = update([], $target, '1.0.1', new MockHttpClient(new MockResponse('', ['error' => 'offline'])));
 check('with GitHub out of reach, it says so and suggests naming a version', $run->getStatusCode() === 1 && str_contains($run->getDisplay(), 'sherpa update 1.0.1'), $run->getDisplay());
+
+// ---- the notes, from the history -----------------------------------------------
+// Run on this repository's own tags: v1.0.1 is the commits after v1.0.0.
+$repo = dirname(__DIR__);
+if (is_dir($repo . '/.git') && trim((string) shell_exec('git -C ' . escapeshellarg($repo) . ' tag -l v1.0.1 2>/dev/null')) === 'v1.0.1') {
+    $notes = (string) shell_exec('cd ' . escapeshellarg($repo) . ' && sh bin/release-notes.sh v1.0.1 2>&1');
+    check('the notes of a release are its commits since the one before',
+        str_contains($notes, 'What changed in Sherpa 1.0.1') && str_contains($notes, '- Say at start-up when a newer release is out')
+        && str_contains($notes, 'Since 1.0.0.'), $notes);
+    check('and none from the release before', !str_contains($notes, 'Confine symlinks'), $notes);
+} else {
+    check('the notes script (skipped: no git history with tags here)', true);
+}
 
 // ---- wired --------------------------------------------------------------------
 $kernel = new Kernel('dev', true);
