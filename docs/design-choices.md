@@ -249,7 +249,8 @@ Sherpa is written in PHP 8.4 with Symfony. A PHP tool usually asks its users to
 install PHP. The release is instead a phar appended to a static PHP runtime
 (`micro`), pinned by checksum:
 
-- one file per platform (Linux x86_64 and aarch64, macOS on Apple Silicon),
+- one file per platform (Linux x86_64 and aarch64, macOS on Apple Silicon and
+  Intel),
   24 MB on Linux;
 - nothing else to install;
 - 0.8 s for the first start, 0.28 s after that.

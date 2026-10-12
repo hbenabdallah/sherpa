@@ -50,7 +50,8 @@ check('a tag that is not a release number is not one', latestIs('nightly')->late
 check('Linux x86_64 is linux-x86_64', Releases::platform('Linux', 'x86_64') === 'linux-x86_64');
 check('Linux on ARM is linux-aarch64', Releases::platform('Linux', 'aarch64') === 'linux-aarch64');
 check('an Apple Silicon Mac is macos-aarch64', Releases::platform('Darwin', 'arm64') === 'macos-aarch64');
-check('an Intel Mac has no executable', Releases::platform('Darwin', 'x86_64') === null);
+check('an Intel Mac is macos-x86_64', Releases::platform('Darwin', 'x86_64') === 'macos-x86_64');
+check('Windows has no executable', Releases::platform('Windows', 'x86_64') === null);
 
 // ---- the notice at start-up ---------------------------------------------------
 $now = 1_800_000_000;

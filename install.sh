@@ -60,7 +60,7 @@ case "$os-$arch" in
     Linux-x86_64|Linux-amd64) platform=linux-x86_64 ;;
     Linux-aarch64|Linux-arm64) platform=linux-aarch64 ;;
     Darwin-arm64|Darwin-aarch64) platform=macos-aarch64 ;;
-    Darwin-x86_64) fail "no executable for Intel Macs yet. Sherpa runs from the source there: see the README." ;;
+    Darwin-x86_64) platform=macos-x86_64 ;;
     *) fail "no executable for $os $arch. Sherpa runs from the source there: see the README." ;;
 esac
 
@@ -108,7 +108,7 @@ mv "$target.new" "$target"
 
 # A file a browser downloaded is quarantined on macOS; curl's is not, but a
 # leftover mark from an earlier install would still stop it at launch.
-if [ "$platform" = macos-aarch64 ] && command -v xattr > /dev/null 2>&1; then
+if [ "${platform%%-*}" = macos ] && command -v xattr > /dev/null 2>&1; then
     xattr -d com.apple.quarantine "$target" 2> /dev/null || true
 fi
 

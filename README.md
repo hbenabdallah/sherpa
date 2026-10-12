@@ -79,7 +79,7 @@ Sherpa answers in the language of your question; its interface is in English.
 
 ## Quick start
 
-**1. Install** — one file for Linux (x86_64, aarch64) and macOS (Apple Silicon):
+**1. Install** — one file for Linux (x86_64, aarch64) and macOS (Apple Silicon, Intel):
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/hbenabdallah/sherpa/main/install.sh | sh
@@ -376,8 +376,10 @@ model's prices to `config.yaml` and Sherpa shows the cost of the session;
 
 ## Known limits
 
-- The executable exists for Linux (x86_64, aarch64) and Apple Silicon Macs; not
-  for Intel Macs or Windows.
+- The executable exists for Linux (x86_64, aarch64) and macOS (Apple Silicon,
+  Intel). On Windows, Sherpa runs in WSL with the Linux executable: natively,
+  its terminal handling and process control (raw mode, signals) have no
+  equivalent.
 - The model has to support tool calling.
 
 ## Contributing

@@ -82,7 +82,7 @@ Sherpa répond dans la langue de votre question ; son interface est en anglais.
 
 ## Démarrage rapide
 
-**1. Installer** — un seul fichier pour Linux (x86_64, aarch64) et macOS (Apple Silicon) :
+**1. Installer** — un seul fichier pour Linux (x86_64, aarch64) et macOS (Apple Silicon, Intel) :
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/hbenabdallah/sherpa/main/install.sh | sh
@@ -399,8 +399,10 @@ rien.
 
 ## Limites connues
 
-- L'exécutable existe pour Linux (x86_64, aarch64) et les Mac Apple Silicon ;
-  pas pour les Mac Intel ni Windows.
+- L'exécutable existe pour Linux (x86_64, aarch64) et macOS (Apple Silicon,
+  Intel). Sous Windows, Sherpa tourne dans WSL avec l'exécutable Linux : en
+  natif, sa gestion du terminal et des processus (mode brut, signaux) n'a pas
+  d'équivalent.
 - Le modèle doit savoir appeler des outils.
 
 ## Contribuer

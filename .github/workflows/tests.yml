@@ -65,6 +65,30 @@ jobs:
       - name: suites
         run: ~/.local/share/sherpa/php tests/run.php
 
+  # The Intel Mac's static PHP, checked on an Intel Mac at every push: the
+  # release runs its executable there before publishing, and a tag is a bad
+  # place to learn that the runner or the runtime is not what it should be.
+  # `make php` refuses a PHP without what Sherpa needs.
+  intel-mac:
+    name: PHP on an Intel Mac
+    runs-on: macos-15-intel
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/sherpa
+            var/micro
+          key: static-php-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Makefile') }}
+
+      - name: make php
+        run: make php
+
+      - name: runs Sherpa's own checks
+        run: ~/.local/share/sherpa/php -r 'exit(PHP_VERSION_ID >= 80400 && extension_loaded("pdo_sqlite") && extension_loaded("pcntl") && extension_loaded("phar") ? 0 : 1);'
+
   shell:
     name: Shell scripts
     runs-on: ubuntu-latest

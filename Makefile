@@ -63,10 +63,12 @@ PHP_STATIC_VERSION ?= 8.4.23
 PHP_SHA256_linux-x86_64    := 1aeed5bc7967977ca5b1da7163acd91bf9ba3ac56037045d4e91ee2ff2712bb7
 PHP_SHA256_linux-aarch64   := 0978d89157292bcc9268a34a73a4d5d2793f8dff1403b5138a94d2af6b7a09b0
 PHP_SHA256_macos-aarch64   := bba286e442796dbd420d778a016e2817b31d5036d11b3ba316d19a60de912cdc
+PHP_SHA256_macos-x86_64    := bd1c20f355e73a9f807b24ba62fd98f3a57bc08d063ebb3aa6393909e01ce89e
 MICRO_SHA256_linux-x86_64  := 104659cc43c5812199b500384079dd7b235aa88fea91ca89b96fc8b5e029985f
 MICRO_SHA256_linux-aarch64 := 28329ce81a8bcf7ef033b799eb399a5848eff558e0c4aa8d29eff7e166972f2b
 MICRO_SHA256_macos-aarch64 := 5347aff955115a34a3b41ed4c2fd80a46f9800de0e5718c6495f35f1c9cb9ce2
-RELEASE_PLATFORMS := linux-x86_64 linux-aarch64 macos-aarch64
+MICRO_SHA256_macos-x86_64  := 923fdc5503dc5583ca21f71b7c71af1b6e14f36cd7b0139806c153e97ca1c4ff
+RELEASE_PLATFORMS := linux-x86_64 linux-aarch64 macos-aarch64 macos-x86_64
 
 # This machine, in static-php-cli's words: Darwin is macos, arm64 is aarch64.
 HOST_PLATFORM := $(shell uname -s | tr 'A-Z' 'a-z' | sed 's/darwin/macos/')-$(shell uname -m | sed 's/arm64/aarch64/')

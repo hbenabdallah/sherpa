@@ -65,6 +65,7 @@ final class Releases
             $os === 'Linux' && in_array($arch, ['x86_64', 'amd64'], true)   => 'linux-x86_64',
             $os === 'Linux' && in_array($arch, ['aarch64', 'arm64'], true)  => 'linux-aarch64',
             $os === 'Darwin' && in_array($arch, ['arm64', 'aarch64'], true) => 'macos-aarch64',
+            $os === 'Darwin' && $arch === 'x86_64'                          => 'macos-x86_64',
             default                                                         => null,
         };
     }
