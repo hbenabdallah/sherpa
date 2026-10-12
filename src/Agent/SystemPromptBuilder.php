@@ -4,6 +4,7 @@ namespace App\Agent;
 
 use App\Mcp\McpRegistry;
 use App\Memory\MemoryStore;
+use App\Project\DockerWrapper;
 use App\Project\Project;
 use App\Project\RecentActivity;
 use App\Project\StackDetector;
@@ -104,6 +105,12 @@ class SystemPromptBuilder
         $docker = $project->docker->enabled
             ? 'yes, container ' . $project->docker->container
             : 'no';
+        // Inside that container, the task file's targets cannot work: they call
+        // docker, which is not there. What a target runs still does.
+        if ($project->docker->enabled && ($wrapper = DockerWrapper::in($project->path)) !== null) {
+            $docker .= " — but its {$wrapper} already runs commands through docker, and shell_exec runs inside the"
+                . " container where docker is not: run what a target runs, not the target";
+        }
 
         // Detected here rather than read off the project: the stored value was
         // written when the project was added and the prompt is the one place

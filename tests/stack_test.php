@@ -165,6 +165,27 @@ check('the prompt detects rather than trusting what was stored',
     !str_contains($goPrompt, 'stale'), substr($goPrompt, 0, 400));
 check('and states the stack it actually found', str_contains($goPrompt, 'Stack detected: Go 1.23'), $goPrompt);
 
+// ---- a task file that calls docker itself -----------------------------------
+// Sherpa's own repository: `make test` is `docker compose run … php tests/run.php`.
+// With Docker on, shell_exec runs inside the container, where make cannot
+// reach docker; what the target runs still works there.
+$wrapped = project($root, 'enveloppe', ['composer.json' => '{}', 'compose.yaml' => "services: {}\n",
+    'Makefile' => "test:\n\tdocker compose run --rm --no-deps app php tests/run.php\n"]);
+check('a Makefile that runs docker itself is recognised', App\Project\DockerWrapper::in($wrapped) === 'Makefile');
+check('one that only starts the containers is not',
+    App\Project\DockerWrapper::in(project($root, 'demarre', ['Makefile' => "up:\n\tdocker compose up -d && npm run dev\n"])) === null);
+check('nor is a project with no task file', App\Project\DockerWrapper::in(project($root, 'nu', ['README.md' => 'x'])) === null);
+
+$inContainer = new Project(
+    slug: 'x', name: 'exemple', path: $wrapped, memoryDb: '/dev/null',
+    docker: new DockerConfig(enabled: true, container: 'enveloppe-app-1'), stack: '',
+    createdAt: new \DateTimeImmutable(), lastUsedAt: new \DateTimeImmutable(),
+);
+$told = $builder->build($inContainer);
+check('with Docker on, the model is told to run what a target runs, not the target',
+    str_contains($told, 'container enveloppe-app-1 — but its Makefile already runs commands through docker'), $told);
+check('and not told so with Docker off', !str_contains($builder->build(projectAt($wrapped)), 'already runs commands through docker'));
+
 // ---- how the project runs its tests ---------------------------------------
 // The benchmark's one real failure after file_patch was fixed: the model ran
 // `php tests/StrTest.php`, which prints nothing, took the silence for a pass,

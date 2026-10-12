@@ -21,6 +21,7 @@ use App\Permission\SessionPermissions;
 use App\Platform\SwitchablePlatform;
 use App\Project\Project;
 use App\Project\DockerConfig;
+use App\Project\DockerWrapper;
 use App\Project\ProjectQuestions;
 use App\Project\ProjectStore;
 use App\Project\WorkingProject;
@@ -289,6 +290,14 @@ class SherpaCommand extends Command
         if ($standing !== []) {
             echo Terminal::YELLOW . '  ⚠ Allowed without asking: ' . implode(', ', $standing)
                 . Terminal::GRAY . "  (/permissions to withdraw)\n" . Terminal::RESET;
+        }
+
+        // Set up before Sherpa knew better, or answered yes by hand: commands
+        // go into a container where the project's own task file, which calls
+        // docker itself, cannot run.
+        if ($project->docker->enabled && ($wrapper = DockerWrapper::in($project->path)) !== null) {
+            echo Terminal::YELLOW . "  ⚠ Commands run in {$project->docker->container}, but the {$wrapper} already runs them through docker:"
+                . Terminal::GRAY . " there, make cannot reach docker. /project edit and Docker off runs them on this machine.\n" . Terminal::RESET;
         }
 
         $resume = $input->getOption('resume');

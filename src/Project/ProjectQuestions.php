@@ -78,7 +78,7 @@ class ProjectQuestions
         // its Makefile already goes through docker itself: `make test` then
         // works from this machine, and inside the container — with no docker
         // client there — it cannot work at all.
-        $wrapper = ($composed || $running !== []) ? $this->dockerWrapper($path) : null;
+        $wrapper = ($composed || $running !== []) ? DockerWrapper::in($path) : null;
         $likely = $current?->enabled ?? (($composed || $running !== []) && $wrapper === null);
 
         if ($current === null && ($composed || $running !== [])) {
@@ -172,19 +172,6 @@ class ProjectQuestions
 
         // One container and nothing better to go on: it is the app, not the database.
         return $required && count($containers) === 1 ? $containers[0] : null;
-    }
-
-    /** The task file that calls docker run or exec itself, or null. */
-    private function dockerWrapper(string $path): ?string
-    {
-        foreach (['Makefile', 'makefile', 'GNUmakefile', 'justfile', 'Justfile'] as $file) {
-            $content = is_file($path . '/' . $file) ? (string) @file_get_contents($path . '/' . $file) : '';
-            if (preg_match('/\bdocker(?:-compose|\s+compose)?\s+(?:[^\n;&|]*\s)?(?:run|exec)\b/', $content) === 1) {
-                return $file;
-            }
-        }
-
-        return null;
     }
 
     private function hasCompose(string $path): bool
