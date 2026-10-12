@@ -117,6 +117,21 @@ $draft = answer($home . '/boutique', "\n\nboutique-app-1\n\n", $home);
 check('a compose file makes Docker the default answer',
     ($draft['docker'] ?? null) === true && ($draft['container'] ?? null) === 'boutique-app-1', json_encode($draft));
 
+// Sherpa's own repository: a compose file, and a Makefile whose test target
+// runs docker compose itself. Said yes to, every command went into the
+// container, where make test cannot reach docker at all.
+mkdir($home . '/outil', 0777, true);
+file_put_contents($home . '/outil/compose.yaml', "services: {}\n");
+file_put_contents($home . '/outil/Makefile', "test:\n\tdocker compose run --rm --no-deps app php tests/run.php\n");
+$draft = answer($home . '/outil', "\n\n", $home);
+check('a Makefile that runs docker itself makes no Docker the default answer', ($draft['docker'] ?? null) === false, json_encode($draft));
+$draft = answer($home . '/outil', "\no\noutil-app-1\n\n", $home);
+file_put_contents($home . '/outil/Makefile', "up:\n\tdocker compose up -d && npm run dev\n");
+$draft = answer($home . '/outil', "\n\noutil-app-1\n\n", $home);
+check('a Makefile that only starts the containers is no such wrapper', ($draft['docker'] ?? null) === true, json_encode($draft));
+file_put_contents($home . '/outil/Makefile', "test:\n\tdocker compose run --rm --no-deps app php tests/run.php\n");
+check('which can still be overridden', ($draft['docker'] ?? null) === true && ($draft['container'] ?? null) === 'outil-app-1', json_encode($draft));
+
 check('and answering never wrote a project', (new ProjectStore(new StackDetector()))->forDirectory($home . '/boutique') === null);
 
 // ---- forgetting a project -----------------------------------------------------

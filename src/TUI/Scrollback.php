@@ -60,7 +60,9 @@ final class Scrollback
     /** Text as if it had been printed. */
     public function feed(string $text): void
     {
-        $parts = preg_split('/(\e\[[0-9;?<=>]*[ -\/]*[@-~]|\e[^\[]|\r|\n)/', $text, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY) ?: [];
+        // An OSC sequence runs to its terminator: /copy sends the whole reply
+        // as one, in base64, and cut at "\e]" the rest of it read as text.
+        $parts = preg_split('/(\e\][^\x07\e]*(?:\x07|\e\\\\)|\e\[[0-9;?<=>]*[ -\/]*[@-~]|\e[^\[\]]|\r|\n)/', $text, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY) ?: [];
 
         foreach ($parts as $part) {
             if ($part === "\n") {

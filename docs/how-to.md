@@ -114,7 +114,9 @@ Node or database), tell Sherpa. It will run `shell_exec` there with
 
 - In a new directory, the second question at launch is "Docker environment?".
   The default answer is yes when the directory has a compose file or matching
-  containers are running. Then give the container's name.
+  containers are running — unless its Makefile already runs its commands
+  through `docker compose run` or `exec`: those work from your machine, and
+  not from inside the container. Then give the container's name.
 - For an existing project, use `/project edit`.
 
 The working directory inside the container is found from the container's

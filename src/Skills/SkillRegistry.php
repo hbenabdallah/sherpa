@@ -101,23 +101,4 @@ class SkillRegistry
     {
         return array_values($this->skills);
     }
-
-    public function create(string $name, string $content): Skill
-    {
-        if (!is_dir($this->globalDir)) {
-            mkdir($this->globalDir, 0755, true);
-        }
-
-        $path = $this->globalDir . '/' . $name . '.md';
-        file_put_contents($path, $content);
-
-        $skill = new Skill(
-            name: $name,
-            description: $this->extractFirstLine($content),
-            content: $content,
-            path: $path,
-        );
-        $this->skills[$name] = $skill;
-        return $skill;
-    }
 }

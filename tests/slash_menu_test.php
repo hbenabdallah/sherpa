@@ -114,6 +114,13 @@ check('colours are kept', $lines[0] === "\e[32m✓ Model\e[0m ready", json_encod
 check('the waiting line leaves nothing behind but a blank', trim($lines[1]) === '', json_encode($lines));
 check('text after it is kept', $lines[2] === 'Sherpa Bonjour', json_encode($lines));
 check('cursor movement and erasing are dropped', $lines[3] === 'moved', json_encode($lines));
+
+// /copy hands the reply to the terminal as an OSC 52 sequence, in base64.
+$copied = new Scrollback();
+$copied->feed("avant\e]52;c;" . base64_encode(str_repeat('réponse ', 50)) . "\x07après\n");
+$copied->feed("lien \e]8;;https://example.test\e\\ici\e]8;;\e\\\n");
+check('a clipboard sequence leaves no base64 behind', $copied->lines()[0] === 'avantaprès', json_encode($copied->lines()));
+check('nor does one ended by ESC \\', $copied->lines()[1] === 'lien ici', json_encode($copied->lines()));
 $log->pause();
 $log->feed('');
 $log->resume();
