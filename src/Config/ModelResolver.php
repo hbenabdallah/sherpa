@@ -40,7 +40,31 @@ final class ModelResolver
      */
     public function embeddingModel(Backend $backend): string
     {
-        return $this->config->embeddingModel($backend) ?? trim($this->envEmbeddingModel);
+        return $this->config->embeddingsElsewhere()['model']
+            ?? $this->config->embeddingModel($backend)
+            ?? trim($this->envEmbeddingModel);
+    }
+
+    /**
+     * Where embeddings come from when it is not the chat's backend, resolved:
+     * Ollama, or a recorded provider's address and key — null for its address
+     * when the name is no recorded provider.
+     *
+     * @return array{provider: string, model: string, url: ?string, key: string}|null
+     */
+    public function embeddingsElsewhere(): ?array
+    {
+        $elsewhere = $this->config->embeddingsElsewhere();
+        if ($elsewhere === null) {
+            return null;
+        }
+
+        $local = strtolower($elsewhere['provider']) === Backend::Ollama->value;
+
+        return $elsewhere + [
+            'url' => $local ? null : ($this->config->providers()[$elsewhere['provider']]['url'] ?? null),
+            'key' => $local ? '' : $this->config->keyOf($elsewhere['provider']),
+        ];
     }
 
     /**
@@ -202,7 +226,8 @@ final class ModelResolver
     /** Whether the embedding model is already settled: by the environment, or by this machine. */
     public function embeddingChosen(Backend $backend): bool
     {
-        return trim($this->envEmbeddingModel) !== '' || $this->config->hasEmbeddingChoice($backend);
+        return trim($this->envEmbeddingModel) !== '' || $this->config->embeddingsElsewhere() !== null
+            || $this->config->hasEmbeddingChoice($backend);
     }
 
     public function rememberEmbeddingModel(Backend $backend, string $model): bool

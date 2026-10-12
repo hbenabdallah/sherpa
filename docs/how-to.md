@@ -8,6 +8,7 @@ Short recipes. For what each part does, see [concepts](concepts.md).
 - [Work on a project that runs in a container](#work-on-a-project-that-runs-in-a-container)
 - [Write a skill](#write-a-skill)
 - [Add an MCP server](#add-an-mcp-server)
+- [Search the documentation with another provider's embeddings](#search-the-documentation-with-another-providers-embeddings)
 - [Measure documentation search on your project](#measure-documentation-search-on-your-project)
 - [Keep an eye on cost](#keep-an-eye-on-cost)
 
@@ -225,6 +226,25 @@ The arguments work like this:
 - The rest of the line goes to the first argument that is still empty, so a
   prompt with a single argument takes the line as you typed it.
 - A missing required argument is refused, with the usage line.
+
+## Search the documentation with another provider's embeddings
+
+`doc_search` finds passages by meaning with an embedding model, which Sherpa
+looks for at the chat provider. Some have none — Anthropic, Groq — and search
+then falls back to keywords. Take the embeddings from another provider, or
+from a local Ollama, in `~/.config/sherpa/config.yaml`:
+
+```yaml
+embeddings:
+  provider: openai          # a provider recorded with /provider add, or ollama
+  model: text-embedding-3-small
+```
+
+The provider's own key is used (keys.yaml, or its `key_env` variable), never
+the chat provider's. With `ollama`, nothing leaves your machine for this:
+`ollama pull nomic-embed-text` and name that model. Changing the model
+re-embeds the documentation at the next search, since vectors from two models
+cannot be compared.
 
 ## Measure documentation search on your project
 

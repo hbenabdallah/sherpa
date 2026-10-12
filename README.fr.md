@@ -402,7 +402,6 @@ rien.
 - L'exécutable existe pour Linux (x86_64, aarch64) et les Mac Apple Silicon ;
   pas pour les Mac Intel ni Windows.
 - Le modèle doit savoir appeler des outils.
-- Le modèle d'embeddings doit venir du même fournisseur que le modèle de chat.
 
 ## Contribuer
 

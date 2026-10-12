@@ -190,6 +190,46 @@ class MachineConfig
         return is_string($model) && trim($model) !== '' ? trim($model) : null;
     }
 
+    /**
+     * Embeddings from somewhere else than the chat:
+     *
+     *     embeddings:
+     *       provider: openai     # a recorded API provider, or ollama
+     *       model: text-embedding-3-small
+     *
+     * For a chat provider with no embedding model (Anthropic, Groq), or to
+     * keep the documentation's vectors on this machine. Over the per-backend
+     * embedding_model when set, whichever backend the chat is on.
+     *
+     * @return array{provider: string, model: string}|null
+     */
+    public function embeddingsElsewhere(): ?array
+    {
+        $section = $this->data()['embeddings'] ?? null;
+        $provider = is_array($section) ? self::text($section['provider'] ?? null) : null;
+        $model = is_array($section) ? self::text($section['model'] ?? null) : null;
+
+        return $provider !== null && $model !== null ? ['provider' => $provider, 'model' => $model] : null;
+    }
+
+    /**
+     * The key of a recorded provider, whichever is in force: its variable when
+     * it names one and it is set, else the key kept for it, else ''. Never
+     * another provider's, nor SHERPA_API_KEY, which belongs to the chat's.
+     */
+    public function keyOf(string $name): string
+    {
+        $variable = self::text($this->data()['api']['providers'][$name]['key_env'] ?? null);
+        if ($variable !== null) {
+            $value = $_SERVER[$variable] ?? $_ENV[$variable] ?? getenv($variable);
+            if (is_string($value) && trim($value) !== '') {
+                return trim($value);
+            }
+        }
+
+        return $this->storedKey($name) ?? '';
+    }
+
     /** Whether this machine settled the question for $backend — a model, or none found (''). */
     public function hasEmbeddingChoice(Backend $backend): bool
     {

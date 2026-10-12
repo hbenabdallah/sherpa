@@ -379,7 +379,6 @@ model's prices to `config.yaml` and Sherpa shows the cost of the session;
 - The executable exists for Linux (x86_64, aarch64) and Apple Silicon Macs; not
   for Intel Macs or Windows.
 - The model has to support tool calling.
-- The embedding model has to come from the same provider as the chat model.
 
 ## Contributing
 

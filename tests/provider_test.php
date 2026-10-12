@@ -259,6 +259,64 @@ $told = provider(twoProviders($dir . '/typo/config.yaml'), 'key two', "k-new\n")
 check('and the user is told why the key could not be saved',
     str_contains($told['shown'] ?? '', 'no longer parses as YAML'), json_encode($told));
 
+// ---- embeddings from another provider ------------------------------------------
+// A chat provider with no embedding model (Anthropic, Groq) searched the
+// documentation by keywords only. `embeddings:` names where vectors come from.
+mkdir($dir . '/emb');
+file_put_contents($dir . '/emb/config.yaml', Yaml::dump(['backend' => 'api', 'api' => ['provider' => 'chat', 'providers' => [
+    'chat' => ['url' => 'https://chat.test/v1', 'model' => 'chat/model'],
+    'oa'   => ['url' => 'https://emb.test/v1'],
+]], 'embeddings' => ['provider' => 'oa', 'model' => 'text-embedding-3-small']], 4, 2));
+file_put_contents($dir . '/emb/keys.yaml', "chat: k-chat\noa: k-emb\n");
+$embConfig = configAt($dir . '/emb/config.yaml');
+$embModels = new ModelResolver($embConfig, 'env:7b', 32768);
+
+$sent = [];
+$client = new Symfony\Component\HttpClient\MockHttpClient(function (string $method, string $url, array $options) use (&$sent) {
+    $body = json_decode($options['body'] ?? '{}', true);
+    $sent[] = ['url' => $url, 'auth' => implode(',', array_filter($options['headers'] ?? [], fn($h) => stripos($h, 'authorization') === 0)), 'model' => $body['model'] ?? null];
+    $rows = array_map(fn($i) => ['index' => $i, 'embedding' => [3.0, 4.0]], array_keys((array) ($body['input'] ?? [])));
+
+    return new Symfony\Component\HttpClient\Response\MockResponse(json_encode(str_ends_with($url, '/api/embed')
+        ? ['embeddings' => array_map(fn() => [3.0, 4.0], (array) $body['input'])]
+        : ['data' => $rows]));
+});
+$chatPlatform = new App\Platform\SwitchablePlatform(
+    new App\Platform\OllamaPlatform($client, 'http://ollama.test', 'local'),
+    new App\Platform\OpenAiCompatiblePlatform($client, 'https://chat.test/v1', 'chat/model', 'k-chat'),
+);
+$chatPlatform->switchTo(Backend::Api);
+$embeddings = new App\Rag\Embedding\BackendEmbeddings($chatPlatform, $embModels, $client);
+
+check('the embedding model named under embeddings: is the one in use', $embeddings->model() === 'text-embedding-3-small', $embeddings->model());
+check('and it settles the question: nothing is detected on the chat provider', $embModels->embeddingChosen(Backend::Api));
+$vectors = $embeddings->embed(['un', 'deux']);
+check('vectors come from the provider named, not the chat\'s', ($sent[0]['url'] ?? '') === 'https://emb.test/v1/embeddings', json_encode($sent));
+check('with that provider\'s key, never the chat\'s', str_contains($sent[0]['auth'] ?? '', 'k-emb') && !str_contains($sent[0]['auth'] ?? '', 'k-chat'), json_encode($sent));
+check('and they are normalised like any other', abs(($vectors[0][0] ?? 0) - 0.6) < 1e-9, json_encode($vectors));
+
+$file = Yaml::parseFile($dir . '/emb/config.yaml');
+$file['embeddings'] = ['provider' => 'ollama', 'model' => 'nomic-embed-text'];
+file_put_contents($dir . '/emb/config.yaml', Yaml::dump($file, 4, 2));
+$sent = [];
+$embeddings->embed(['trois']);
+check('ollama as the provider: vectors from the local Ollama, with no key',
+    ($sent[0]['url'] ?? '') === 'http://ollama.test/api/embed' && ($sent[0]['model'] ?? '') === 'nomic-embed-text' && ($sent[0]['auth'] ?? '') === '', json_encode($sent));
+
+$file['embeddings'] = ['provider' => 'absent', 'model' => 'm'];
+file_put_contents($dir . '/emb/config.yaml', Yaml::dump($file, 4, 2));
+try {
+    $embeddings->embed(['quatre']);
+    $why = '';
+} catch (RuntimeException $e) {
+    $why = $e->getMessage();
+}
+check('a provider that is not recorded is said, with what to do', str_contains($why, '"absent", which is no recorded provider'), $why);
+
+unset($file['embeddings']);
+file_put_contents($dir . '/emb/config.yaml', Yaml::dump($file, 4, 2));
+check('without embeddings:, the chat backend\'s own setting is used again', $embeddings->model() === '' && !$embModels->embeddingChosen(Backend::Api), $embeddings->model());
+
 exec('rm -rf ' . escapeshellarg($dir));
 
 printf("\n%d passed, %d failed\n", $pass, $fail);
