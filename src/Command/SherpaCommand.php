@@ -37,6 +37,7 @@ use App\TUI\LineEditor;
 use App\TUI\StatusBar;
 use App\TUI\Terminal;
 use App\TUI\Scrollback;
+use App\Update\UpdateNotice;
 use App\Usage\TokenCapReached;
 use App\Usage\UsageMeter;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -93,6 +94,9 @@ class SherpaCommand extends Command
          * session. SHERPA_FACT_EXTRACTION.
          */
         private readonly bool $extractFacts = true,
+        // A newer release, said under the logo. Optional so the tests that
+        // build this command need not reach GitHub.
+        private readonly ?UpdateNotice $updates = null,
     ) {
         parent::__construct();
     }
@@ -138,6 +142,13 @@ class SherpaCommand extends Command
         }
 
         $this->statusBar->renderWelcome();
+
+        // Only for someone at the keyboard: a script has no use for it, and
+        // should not wait on GitHub.
+        $newer = $this->lineEditor->isInteractive() ? $this->updates?->message() : null;
+        if ($newer !== null) {
+            echo Terminal::LIME . '  ↑ ' . Terminal::RESET . Terminal::GRAY . $newer . "\n\n" . Terminal::RESET;
+        }
 
         // Where the model runs, settled before anything is asked of it: a model
         // name only means something to the backend that serves it.

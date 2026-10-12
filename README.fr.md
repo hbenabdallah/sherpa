@@ -112,8 +112,13 @@ curl -fsSL https://raw.githubusercontent.com/hbenabdallah/sherpa/main/install.sh
 Le script prend le fichier de votre machine dans la
 [dernière release](https://github.com/hbenabdallah/sherpa/releases/latest),
 vérifie sa somme SHA-256 et le met dans `~/.local/bin` (il le signale si ce
-dossier n'est pas dans votre `PATH`). Le relancer met à jour. Une version
-donnée, un autre dossier, ou la désinstallation :
+dossier n'est pas dans votre `PATH`).
+
+Quand une nouvelle version sort, Sherpa le signale sous son logo, et
+`sherpa update` l'installe : vérifiée par la somme SHA-256 de la release, mise
+en place d'un coup ou pas du tout. `sherpa update 1.0.0` revient à une version
+donnée. Relancer le script marche aussi. Une version donnée, un autre dossier,
+ou la désinstallation :
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/hbenabdallah/sherpa/main/install.sh | sh -s -- --version 1.0.0
@@ -350,6 +355,7 @@ ce qui a été rejeté, est dans [les choix de conception](https://github.com/hb
 | `OLLAMA_MODEL`, `OLLAMA_CTX`, `OLLAMA_KEEP_ALIVE` | le modèle d'Ollama, sa fenêtre de contexte, et combien de temps il reste chargé (`30m` par défaut) |
 | `SHERPA_MAX_SESSION_TOKENS` | arrête une session au-delà de ce nombre de tokens |
 | `SHERPA_FACT_EXTRACTION=off` | pas de passage mémoire en fin de session |
+| `SHERPA_UPDATE_CHECK=off` | pas de vérification quotidienne d'une nouvelle version |
 
 Depuis les sources, les mêmes réglages peuvent aller dans `.env` (voir
 `.env.dist`).
@@ -367,6 +373,9 @@ ailleurs : son adresse est affichée au début de chaque session et dans
 `/context`, et une clé n'est jamais envoyée qu'au fournisseur pour lequel elle a
 été donnée ; Sherpa prévient si elle partait en `http://` simple vers un hôte qui
 n'est pas local. Avec un modèle local par Ollama, rien ne quitte votre machine.
+À part ça, l'exécutable demande une fois par jour à GitHub quelle est la
+dernière version : rien sur vous ni sur votre code ne part avec, et
+`SHERPA_UPDATE_CHECK=off` l'arrête.
 
 **Peut-il modifier mes fichiers ou lancer des commandes sans demander ?** Non.
 Écrire un fichier, lancer une commande et lire une page web demandent toujours

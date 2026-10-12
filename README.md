@@ -109,7 +109,12 @@ curl -fsSL https://raw.githubusercontent.com/hbenabdallah/sherpa/main/install.sh
 The script picks the file for your machine from the
 [latest release](https://github.com/hbenabdallah/sherpa/releases/latest), checks
 its SHA-256, and puts it in `~/.local/bin` (it says so if that is not in your
-`PATH`). Run it again to update. A given version, another directory, or removing it:
+`PATH`).
+
+When a new release is out, Sherpa says so under its logo, and `sherpa update`
+installs it — checked against the release's SHA-256, put in place whole or not
+at all. `sherpa update 1.0.0` goes back to a given version. Running the script
+again works too. A given version, another directory, or removing it:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/hbenabdallah/sherpa/main/install.sh | sh -s -- --version 1.0.0
@@ -332,6 +337,7 @@ was rejected, is in the [design choices](https://github.com/hbenabdallah/sherpa/
 | `OLLAMA_MODEL`, `OLLAMA_CTX`, `OLLAMA_KEEP_ALIVE` | Ollama's model, context window, and how long it stays loaded (default `30m`) |
 | `SHERPA_MAX_SESSION_TOKENS` | stop a session past this many tokens |
 | `SHERPA_FACT_EXTRACTION=off` | no memory pass at the end of a session |
+| `SHERPA_UPDATE_CHECK=off` | no daily check for a newer release |
 
 From the source, the same settings can live in `.env` (see `.env.dist`).
 
@@ -347,7 +353,9 @@ over: Sherpa says why it cannot save.
 its address is shown when a session starts and in `/context`, and a key is only
 ever sent to the provider it was given for — Sherpa warns if that would be over
 plain `http://` to a host that is not local. With a local model through Ollama,
-nothing leaves your machine.
+nothing leaves your machine. Apart from that, the executable asks GitHub once a
+day which release is the latest — nothing about you or your code goes with it,
+and `SHERPA_UPDATE_CHECK=off` stops it.
 
 **Can it change my files or run commands without asking?** No. Writing a file,
 running a command and fetching a web page always ask first, unless you granted

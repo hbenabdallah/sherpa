@@ -26,8 +26,8 @@ $_SERVER['APP_SECRET'] ??= $_ENV['APP_SECRET'] ?? 'sherpa';
 $application = new Application(new Kernel('prod', false));
 $application->setName('Sherpa');
 $application->setVersion(App\Version::current());
-// `sherpa mcp …` is a command of its own; anything else is the session,
-// whose options come straight after the program's name.
-$application->setDefaultCommand('sherpa', ($_SERVER['argv'][1] ?? '') !== 'mcp');
+// `sherpa mcp …` and `sherpa update` are commands of their own; anything
+// else is the session, whose options come straight after the program's name.
+$application->setDefaultCommand('sherpa', !in_array($_SERVER['argv'][1] ?? '', ['mcp', 'update'], true));
 
 exit($application->run());

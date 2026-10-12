@@ -54,7 +54,7 @@ class Kernel extends BaseKernel
      * Where the single executable compiles its container: the archive itself is
      * read-only, and a new release, a moved file or a rebuilt one gets its own.
      */
-    private static function userCacheDir(): string
+    public static function userCacheDir(): string
     {
         $base = getenv('XDG_CACHE_HOME') ?: (($_SERVER['HOME'] ?? getenv('HOME') ?: sys_get_temp_dir()) . '/.cache');
 

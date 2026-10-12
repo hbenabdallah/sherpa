@@ -269,6 +269,14 @@ Some details that had to change for the executable:
   declared with a glob.
 - There is no `GLOB_BRACE` on musl.
 
+Updates are told, not done behind the user's back. Once a day, with a timeout
+of a second and a half, the executable asks GitHub which release is the latest,
+by the redirect of `/releases/latest` rather than the API and its sixty
+requests an hour; the answer is cached, and offline nothing is said. `sherpa
+update` then downloads the executable and its SHA-256 and renames it over the
+running one — after which it exits at once: the process still loads classes
+from its archive as it needs them, and that file is now another release.
+
 The executable still contains readable PHP. It is a way to distribute Sherpa,
 not a way to hide the code, which is source-available anyway.
 

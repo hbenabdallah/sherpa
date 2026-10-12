@@ -61,5 +61,9 @@ check 'documents' '/docs reads the project documentation'
 if [ -e "$work/project/broken.php" ]; then echo "  ✗ the broken file was not written"; fail=1; else echo "  ✓ the broken file was not written"; fi
 if ls "$work/home/.cache/sherpa"/prod-* > /dev/null 2>&1; then echo "  ✓ its container is compiled under ~/.cache/sherpa"; else echo "  ✗ no container under ~/.cache/sherpa"; fail=1; fi
 
+# A command of its own, not the session's options.
+if env -i PATH=/usr/bin:/bin HOME="$work/home" "$binary" update --help 2>&1 | grep -q 'Install the latest Sherpa'; then
+    echo "  ✓ sherpa update is a command"; else echo "  ✗ sherpa update is not a command"; fail=1; fi
+
 [ "$fail" -eq 0 ] || { echo "$out" | tail -40; exit 1; }
 echo "✓ smoke test passed"
