@@ -87,7 +87,8 @@ jobs:
         run: make php
 
       - name: runs Sherpa's own checks
-        run: ~/.local/share/sherpa/php -r 'exit(PHP_VERSION_ID >= 80400 && extension_loaded("pdo_sqlite") && extension_loaded("pcntl") && extension_loaded("phar") ? 0 : 1);'
+        run: |
+          ~/.local/share/sherpa/php -r 'exit(PHP_VERSION_ID >= 80400 && extension_loaded("pdo_sqlite") && extension_loaded("pcntl") && extension_loaded("phar") ? 0 : 1);'
 
   shell:
     name: Shell scripts
