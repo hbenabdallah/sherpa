@@ -19,8 +19,10 @@ use Psr\Log\AbstractLogger;
  */
 final class ServerLog extends AbstractLogger
 {
-    /** How much of stderr to keep for the error message. */
+    /** How much of stderr to keep, and to quote: the end, where the reason is. */
     private const KEEP = 4000;
+    private const QUOTED_LINES = 15;
+    private const QUOTED_CHARS = 1500;
 
     private string $stderr = '';
 
@@ -37,9 +39,21 @@ final class ServerLog extends AbstractLogger
         }
     }
 
-    /** The server's own words, or an empty string when it said nothing. */
+    /**
+     * The server's last words, or an empty string when it said nothing. A
+     * screenful at most: a stack trace of four thousand characters buried the
+     * one line that said what was wrong.
+     */
     public function stderr(): string
     {
-        return trim($this->stderr);
+        $lines = explode("\n", trim($this->stderr));
+        $tail = trim(implode("\n", array_slice($lines, -self::QUOTED_LINES)));
+        if (strlen($tail) > self::QUOTED_CHARS) {
+            $tail = '…' . mb_strcut($tail, -self::QUOTED_CHARS);
+        }
+
+        return count($lines) > self::QUOTED_LINES || str_starts_with($tail, '…')
+            ? "(the end of what it printed)\n" . $tail
+            : $tail;
     }
 }

@@ -47,4 +47,33 @@ final class ApiEndpoint
 
         return rtrim($url, '/');
     }
+
+    /**
+     * Whether a key sent to $url crosses a network in clear: plain http to a
+     * host that is neither this machine nor a private network. A local server
+     * on http is the norm; a provider typed with http:// instead of https://
+     * hands the key to every hop on the way.
+     *
+     * Judged from the address as written, without a DNS lookup: a name that
+     * resolves to a private address still counts as distant.
+     */
+    public static function sendsInClear(string $url): bool
+    {
+        $parts = parse_url($url);
+        if (!is_array($parts) || strtolower($parts['scheme'] ?? '') !== 'http') {
+            return false;
+        }
+
+        $host = strtolower(trim($parts['host'] ?? '', '[]'));
+        if ($host === '' || $host === 'localhost' || str_ends_with($host, '.localhost')
+            || str_ends_with($host, '.local') || str_ends_with($host, '.internal') || !str_contains($host, '.') && !str_contains($host, ':')) {
+            return false;
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
+            return filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false;
+        }
+
+        return true;
+    }
 }

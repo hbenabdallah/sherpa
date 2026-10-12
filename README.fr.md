@@ -365,7 +365,8 @@ la main) n'est jamais écrasé : Sherpa dit pourquoi il ne peut pas enregistrer.
 **Où va mon code ?** Chez le fournisseur que vous avez configuré, et nulle part
 ailleurs : son adresse est affichée au début de chaque session et dans
 `/context`, et une clé n'est jamais envoyée qu'au fournisseur pour lequel elle a
-été donnée. Avec un modèle local par Ollama, rien ne quitte votre machine.
+été donnée ; Sherpa prévient si elle partait en `http://` simple vers un hôte qui
+n'est pas local. Avec un modèle local par Ollama, rien ne quitte votre machine.
 
 **Peut-il modifier mes fichiers ou lancer des commandes sans demander ?** Non.
 Écrire un fichier, lancer une commande et lire une page web demandent toujours

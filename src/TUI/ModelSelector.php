@@ -186,10 +186,33 @@ class ModelSelector
      * Assumes the terminal is already out of raw mode with a visible cursor —
      * both callers arrange that, because both need to read a typed line.
      */
+    /**
+     * The model's name and what the server says of it. All of it comes from
+     * the server, and is shown as text: a name carrying "\e[2J" cleared the
+     * screen, one carrying a line break drew a line of its own.
+     */
+    private function heading(ModelInfo $info): string
+    {
+        $facts = array_filter([
+            $info->parameterSize === null ? null : self::shown($info->parameterSize),
+            $info->humanSize(),
+            $info->capabilitiesUnknown() ? null : self::shown(implode(' · ', $info->capabilities)),
+        ], fn(?string $f) => $f !== null && $f !== '');
+
+        return Terminal::BOLD . Terminal::GREEN . "\n  " . self::shown($info->name) . "\n" . Terminal::RESET
+            . ($facts === [] ? '' : Terminal::GRAY . '  ' . implode('  ·  ', $facts) . "\n" . Terminal::RESET)
+            . "\n";
+    }
+
+    private static function shown(string $text): string
+    {
+        return Terminal::plain($text, singleLine: true);
+    }
+
     private function confirm(ModelInfo $info, ?ModelProfile $current): ?ModelProfile
     {
         if (!$info->supportsTools()) {
-            echo Terminal::RED . Terminal::BOLD . "\n  ✗ {$info->name} cannot call tools.\n" . Terminal::RESET;
+            echo Terminal::RED . Terminal::BOLD . "\n  ✗ " . self::shown($info->name) . " cannot call tools.\n" . Terminal::RESET;
             echo Terminal::GRAY . "    Sherpa is a loop of tool calls: this model could neither\n"
                 . "    read a file nor run a command. It would talk, without acting.\n\n" . Terminal::RESET;
             $this->editor->ask('  Enter to choose another one… ', Terminal::GRAY);
@@ -206,19 +229,7 @@ class ModelSelector
             $suggested = $native === null ? $current->contextWindow : min($current->contextWindow, $native);
         }
 
-        echo Terminal::BOLD . Terminal::GREEN . "\n  {$info->name}\n" . Terminal::RESET;
-
-        $facts = array_filter([
-            $info->parameterSize,
-            $info->humanSize(),
-            $info->capabilitiesUnknown() ? null : implode(' · ', $info->capabilities),
-        ], fn(?string $f) => $f !== null && $f !== '');
-
-        if ($facts !== []) {
-            echo Terminal::GRAY . '  ' . implode('  ·  ', $facts) . "\n" . Terminal::RESET;
-        }
-
-        echo "\n";
+        echo $this->heading($info);
 
         if ($native !== null) {
             echo Terminal::GRAY . "  Native window: " . Terminal::RESET
@@ -332,7 +343,7 @@ class ModelSelector
 
         $meta = trim(sprintf(
             '%8s %8s %6s',
-            $model->parameterSize ?? '',
+            self::shown($model->parameterSize ?? ''),
             $model->humanSize(),
             $model->humanContext(),
         ));

@@ -143,7 +143,7 @@ final class McpClient
             // A protocol-level error is not an answer: the tool never ran, and
             // saying otherwise would have the model act on a result that does
             // not exist. A tool that ran and failed comes back below, flagged.
-            throw $this->failure("calling {$name} failed", $e);
+            throw $this->failure("calling {$name} failed", $e, quoteLog: false);
         }
 
         return [
@@ -198,7 +198,7 @@ final class McpClient
         try {
             $result = $this->request(fn(Sdk $client) => $client->readResource($uri));
         } catch (SdkException $e) {
-            throw $this->failure("reading {$uri} failed", $e);
+            throw $this->failure("reading {$uri} failed", $e, quoteLog: false);
         }
 
         $parts = [];
@@ -376,10 +376,16 @@ final class McpClient
     /**
      * One exception for every way this can go wrong, carrying what the server
      * said about it — which is the part a user can act on.
+     *
+     * @param bool $quoteLog false for a failure that becomes a tool result: that
+     *                       goes to the model's provider, and a server's log is
+     *                       not the model's to read — it can hold tokens, paths,
+     *                       the environment it was started with. The user still
+     *                       has the cause, from /mcp.
      */
-    private function failure(string $what, SdkException $e): McpException
+    private function failure(string $what, SdkException $e, bool $quoteLog = true): McpException
     {
-        $stderr = $this->log->stderr();
+        $stderr = $quoteLog ? $this->log->stderr() : '';
 
         return new McpException(
             "MCP server “{$this->config->name}”: {$what}: {$e->getMessage()}"

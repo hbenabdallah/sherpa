@@ -189,6 +189,15 @@ $out = captured(function () {
 });
 check('tool arguments cannot clear the screen', !str_contains($out, "\e[2J"), bin2hex($out));
 
+// A model's name and details come from the server, and are shown as text.
+$selector = new App\TUI\ModelSelector(new Terminal(), new App\TUI\LineEditor(), new App\Platform\OllamaPlatform(
+    new Symfony\Component\HttpClient\MockHttpClient(), 'http://ollama.test', 'x'));
+$heading = (new ReflectionMethod($selector, 'heading'))->invoke($selector,
+    new App\Platform\ModelInfo("piège\e[2J\nfaux", 8192, ["tools\e]0;titre\x07"], null, "7B\e[31m"));
+check('a model name from the server cannot clear the screen', !str_contains($heading, "\e[2J") && !str_contains($heading, "\e]0;"), bin2hex($heading));
+check('nor draw a line of its own', !str_contains($heading, "piège\n"), $heading);
+check('and its details are still shown', str_contains(Terminal::plain($heading), 'piège') && str_contains(Terminal::plain($heading), '7B'), $heading);
+
 // The label is owed only if something is actually streamed.
 $out = captured(function () {
     $p = pane();

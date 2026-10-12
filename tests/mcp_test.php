@@ -74,6 +74,24 @@ $paged = McpClient::for(server('paginated'));
 check('every page of tools/list is followed', count($paged->listTools()) === 3, json_encode(array_column($paged->listTools(), 'name')));
 $paged->close();
 
+// ---- what is quoted of a server's log --------------------------------------
+// A stack trace of four thousand characters buried the line that said what
+// was wrong: the end is quoted, a screenful at most.
+$log = new App\Mcp\ServerLog();
+for ($i = 1; $i <= 40; $i++) {
+    $log->debug('Server stderr', ['output' => "at frame {$i}"]);
+}
+$log->debug('Server stderr', ['output' => 'fatal: missing DATABASE_URL']);
+$quoted = $log->stderr();
+check('a long log is quoted by its end, the reason included', str_ends_with($quoted, 'fatal: missing DATABASE_URL'), $quoted);
+check('a screenful at most, and said to be the end', substr_count($quoted, "\n") <= 15 && str_contains($quoted, 'the end of what it printed'), $quoted);
+$short = new App\Mcp\ServerLog();
+$short->debug('Server stderr', ['output' => 'fatal: missing configuration']);
+check('a short one is quoted as it is', $short->stderr() === 'fatal: missing configuration', $short->stderr());
+$wide = new App\Mcp\ServerLog();
+$wide->debug('Server stderr', ['output' => str_repeat('é', 3000)]);
+check('a single huge line is cut too, without breaking a character', strlen($wide->stderr()) < 1600 && mb_check_encoding($wide->stderr(), 'UTF-8'), (string) strlen($wide->stderr()));
+
 // ---- servers that fail ------------------------------------------------------
 $missing = McpClient::for(new ServerConfig(name: 'absent', command: 'nexistepasdutout'));
 $threw = false;
@@ -97,6 +115,9 @@ $protocolError = McpClient::for(server('protoerror'));
 $threw = false;
 try { $protocolError->callTool('echo', ['text' => 'x']); } catch (McpException $e) { $threw = true; $message = $e->getMessage(); }
 check('a JSON-RPC error is raised rather than returned as content', $threw && str_contains($message ?? '', 'invalid parameter'), $message ?? '');
+// That message becomes the tool result, and the tool result goes to the
+// model's provider: the server's log, which can hold a token, stays out.
+check('and the server\'s log is not quoted to the model', !str_contains($message ?? '', 'SECRET-1234'), $message ?? '');
 $protocolError->close();
 
 // A server that accepts the handshake and then answers nothing must not hold

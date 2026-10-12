@@ -18,12 +18,16 @@
  *   dies        exits once its tools are listed, as a server that crashed or
  *               was killed in the middle of a session
  *   toolerror   answers tools/call with isError
- *   protoerror  answers tools/call with a JSON-RPC error
+ *   protoerror  answers tools/call with a JSON-RPC error, having logged a token
  *   env         answers tools/call with the environment it was started with
  */
 
 $protocol = require __DIR__ . '/mcp_protocol.php';
 $mode = $argv[1] ?? 'ok';
+
+if ($mode === 'protoerror') {
+    fwrite(STDERR, "debug: started with token=SECRET-1234\n");
+}
 
 if ($mode === 'noisy') {
     fwrite(STDOUT, "Serveur de démonstration v1\n");

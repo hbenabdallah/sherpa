@@ -183,6 +183,11 @@ final class ModelSession
         if (!$profile->backend->isLocal()) {
             echo Terminal::GRAY . '  The files and command output Sherpa reads are sent to '
                 . $this->platform->name() . ".\n" . Terminal::RESET;
+
+            if ($this->platform->apiHasKey() && ApiEndpoint::sendsInClear($this->platform->apiEndpoint())) {
+                echo Terminal::YELLOW . '  ⚠ Over plain http: the key and the code travel unencrypted to '
+                    . $this->platform->apiEndpoint() . ". Use https:// if the provider offers it.\n" . Terminal::RESET;
+            }
         }
     }
     /**

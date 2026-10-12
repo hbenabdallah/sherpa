@@ -113,6 +113,18 @@ check('other files are not judged', $guard->problem('notes.md', '<?php (((') ===
 
 // Inside the single executable PHP_BINARY is Sherpa itself, so `php -l` is not
 // available: PHP's parser runs in the process instead, with the same verdicts.
+// The code being checked sits in the shared temporary directory while php -l
+// reads it: readable by its owner only, whatever the umask.
+$copy = new ReflectionMethod(SyntaxGuard::class, 'privateCopy');
+$previous = umask(0);
+$tmp = $copy->invoke(null, '<?php echo "secret";');
+umask($previous);
+check('the copy linted is readable by its owner only', is_string($tmp) && (fileperms($tmp) & 0777) === 0600, is_string($tmp) ? decoct(fileperms($tmp) & 0777) : 'none');
+check('and holds the code whole', is_string($tmp) && file_get_contents($tmp) === '<?php echo "secret";');
+if (is_string($tmp)) {
+    unlink($tmp);
+}
+
 $inside = new SyntaxGuard(inProcess: true);
 check('in-process, valid PHP passes too', $inside->problem('a.php', "<?php\nuse A\\B;\n") === null);
 $broken = $inside->problem('src/Cart.php', "<?php\nuse Boutique.User.UserRepository;\n");

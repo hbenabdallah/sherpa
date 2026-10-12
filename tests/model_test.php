@@ -155,6 +155,15 @@ check('and adds the new one beside it', $legacy->read(Backend::Api)?->model === 
 check('a pasted endpoint is cut back to the base URL',
     ApiEndpoint::normalize('https://api.openai.com/v1/chat/completions') === 'https://api.openai.com/v1');
 check('a trailing slash is dropped', ApiEndpoint::normalize('https://api.mistral.ai/v1/') === 'https://api.mistral.ai/v1');
+// A key sent over plain http to a distant host is readable on the way; to a
+// server on this machine or the local network, http is the norm.
+check('plain http to a provider sends the key in clear', ApiEndpoint::sendsInClear('http://api.provider.com/v1'));
+check('and so does a public address', ApiEndpoint::sendsInClear('http://8.8.8.8:8000/v1'));
+check('https does not', !ApiEndpoint::sendsInClear('https://api.provider.com/v1'));
+foreach (['http://localhost:8000/v1', 'http://127.0.0.1:1234/v1', 'http://[::1]:8000/v1', 'http://192.168.1.20:8000/v1',
+    'http://10.0.0.5/v1', 'http://gpu-box:8000/v1', 'http://llm.local/v1', 'http://host.docker.internal:11434/v1'] as $local) {
+    check("nor a server at home: {$local}", !ApiEndpoint::sendsInClear($local));
+}
 check('a missing scheme means https', ApiEndpoint::normalize('openrouter.ai/api/v1') === 'https://openrouter.ai/api/v1');
 check('except for a local server, which is plain http',
     ApiEndpoint::normalize('localhost:8000/v1') === 'http://localhost:8000/v1');

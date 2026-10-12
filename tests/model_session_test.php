@@ -141,6 +141,18 @@ check('announcing an online model says where the code goes',
     str_contains($announced, 'sent to api.example.com'), $announced);
 $local = captured(fn() => $session->announce(new ModelProfile('local:7b', 32768, 'machine config', Backend::Ollama)));
 check('a local one has nothing to disclose', !str_contains($local, 'sent to'), $local);
+check('a key over https raises no alarm', !str_contains($announced, 'plain http'), $announced);
+
+// A provider typed with http:// instead of https:// hands the key to every hop.
+$platform->useApiEndpoint('http://api.example.com/v1');
+$platform->useApiKey('k-secret');
+$clear = captured(fn() => $session->announce(new ModelProfile('distant/modele', 65536, 'machine config', Backend::Api)));
+check('a key sent over plain http to a distant host is warned about', str_contains($clear, 'plain http') && str_contains($clear, 'https://'), $clear);
+$platform->useApiEndpoint('http://localhost:8000/v1');
+$home = captured(fn() => $session->announce(new ModelProfile('distant/modele', 65536, 'machine config', Backend::Api)));
+check('but not one sent to a server on this machine', !str_contains($home, 'plain http'), $home);
+$platform->useApiEndpoint('https://api.example.com/v1');
+$platform->useApiKey(null);
 
 // ---- resolving without a terminal -----------------------------------------
 // A pipe cannot answer a menu: the configured default is taken, and said.

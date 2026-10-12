@@ -40,14 +40,40 @@ class SyntaxGuard
         };
     }
 
+    /**
+     * The code about to be written, in a file only its owner can read. In the
+     * shared temporary directory, created with the default mode, it was
+     * readable by every account on the machine for as long as the lint ran.
+     * Created exclusively, so a name planted there in advance is not followed.
+     */
+    private static function privateCopy(string $content): ?string
+    {
+        $tmp = sys_get_temp_dir() . '/sherpa-lint-' . bin2hex(random_bytes(6)) . '.php';
+        $handle = @fopen($tmp, 'x');
+        if ($handle === false) {
+            return null;
+        }
+
+        $written = @chmod($tmp, 0600) && @fwrite($handle, $content) === strlen($content);
+        fclose($handle);
+
+        if (!$written) {
+            @unlink($tmp);
+
+            return null;
+        }
+
+        return $tmp;
+    }
+
     private function php(string $path, string $content): ?string
     {
         if ($this->inProcess ?? \Phar::running(false) !== '') {
             return $this->parse($path, $content);
         }
 
-        $tmp = sys_get_temp_dir() . '/sherpa-lint-' . bin2hex(random_bytes(6)) . '.php';
-        if (@file_put_contents($tmp, $content) === false) {
+        $tmp = self::privateCopy($content);
+        if ($tmp === null) {
             return null; // cannot check, so do not block
         }
 

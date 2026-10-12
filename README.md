@@ -345,7 +345,8 @@ over: Sherpa says why it cannot save.
 
 **Where does my code go?** To the provider you configured, and nowhere else:
 its address is shown when a session starts and in `/context`, and a key is only
-ever sent to the provider it was given for. With a local model through Ollama,
+ever sent to the provider it was given for — Sherpa warns if that would be over
+plain `http://` to a host that is not local. With a local model through Ollama,
 nothing leaves your machine.
 
 **Can it change my files or run commands without asking?** No. Writing a file,
