@@ -68,6 +68,10 @@ Sherpa answers in the language of your question; its interface is in English.
   their findings.
 - **Skills** (Markdown files) and **MCP servers** (tools, resources and prompts),
   in the `mcpServers` format other clients use.
+- **In your editor**: `sherpa acp` runs the same agent in Zed, PhpStorm and the
+  other JetBrains IDEs, or any client of the Agent Client Protocol — edits
+  approved from the editor's diff view, files open in a tab edited as you see
+  them ([set it up](docs/how-to.md#use-sherpa-in-your-editor-zed-jetbrains)).
 
 ## Quick start
 
@@ -358,6 +362,11 @@ your machine or your local network.
 
 **Which models work?** Any model that supports tool calling, online or through
 Ollama. Sherpa is a loop of tool calls, and says so when a model cannot make them.
+
+**Can I use it in my editor rather than a terminal?** Yes: Zed and the
+JetBrains IDEs start `sherpa acp` and show the conversation in their own panel,
+with the same model, tools, permissions and saved conversations. Set it up once
+with `sherpa acp --setup`; [how-to](docs/how-to.md#use-sherpa-in-your-editor-zed-jetbrains).
 
 **Do I need PHP?** No. The executable bundles its own PHP runtime. Sherpa works
 on projects in any language; it is written in PHP 8.4 and Symfony 8.

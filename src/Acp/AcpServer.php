@@ -201,8 +201,40 @@ final class AcpServer
                 'mcpCapabilities'    => ['http' => true, 'sse' => false],
             ],
             'agentInfo'   => ['name' => 'sherpa', 'title' => 'Sherpa', 'version' => Version::current()],
-            'authMethods' => ($this->client['auth']['terminal'] ?? false) === true ? [self::SETUP] : [],
+            'authMethods' => $this->setupMethods(),
         ];
+    }
+
+    /**
+     * The setup, for an editor that can run it in a terminal. Said both ways
+     * editors understand: ACP's `type: terminal`, and the `_meta` form that
+     * came before it, which names the whole command.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function setupMethods(): array
+    {
+        $terminal = ($this->client['auth']['terminal'] ?? false) === true;
+        $meta = ($this->client['_meta']['terminal-auth'] ?? false) === true;
+        if (!$terminal && !$meta) {
+            return [];
+        }
+
+        $method = self::SETUP;
+        if ($meta) {
+            // The single executable is its own program; a checkout is PHP running bin/sherpa.
+            $argv = array_values(array_map('strval', (array) ($_SERVER['argv'] ?? [])));
+            $program = \Phar::running(false);
+            $args = $program !== '' ? array_slice($argv, 1) : [(string) realpath($argv[0] ?? ''), ...array_slice($argv, 1)];
+
+            $method['_meta'] = ['terminal-auth' => [
+                'command' => $program !== '' ? $program : PHP_BINARY,
+                'args'    => [...$args, '--setup'],
+                'label'   => 'Sherpa setup',
+            ]];
+        }
+
+        return [$method];
     }
 
     /**

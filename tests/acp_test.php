@@ -344,6 +344,15 @@ $init = $blank->call('initialize', ['protocolVersion' => 1, 'clientCapabilities'
 $methods = $init['result']['authMethods'] ?? [];
 check('an editor that can run a terminal is offered the setup as terminal authentication',
     count($methods) === 1 && $methods[0]['type'] === 'terminal' && $methods[0]['args'] === ['--setup'] && $methods[0]['id'] === 'setup', json_encode($methods));
+$blank->close();
+
+// The form the registry's validator and earlier editors send.
+$blank = new Editor($work, null, 'blank');
+$methods = $blank->call('initialize', ['protocolVersion' => 1, 'clientCapabilities' => ['_meta' => ['terminal-auth' => true]]], 60.0)['result']['authMethods'] ?? [];
+$meta = $methods[0]['_meta']['terminal-auth'] ?? [];
+check('an editor asking the earlier way is offered it too, with the whole command',
+    ($methods[0]['type'] ?? '') === 'terminal' && $meta['command'] === PHP_BINARY
+    && $meta['args'] === [realpath(dirname(__DIR__) . '/bin/sherpa'), 'acp', '--setup'], json_encode($methods));
 $refused = $blank->call('session/new', ['cwd' => $project, 'mcpServers' => []]);
 check('and a session asks for it: auth_required', ($refused['error']['code'] ?? 0) === -32000, json_encode($refused));
 check('saying what is missing', str_contains((string) ($refused['error']['message'] ?? ''), 'No API configured'), json_encode($refused));

@@ -2,6 +2,7 @@
 
 Short recipes. For what each part does, see [concepts](concepts.md).
 
+- [Use Sherpa in your editor (Zed, JetBrains)](#use-sherpa-in-your-editor-zed-jetbrains)
 - [Use several API providers](#use-several-api-providers)
 - [Use Claude](#use-claude)
 - [Run on a local model with Ollama](#run-on-a-local-model-with-ollama)
@@ -11,6 +12,69 @@ Short recipes. For what each part does, see [concepts](concepts.md).
 - [Search the documentation with another provider's embeddings](#search-the-documentation-with-another-providers-embeddings)
 - [Measure documentation search on your project](#measure-documentation-search-on-your-project)
 - [Keep an eye on cost](#keep-an-eye-on-cost)
+
+## Use Sherpa in your editor (Zed, JetBrains)
+
+`sherpa acp` runs Sherpa for an editor, over the
+[Agent Client Protocol](https://agentclientprotocol.com): Zed, the JetBrains IDEs
+(PhpStorm included) and the other ACP clients start it and show the conversation
+in their own panel. It is the same agent as in the terminal — same model, same
+tools, same project memory and saved conversations — with the editor's own views:
+
+- an edit is shown in the editor's diff view before you approve it, with the
+  same answers as in the terminal: once, for the session, or always for this
+  project;
+- the plan the model keeps is the editor's task list, and plan mode's plan is
+  approved there too;
+- a file open in a tab is read and edited as you see it, unsaved changes
+  included, when the editor offers that;
+- stopping a turn in the editor stops it, a running command included;
+- a conversation from the editor's history is picked back up where it was left.
+
+**Set it up once.** The editor asks nothing, so Sherpa has to know its model
+before: run `sherpa acp --setup` in a terminal (the provider, its key, the
+model), or simply `sherpa` once. The key is kept in `keys.yaml`, which the editor
+reads; a `SHERPA_API_KEY` exported in your shell often is not seen by an editor
+started from the desktop. An editor that supports it offers the same setup
+itself, in a terminal, when Sherpa is not set up yet. For a project that runs in
+a container, run `sherpa` once in its directory and answer yes to Docker: the
+editor then runs its commands there too.
+
+**Zed.** In Agent Settings, External Agents, *Add Agent* then *Add Custom Agent*,
+and give it the full path of the executable:
+
+```json
+{
+  "agent_servers": {
+    "Sherpa": {
+      "type": "custom",
+      "command": "/home/you/.local/bin/sherpa",
+      "args": ["acp"],
+      "env": {}
+    }
+  }
+}
+```
+
+**JetBrains IDEs.** In the AI Chat window, ⋯ then *Add Custom Agent* opens
+`~/.jetbrains/acp.json`:
+
+```json
+{
+  "agent_servers": {
+    "Sherpa": {
+      "command": "/home/you/.local/bin/sherpa",
+      "args": ["acp"],
+      "env": {}
+    }
+  }
+}
+```
+
+The options of `sherpa` work after `acp`: `["acp", "-P", "mistral"]` uses a
+recorded provider, `["acp", "-m", "<model>"]` another model. What Sherpa prints
+goes to the editor's agent log (Zed: `dev: open acp logs`); the slash commands
+(`/model`, `/docs`…) stay in the terminal.
 
 ## Use several API providers
 
