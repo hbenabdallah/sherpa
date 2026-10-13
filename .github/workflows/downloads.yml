@@ -1,8 +1,10 @@
 name: Downloads badge
 
-# How many times the executable was downloaded from the Releases — what
-# install.sh fetches, so about one per install or update. The .sha256 and
-# notices files are left out: counted too, every install would count twice.
+# How many installs and updates: the downloads of the executables' .sha256.
+# install.sh and `sherpa update` fetch exactly one with each executable, and
+# nothing else does — the executables themselves are also fetched by crawlers
+# and by clicks on the release page, which installed nothing: one per platform
+# and release, every release, with no checksum ever asked for.
 #
 # The figure goes to downloads.json on the `badges` branch, which shields.io
 # reads for the badge in the README:
@@ -31,7 +33,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: count the executable downloads
+      - name: count the installs
         id: count
         env:
           GH_TOKEN: ${{ github.token }}
@@ -42,12 +44,12 @@ jobs:
             releases=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
               "https://api.github.com/repos/$GITHUB_REPOSITORY/releases?per_page=100&page=$page")
             [ "$(echo "$releases" | jq 'length')" -eq 0 ] && break
-            count=$(echo "$releases" | jq '[.[].assets[] | select(.name | test("\\.(sha256|md)$") | not) | .download_count] | add // 0')
+            count=$(echo "$releases" | jq '[.[].assets[] | select(.name | endswith(".sha256")) | .download_count] | add // 0')
             total=$((total + count))
             page=$((page + 1))
           done
           echo "total=$total" >> "$GITHUB_OUTPUT"
-          echo "Executable downloads: $total"
+          echo "Installs and updates: $total"
 
       - name: write it on the badges branch
         env:
@@ -65,5 +67,5 @@ jobs:
           printf '{"schemaVersion":1,"label":"installs","message":"%s","color":"afd75f"}\n' "$TOTAL" > downloads.json
           git add downloads.json
           git diff --cached --quiet && { echo 'No change.'; exit 0; }
-          git commit -qm "Downloads: $TOTAL"
+          git commit -qm "Installs: $TOTAL"
           git push -q origin badges
