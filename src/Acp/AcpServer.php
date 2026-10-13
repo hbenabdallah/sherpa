@@ -23,6 +23,8 @@ use App\Runtime\Frontend;
 use App\Runtime\Interrupt;
 use App\Session\SessionStore;
 use App\Skills\SkillRegistry;
+use App\Tool\Edit\FileSaver;
+use App\Tool\Edit\Files;
 use App\Usage\TokenCapReached;
 use App\Usage\UsageMeter;
 use App\Version;
@@ -78,6 +80,7 @@ final class AcpServer
         private readonly SwitchablePlatform $platform,
         private readonly ContextBudget $budget,
         private readonly UsageMeter $usage,
+        private readonly Files $files,
     ) {}
 
     /** Answer the editor until it closes its end. */
@@ -163,6 +166,14 @@ final class AcpServer
     private function initialize(array $params): array
     {
         $this->client = is_array($params['clientCapabilities'] ?? null) ? $params['clientCapabilities'] : [];
+
+        // Files through the editor where it offers: what the user sees in a
+        // tab, saved or not, is what the model reads and edits.
+        $fs = is_array($this->client['fs'] ?? null) ? $this->client['fs'] : [];
+        $this->files->through(
+            ($fs['readTextFile'] ?? false) === true ? $this->readFromEditor(...) : null,
+            ($fs['writeTextFile'] ?? false) === true ? $this->writeThroughEditor(...) : null,
+        );
 
         return [
             'protocolVersion'   => self::PROTOCOL_VERSION,
@@ -330,6 +341,47 @@ final class AcpServer
         }
 
         $this->connection->notify('session/update', ['sessionId' => $session->id, 'update' => $update]);
+    }
+
+    /** The editor's text of a file — unsaved changes included — or null to read it from disk. */
+    private function readFromEditor(string $path): ?string
+    {
+        $session = $this->running ?? $this->current;
+        if ($session === null) {
+            return null;
+        }
+
+        try {
+            $result = $this->connection->request('fs/read_text_file', ['sessionId' => $session, 'path' => $path]);
+        } catch (AcpError) {
+            return null;
+        }
+
+        return is_array($result) && is_string($result['content'] ?? null) ? $result['content'] : null;
+    }
+
+    /** @throws \RuntimeException */
+    private function writeThroughEditor(string $path, string $content): void
+    {
+        $session = $this->running ?? $this->current;
+        if ($session === null) {
+            FileSaver::save($path, $path, $content);
+
+            return;
+        }
+
+        try {
+            $this->connection->request('fs/write_text_file', ['sessionId' => $session, 'path' => $path, 'content' => $content]);
+        } catch (AcpError $e) {
+            throw new \RuntimeException('the editor could not write ' . $this->relative($path) . ': ' . $e->getMessage());
+        }
+    }
+
+    private function relative(string $path): string
+    {
+        $root = rtrim((string) $this->directory, '/') . '/';
+
+        return str_starts_with($path, $root) ? substr($path, strlen($root)) : $path;
     }
 
     // ---- one conversation at a time ---------------------------------------------------

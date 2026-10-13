@@ -19,6 +19,7 @@ use App\Runtime\Frontend;
 use App\Runtime\Interrupt;
 use App\Tool\DelegateTool;
 use App\Tool\Edit\EditPreview;
+use App\Tool\Edit\Files;
 use App\Tool\FilePatchTool;
 use App\Tool\FileWriteTool;
 use App\Tool\PlanReadyTool;
@@ -84,6 +85,16 @@ check('a sub-agent shows its work through it too', property($delegate, 'output')
 $shell = $container->get(ShellExecTool::class);
 check('shell_exec hears the interrupt', property($shell, 'interrupt') instanceof Interrupt);
 
+$files = property($container->get(App\Tool\FileReadTool::class), 'files');
+check('the file tools read and write through one shared place',
+    $files instanceof Files
+    && property($container->get(FileWriteTool::class), 'files') === $files
+    && property($container->get(FilePatchTool::class), 'files') === $files);
+$acp = (new Symfony\Bundle\FrameworkBundle\Console\Application($kernel))->find('acp');
+$acp = $acp instanceof Symfony\Component\Console\Command\LazyCommand ? $acp->getCommand() : $acp;
+check('the one `sherpa acp` points at the editor', property(property($acp, 'server'), 'files') === $files);
+check('and the agent loop it runs is the terminal\'s, with the same frontend switch', property(property($acp, 'server'), 'agent') === $agent);
+
 // ---- switched over --------------------------------------------------------------
 $recorder = new Recorder();
 $frontend->use($recorder, $recorder);
@@ -124,6 +135,27 @@ check('nor a path outside the project',
     $preview->of(new ToolCall('c', 'file_write', ['path' => '../outside.php', 'content' => 'x'])) === null);
 check('nor a call that edits nothing', $preview->of(new ToolCall('c', 'file_read', ['path' => 'Invoice.php'])) === null);
 check('file_write is untouched by the preview', file_get_contents("{$project}/Invoice.php") === "<?php\nreturn \$price;\n" && !is_file("{$project}/New.php"));
+
+// ---- files: the disk, or the editor ------------------------------------------------
+check('lines as file() gives them', Files::lines("a\nb\n") === ['a', 'b'] && Files::lines("a\r\nb") === ['a', 'b']
+    && Files::lines('') === [] && Files::lines("\n") === [''] && Files::lines("a\rb\n") === ["a\rb"]);
+
+$shared = new Files();
+check('with no editor, the disk', $shared->read("{$project}/Invoice.php") === "<?php\nreturn \$price;\n");
+check('a file that is not there reads as none', $shared->read("{$project}/Nope.php") === null);
+$writes = [];
+$shared->through(
+    fn(string $path) => str_ends_with($path, 'Invoice.php') ? "<?php\n// in the tab\n" : null,
+    function (string $path, string $text) use (&$writes) { $writes[$path] = $text; },
+);
+check('through an editor, its text', $shared->read("{$project}/Invoice.php") === "<?php\n// in the tab\n");
+check('and the disk for what it cannot give', $shared->read("{$project}/New.php") === null);
+$tool = new FilePatchTool($paths, files: $shared);
+$tool('Invoice.php', '// in the tab', '// patched in the tab');
+check('a patch applies to the tab and goes back to it', ($writes["{$project}/Invoice.php"] ?? '') === "<?php\n// patched in the tab\n");
+check('leaving the disk alone', file_get_contents("{$project}/Invoice.php") === "<?php\nreturn \$price;\n");
+$read = (new App\Tool\FileReadTool($paths, files: $shared))('Invoice.php');
+check('file_read reads the tab, numbered', str_contains($read, '2 | // in the tab'), $read);
 
 // ---- a command cancelled by a message, not a signal ------------------------------
 $interrupt = new Interrupt();

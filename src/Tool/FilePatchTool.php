@@ -8,7 +8,7 @@ use App\Agent\Tool\Permission;
 use App\Project\PathOutsideProjectException;
 use App\Project\PathSuggestions;
 use App\Project\ProjectPathResolver;
-use App\Tool\Edit\FileSaver;
+use App\Tool\Edit\Files;
 use App\Tool\Edit\LineDiff;
 use App\Tool\Edit\PatchOutcome;
 use App\Tool\Edit\ProposedEdit;
@@ -25,6 +25,8 @@ class FilePatchTool
     public function __construct(
         private readonly ProjectPathResolver $paths = new ProjectPathResolver(),
         private readonly SyntaxGuard $syntax = new SyntaxGuard(),
+        // The disk, or the editor's buffers under `sherpa acp`.
+        private readonly Files $files = new Files(),
     ) {}
 
     /**
@@ -42,7 +44,7 @@ class FilePatchTool
             throw new \RuntimeException("file not found: {$path}" . PathSuggestions::hint($this->paths->root(), $path, directory: false));
         }
 
-        $original = (string) file_get_contents($resolved);
+        $original = (string) $this->files->read($resolved);
         $outcome = TextPatch::apply($original, $search, $replace);
 
         if (!$outcome->ok()) {
@@ -59,7 +61,7 @@ class FilePatchTool
             );
         }
 
-        FileSaver::save($resolved, $path, (string) $outcome->content);
+        $this->files->write($resolved, $path, (string) $outcome->content);
 
         // Said when it was not the exact text, so the next patch in the
         // session starts from the right habit rather than from the slip.
@@ -86,7 +88,7 @@ class FilePatchTool
         // Surface up front whether this patch can actually apply — and what it
         // will really change when a fallback placed it — so the user is not
         // asked to approve one edit and shown another.
-        $current = (string) file_get_contents($resolved);
+        $current = (string) $this->files->read($resolved);
         $outcome = TextPatch::apply($current, $search, $replace);
 
         if (!$outcome->ok()) {
@@ -120,7 +122,7 @@ class FilePatchTool
             return null;
         }
 
-        $current = (string) file_get_contents($resolved);
+        $current = (string) $this->files->read($resolved);
         $outcome = TextPatch::apply($current, $search, $replace);
 
         return $outcome->ok() ? new ProposedEdit($resolved, $current, (string) $outcome->content) : null;

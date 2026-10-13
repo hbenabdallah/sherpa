@@ -8,6 +8,7 @@ use App\Agent\Tool\Param;
 use App\Agent\Tool\Permission;
 use App\Project\PathSuggestions;
 use App\Project\ProjectPathResolver;
+use App\Tool\Edit\Files;
 
 #[AsTool(
     name: 'file_read',
@@ -35,6 +36,8 @@ class FileReadTool
     public function __construct(
         private readonly ProjectPathResolver $paths = new ProjectPathResolver(),
         private readonly ?ContextBudget $budget = null,
+        // The disk, or the editor's buffers under `sherpa acp`.
+        private readonly Files $files = new Files(),
     ) {}
 
     public function __invoke(
@@ -64,10 +67,11 @@ class FileReadTool
             throw new \RuntimeException("file is not readable: {$path}");
         }
 
-        $lines = file($resolved, FILE_IGNORE_NEW_LINES);
-        if ($lines === false) {
+        $text = $this->files->read($resolved);
+        if ($text === null) {
             throw new \RuntimeException("could not read file: {$path}");
         }
+        $lines = Files::lines($text);
 
         $total = count($lines);
         if ($offset !== null || $limit !== null) {

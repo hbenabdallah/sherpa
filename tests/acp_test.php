@@ -52,6 +52,18 @@ final class Editor
     /** @var \Closure(array<string, mixed>): ?string picks an option id for a question, null to cancel */
     public \Closure $answer;
 
+    /** @var array<string, string> files open in tabs, with changes not saved: path => text */
+    public array $buffers = [];
+
+    /** @var list<string> paths Sherpa asked the editor to read */
+    public array $read = [];
+
+    /** Answer every read with an error, as an editor that cannot give the file. */
+    public bool $refuseReads = false;
+
+    /** @var array<string, string> what Sherpa asked the editor to write: path => text */
+    public array $written = [];
+
     public function __construct(string $work, string $apiUrl)
     {
         $env = [
@@ -104,6 +116,17 @@ final class Editor
                     fwrite($this->pipes[0], json_encode(['jsonrpc' => '2.0', 'id' => $message['id'], 'result' => ['outcome' => $option === null
                         ? ['outcome' => 'cancelled']
                         : ['outcome' => 'selected', 'optionId' => $option]]]) . "\n");
+                } elseif (($message['method'] ?? '') === 'fs/read_text_file') {
+                    $path = $message['params']['path'];
+                    $this->read[] = $path;
+                    $text = $this->refuseReads ? null : ($this->buffers[$path] ?? (is_file($path) ? file_get_contents($path) : null));
+                    fwrite($this->pipes[0], json_encode($text === null
+                        ? ['jsonrpc' => '2.0', 'id' => $message['id'], 'error' => ['code' => -32002, 'message' => 'Resource not found']]
+                        : ['jsonrpc' => '2.0', 'id' => $message['id'], 'result' => ['content' => $text]]) . "\n");
+                } elseif (($message['method'] ?? '') === 'fs/write_text_file') {
+                    $this->written[$message['params']['path']] = $message['params']['content'];
+                    $this->buffers[$message['params']['path']] = $message['params']['content'];
+                    fwrite($this->pipes[0], json_encode(['jsonrpc' => '2.0', 'id' => $message['id'], 'result' => null]) . "\n");
                 } elseif (isset($message['method'])) {
                     $this->updates[] = $message;
                     if ($during !== null) {
@@ -279,6 +302,30 @@ $reply = $again->call('session/prompt', ['sessionId' => $session, 'prompt' => [[
 check('then goes on', ($reply['result']['stopReason'] ?? '') === 'end_turn', json_encode($reply));
 check('an unknown conversation cannot be loaded', ($again->call('session/load', ['sessionId' => '20990101-000000-abcd', 'cwd' => $project, 'mcpServers' => []])['error']['code'] ?? 0) === -32002);
 $again->close();
+
+// ---- an editor that serves the files ------------------------------------------------
+// Invoice.php is open in a tab with a change not yet saved: the model must
+// patch what the user sees, and the result go back to the tab, not the disk.
+file_put_contents("{$project}/Invoice.php", "<?php\nfunction subtotal(): int\n{\n    return 0;\n}\n");
+$tabs = new Editor($work, $api);
+$tabs->buffers["{$project}/Invoice.php"] = "<?php\n// not saved yet\nfunction subtotal(): int\n{\n    return 0;\n}\n";
+$tabs->call('initialize', ['protocolVersion' => 1, 'clientCapabilities' => ['fs' => ['readTextFile' => true, 'writeTextFile' => true]]], 60.0);
+$tabSession = (string) ($tabs->call('session/new', ['cwd' => $project, 'mcpServers' => []])['result']['sessionId'] ?? '');
+$reply = $tabs->call('session/prompt', ['sessionId' => $tabSession, 'prompt' => [['type' => 'text', 'text' => 'Patch the invoice']]]);
+$asked = $tabs->asked[0]['toolCall']['content'][0] ?? [];
+check('the diff asked about is against the tab, unsaved change included', str_contains((string) ($asked['oldText'] ?? ''), '// not saved yet'), json_encode($asked));
+check('the file is read through the editor', in_array("{$project}/Invoice.php", $tabs->read, true));
+$written = $tabs->written["{$project}/Invoice.php"] ?? '';
+check('and written back through it, the unsaved change kept', str_contains($written, '// not saved yet') && str_contains($written, 'return 42;'), $written);
+check('the disk is left to the editor', !str_contains((string) file_get_contents("{$project}/Invoice.php"), 'return 42;'));
+check('the turn ends as usual', ($reply['result']['stopReason'] ?? '') === 'end_turn', json_encode($reply));
+
+$tabs->buffers = [];
+$tabs->refuseReads = true;
+$from = count($tabs->updates);
+$tabs->call('session/prompt', ['sessionId' => $tabSession, 'prompt' => [['type' => 'text', 'text' => 'Patch the invoice']]]);
+check('a file the editor cannot give is read from disk', str_starts_with($tabs->text('agent_message_chunk', $from), 'Done: Patched'), $tabs->text('agent_message_chunk', $from));
+$tabs->close();
 
 // ---- no model -------------------------------------------------------------------
 $dead = new Editor($work, 'http://127.0.0.1:9/v1');
