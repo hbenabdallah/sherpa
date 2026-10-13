@@ -192,6 +192,15 @@ final class LineBuffer
         return null;
     }
 
+    /**
+     * Whether the line is a history entry as it was sent, still untouched: one
+     * the arrows are walking through, not one being written.
+     */
+    public function recalled(): bool
+    {
+        return $this->browsing !== null && $this->text() === $this->history[$this->browsing];
+    }
+
     /** Replace the whole line — a completion taken from the menu — the cursor at its end. */
     public function set(string $text): void
     {

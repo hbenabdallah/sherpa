@@ -307,7 +307,7 @@ class LineEditor
                         return $result === LineBuffer::EOF ? null : $buffer->expanded();
                     }
 
-                    $menu?->update($buffer->text(), $buffer->cursor() === count($buffer->chars()));
+                    self::updateMenu($menu, $buffer);
                 }
 
                 $this->draw($shown, $promptWidth, $buffer, $columns, $menu?->rows($columns) ?? []);
@@ -350,6 +350,17 @@ class LineEditor
             $terminal->restoreMode();
             $this->scrollback?->resume();
         }
+    }
+
+    /**
+     * The menu for the line as it now is. Not over a line recalled from
+     * history: the last one sent is often a command — /exit, from the session
+     * before — and the menu, opening on it, took the arrows, so Up stopped
+     * there until the line was cleared. Edited, the line gets its menu back.
+     */
+    private static function updateMenu(?SlashMenu $menu, LineBuffer $buffer): void
+    {
+        $menu?->update($buffer->text(), $buffer->cursor() === count($buffer->chars()) && !$buffer->recalled());
     }
 
     /**

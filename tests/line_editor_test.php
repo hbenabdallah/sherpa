@@ -9,6 +9,7 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 use App\TUI\Input\KeyReader;
 use App\TUI\Input\LineBuffer;
 use App\TUI\Input\LineView;
+use App\TUI\LineEditor;
 
 $pass = 0;
 $fail = 0;
@@ -91,6 +92,41 @@ check('Up recalls the newest line first', $b->text() === 'second');
 check('and stops at the oldest', $b->text() === 'premier');
 [$b] = typed(['b', 'r', 'o', "\e[A", "\e[B"], $history);
 check('Down past the newest gives back what was being typed', $b->text() === 'bro', $b->text());
+
+// ---- history through a command: the menu does not take the arrows ---------------
+// The last line sent is often /exit, from the session before. The "/" menu
+// opened on it and Up moved in the menu, stuck there until the line was cleared.
+$editor = new LineEditor();
+$editor->useCompletions(fn() => [
+    ['name' => '/exit', 'hint' => '', 'description' => 'Leave'],
+    ['name' => '/model', 'hint' => '[name]', 'description' => 'Change model'],
+]);
+$menu = (new ReflectionProperty($editor, 'menu'))->getValue($editor);
+$key = new ReflectionMethod($editor, 'handleKey');
+$refresh = new ReflectionMethod($editor, 'updateMenu');
+$press = function (LineBuffer $b, string $k) use ($editor, $key, $refresh, $menu): void {
+    $key->invoke($editor, $k, $b, $menu, true);
+    $refresh->invoke(null, $menu, $b);
+};
+
+$b = new LineBuffer(['fix the subtotal', '/model', '/exit']);
+$press($b, "\e[A");
+check('Up recalls /exit', $b->text() === '/exit', $b->text());
+check('without opening the menu over it', !$menu->isOpen());
+$press($b, "\e[A");
+check('so Up again goes further back, past a command', $b->text() === '/model', $b->text());
+$press($b, "\e[A");
+check('and on to a message', $b->text() === 'fix the subtotal', $b->text());
+
+$b = new LineBuffer(['/exit']);
+$press($b, "\e[A");
+$press($b, "\x7f");
+check('edited, a recalled command gets its menu back', $b->text() === '/exi' && $menu->isOpen(), $b->text());
+$b = new LineBuffer([]);
+$press($b, '/');
+check('and typing "/" still opens it', $menu->isOpen());
+$press($b, "\e[B");
+check('where the arrows move in it, not through history', $b->text() === '/', $b->text());
 
 // ---- what fits on screen -------------------------------------------------------
 [$shown, $column] = LineView::window(mb_str_split('bonjour'), 3, 40);
