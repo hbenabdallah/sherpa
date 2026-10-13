@@ -43,11 +43,28 @@ final class AcpServer
 {
     private const PROTOCOL_VERSION = 1;
 
+    /**
+     * Setting Sherpa up is answering questions in a terminal — the provider,
+     * its key, the model — which an editor runs for its user: ACP's terminal
+     * authentication. The editor appends the arguments to the command it
+     * starts Sherpa with, `sherpa acp`.
+     */
+    private const SETUP = [
+        'id'          => 'setup',
+        'name'        => 'Set up Sherpa',
+        'description' => 'Choose the model provider, its key and the model, in a terminal',
+        'type'        => 'terminal',
+        'args'        => ['--setup'],
+    ];
+
     private Connection $connection;
     private EditorFrontend $editor;
 
     /** Why no session can open: the model cannot be reached. Null when it can. */
     private ?string $unavailable = null;
+
+    /** Unavailable because nothing is set up yet: the editor can offer to. */
+    private bool $needsSetup = false;
 
     /** @var array<string, mixed> what the editor said it can do */
     private array $client = [];
@@ -84,11 +101,12 @@ final class AcpServer
     ) {}
 
     /** Answer the editor until it closes its end. */
-    public function serve(Connection $connection, EditorFrontend $editor, ?string $unavailable): void
+    public function serve(Connection $connection, EditorFrontend $editor, ?string $unavailable, bool $needsSetup = false): void
     {
         $this->connection = $connection;
         $this->editor = $editor;
         $this->unavailable = $unavailable;
+        $this->needsSetup = $needsSetup;
 
         $this->frontend->use($editor, $editor);
         $connection->intercept($this->intercept(...));
@@ -183,7 +201,7 @@ final class AcpServer
                 'mcpCapabilities'    => ['http' => true, 'sse' => false],
             ],
             'agentInfo'   => ['name' => 'sherpa', 'title' => 'Sherpa', 'version' => Version::current()],
-            'authMethods' => [],
+            'authMethods' => ($this->client['auth']['terminal'] ?? false) === true ? [self::SETUP] : [],
         ];
     }
 
@@ -458,7 +476,7 @@ final class AcpServer
     private function assertAvailable(): void
     {
         if ($this->unavailable !== null) {
-            throw new AcpError($this->unavailable);
+            throw new AcpError($this->unavailable, $this->needsSetup ? AcpError::AUTH_REQUIRED : AcpError::INTERNAL_ERROR);
         }
     }
 

@@ -111,11 +111,17 @@ class SherpaCommand extends Command
             ->addOption('context', 'c', InputOption::VALUE_REQUIRED, 'Context window size, in tokens')
             // false when absent, null when given bare: `-r` is "the last one",
             // `-r 3` or `-r <id>` a particular one, as /resume takes them.
-            ->addOption('resume', 'r', InputOption::VALUE_OPTIONAL, 'Pick this project\'s last conversation back up (or the n-th of /sessions)', false);
+            ->addOption('resume', 'r', InputOption::VALUE_OPTIONAL, 'Pick this project\'s last conversation back up (or the n-th of /sessions)', false)
+            // `sherpa acp --setup` as some editors run it, without the acp.
+            ->addOption('setup', null, InputOption::VALUE_NONE, 'Choose the provider, its key and the model for an editor (see sherpa acp), then exit');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        if ($input->getOption('setup')) {
+            return AcpCommand::setUp($this->model, $input) ? Command::SUCCESS : Command::FAILURE;
+        }
+
         // Whatever happens — Ctrl+C, an uncaught error, a fatal — the tty must
         // not be handed back in raw mode. A shutdown function covers the paths
         // a signal handler cannot.

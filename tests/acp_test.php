@@ -64,17 +64,18 @@ final class Editor
     /** @var array<string, string> what Sherpa asked the editor to write: path => text */
     public array $written = [];
 
-    public function __construct(string $work, string $apiUrl)
+    /** @param string|null $apiUrl null: nothing set up at all */
+    public function __construct(string $work, ?string $apiUrl, string $home = 'home')
     {
-        $env = [
+        $env = array_filter([
             'PATH'                   => getenv('PATH') ?: '/usr/bin:/bin',
-            'HOME'                   => "{$work}/home",
+            'HOME'                   => "{$work}/{$home}",
             'SHERPA_API_URL'         => $apiUrl,
-            'SHERPA_API_KEY'         => 'test',
-            'SHERPA_API_MODEL'       => 'fake-chat',
+            'SHERPA_API_KEY'         => $apiUrl === null ? null : 'test',
+            'SHERPA_API_MODEL'       => $apiUrl === null ? null : 'fake-chat',
             'SHERPA_BACKEND'         => 'api',
             'SHERPA_FACT_EXTRACTION' => 'off',
-        ];
+        ], static fn(?string $value) => $value !== null);
         $this->process = proc_open([PHP_BINARY, dirname(__DIR__) . '/bin/sherpa', 'acp'], [
             0 => ['pipe', 'r'],
             1 => ['pipe', 'w'],
@@ -332,8 +333,29 @@ $dead = new Editor($work, 'http://127.0.0.1:9/v1');
 check('without a model, initialize still answers', ($dead->call('initialize', ['protocolVersion' => 1], 60.0)['result']['protocolVersion'] ?? null) === 1);
 $error = (string) ($dead->call('session/new', ['cwd' => $project, 'mcpServers' => []])['error']['message'] ?? '');
 check('and opening a session says why, the way the terminal does', str_contains($error, 'does not answer'), $error);
+check('as an error, not as a setup to offer: it was set up', ($dead->call('session/new', ['cwd' => $project, 'mcpServers' => []])['error']['code'] ?? 0) === -32603);
 check('still nothing but messages on stdout', $dead->stray === [], implode("\n", $dead->stray));
 $dead->close();
+
+// ---- nothing set up: the editor offers to ------------------------------------------
+mkdir("{$work}/blank", 0777, true);
+$blank = new Editor($work, null, 'blank');
+$init = $blank->call('initialize', ['protocolVersion' => 1, 'clientCapabilities' => ['auth' => ['terminal' => true]]], 60.0);
+$methods = $init['result']['authMethods'] ?? [];
+check('an editor that can run a terminal is offered the setup as terminal authentication',
+    count($methods) === 1 && $methods[0]['type'] === 'terminal' && $methods[0]['args'] === ['--setup'] && $methods[0]['id'] === 'setup', json_encode($methods));
+$refused = $blank->call('session/new', ['cwd' => $project, 'mcpServers' => []]);
+check('and a session asks for it: auth_required', ($refused['error']['code'] ?? 0) === -32000, json_encode($refused));
+check('saying what is missing', str_contains((string) ($refused['error']['message'] ?? ''), 'No API configured'), json_encode($refused));
+$blank->close();
+
+$plain = new Editor($work, null, 'blank');
+check('an editor that cannot run a terminal is offered nothing to run',
+    ($plain->call('initialize', ['protocolVersion' => 1], 60.0)['result']['authMethods'] ?? null) === []);
+$plain->close();
+
+exec(sprintf('%s %s acp --setup < /dev/null 2>&1', escapeshellarg(PHP_BINARY), escapeshellarg(dirname(__DIR__) . '/bin/sherpa')), $said, $code);
+check('the setup outside a terminal says it needs one, and fails', $code !== 0 && str_contains(implode("\n", $said), 'run it in a terminal'), implode("\n", $said));
 
 proc_terminate($server);
 proc_close($server);

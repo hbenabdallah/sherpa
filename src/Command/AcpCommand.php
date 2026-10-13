@@ -52,11 +52,18 @@ class AcpCommand extends Command
             ->addOption('backend', 'b', InputOption::VALUE_REQUIRED, 'api (online model) or ollama (local model)')
             ->addOption('provider', 'P', InputOption::VALUE_REQUIRED, 'A recorded API provider (see /provider)')
             ->addOption('model', 'm', InputOption::VALUE_REQUIRED, 'Model to use, instead of the configured one')
-            ->addOption('context', 'c', InputOption::VALUE_REQUIRED, 'Context window size, in tokens');
+            ->addOption('context', 'c', InputOption::VALUE_REQUIRED, 'Context window size, in tokens')
+            // What an editor runs in a terminal when Sherpa says it is not set
+            // up: ACP's terminal authentication.
+            ->addOption('setup', null, InputOption::VALUE_NONE, 'Choose the provider, its key and the model, in a terminal, then return to the editor');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        if ($input->getOption('setup')) {
+            return self::setUp($this->model, $input) ? Command::SUCCESS : Command::FAILURE;
+        }
+
         // Standard output carries the protocol and nothing else: a stray line
         // and the editor loses the framing. Everything Sherpa prints the way
         // it does in a terminal — and any PHP warning — goes to stderr, which
@@ -85,9 +92,46 @@ class AcpCommand extends Command
             $connection,
             new EditorFrontend($connection, $this->edits, $this->paths, $this->shell, $this->todos),
             $unavailable,
+            needsSetup: $unavailable !== null && $this->notSetUp(),
         );
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * `--setup`, in the terminal an editor opened: the questions of a first
+     * run, and nothing of a session after them.
+     */
+    public static function setUp(ModelSession $model, InputInterface $input): bool
+    {
+        if (!function_exists('posix_isatty') || !posix_isatty(STDIN)) {
+            echo "sherpa acp --setup asks questions: run it in a terminal.\n";
+
+            return false;
+        }
+
+        $flag = $input->getOption('backend');
+        $ready = $model->setUp(is_string($flag) ? Backend::parse($flag) : null);
+
+        echo $ready
+            ? Terminal::GREEN . "\n✓ Sherpa is set up. Back to the editor: it can open a session now.\n" . Terminal::RESET
+            : Terminal::RED . "\n✗ Not set up yet. Run sherpa acp --setup again once that is fixed.\n" . Terminal::RESET;
+
+        return $ready;
+    }
+
+    /**
+     * Unavailable because nothing was ever chosen — no address for the API,
+     * no model — rather than because what was chosen does not answer: the
+     * first is the editor's to offer setting up, the second is an error.
+     */
+    private function notSetUp(): bool
+    {
+        if ($this->platform->backend() === Backend::Api && $this->platform->apiEndpoint() === '') {
+            return true;
+        }
+
+        return $this->platform->isAvailable() && $this->model->profile() === null;
     }
 
     /**

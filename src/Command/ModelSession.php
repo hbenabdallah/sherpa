@@ -108,6 +108,40 @@ final class ModelSession
         return $chosen;
     }
     /**
+     * Settle, in a terminal, what an editor cannot ask: where the model is,
+     * its key, which model. Each answer is kept, as at a first run, and the
+     * editor finds them all when it starts `sherpa acp` again.
+     *
+     * @return bool whether a model is ready to use
+     */
+    public function setUp(?Backend $requested): bool
+    {
+        $backend = $this->models->backend($requested);
+        $this->platform->switchTo($backend);
+
+        if ($backend === Backend::Api && !$this->configureApiEndpoint()) {
+            $backend = Backend::Ollama;
+            $this->platform->switchTo($backend);
+        }
+
+        if (!$this->platform->isAvailable()) {
+            $this->explainUnavailable($backend);
+
+            return false;
+        }
+
+        $profile = $this->resolve(null, null, $backend, rememberAsDefault: true);
+        if ($profile === null || $profile->model === '') {
+            return false;
+        }
+
+        $this->apply($profile);
+        $this->announce($profile);
+
+        return true;
+    }
+
+    /**
      * Check a profile nobody looked at on the way in — from -m or a hand-edited
      * config.yaml. Warnings, not refusals: an unexpected answer is more likely
      * a model about to be pulled. Only a window past the ceiling is corrected
