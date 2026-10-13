@@ -19,8 +19,14 @@ class Interrupt
     private bool $requested = false;
     private int $requestsThisTurn = 0;
 
+    private const LISTEN_SECONDS = 0.02;
+
     /** @var (\Closure(): void)|null */
     private ?\Closure $quit = null;
+
+    /** @var (\Closure(): void)|null */
+    private ?\Closure $listen = null;
+    private float $listenedAt = 0.0;
 
     public function install(callable $quit): void
     {
@@ -46,8 +52,27 @@ class Interrupt
         $this->inTurn = false;
     }
 
+    /**
+     * A way to hear a cancel that does not come as a signal: an editor sends
+     * it as a message, and nothing reads that message unless asked. Called
+     * from requested(), which every wait already calls.
+     *
+     * @param (\Closure(): void)|null $listen
+     */
+    public function listenWith(?\Closure $listen): void
+    {
+        $this->listen = $listen;
+    }
+
     public function requested(): bool
     {
+        // Every chunk of a reply asks: at most fifty times a second is heard
+        // soon enough, and costs nothing.
+        if (!$this->requested && $this->listen !== null && microtime(true) - $this->listenedAt >= self::LISTEN_SECONDS) {
+            $this->listenedAt = microtime(true);
+            ($this->listen)();
+        }
+
         return $this->requested;
     }
 
