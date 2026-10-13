@@ -789,7 +789,7 @@ HELP . Terminal::RESET;
         $this->saveSession($bag);
 
         $bag->replace([]);
-        $bag->system($this->promptBuilder->build($project) . $this->resumeNote($session));
+        $bag->system($this->promptBuilder->build($project) . self::resumeNote($session));
         foreach ($session->messages as $message) {
             $bag->add($message);
         }
@@ -873,7 +873,7 @@ HELP . Terminal::RESET;
      * in it are as they were, and a patch aimed at yesterday's version fails —
      * or worse, applies. Part of the system prompt, not of what the user said.
      */
-    private function resumeNote(SavedSession $session): string
+    public static function resumeNote(SavedSession $session): string
     {
         return "\n\n# Resumed conversation\n"
             . 'This conversation was started on ' . $session->startedAt->format('Y-m-d H:i')

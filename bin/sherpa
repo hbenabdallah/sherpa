@@ -13,8 +13,9 @@ require_once dirname(__DIR__).'/vendor/autoload_runtime.php';
 return function (array $context) {
     $kernel = new Kernel($context['APP_ENV'], (bool) $context['APP_DEBUG']);
     $app = new Application($kernel);
-    // `sherpa mcp …` and `sherpa update` are commands of their own; anything
-    // else is the session, whose options come straight after the program's name.
-    $app->setDefaultCommand('sherpa', !in_array($_SERVER['argv'][1] ?? '', ['mcp', 'update'], true));
+    // `sherpa mcp …`, `sherpa update` and `sherpa acp` are commands of their
+    // own; anything else is the session, whose options come straight after the
+    // program's name.
+    $app->setDefaultCommand('sherpa', !in_array($_SERVER['argv'][1] ?? '', ['mcp', 'update', 'acp'], true));
     return $app;
 };

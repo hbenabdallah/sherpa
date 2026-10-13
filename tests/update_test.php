@@ -228,7 +228,7 @@ $session = $session instanceof Symfony\Component\Console\Command\LazyCommand ? $
 check('and the session is handed the notice', (new ReflectionProperty($session, 'updates'))->getValue($session) instanceof UpdateNotice);
 foreach (['bin/sherpa', 'bin/sherpa-release.php'] as $entry) {
     check("and {$entry} does not read it as the session's options",
-        str_contains((string) file_get_contents(dirname(__DIR__) . '/' . $entry), "['mcp', 'update']"));
+        preg_match("/in_array\\(\\\$_SERVER\\['argv'\\]\\[1\\] \\?\\? '', \\[[^]]*'update'/", (string) file_get_contents(dirname(__DIR__) . '/' . $entry)) === 1);
 }
 
 exec('rm -rf ' . escapeshellarg($root));

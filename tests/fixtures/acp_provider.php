@@ -1,0 +1,86 @@
+<?php
+// An OpenAI-compatible provider for `php -S`, scripted by the last user
+// message, so `sherpa acp` can be driven end to end by tests/acp_test.php:
+//
+//   "patch"   file_patch on Invoice.php: return 0 → 42 ("again": 42 → 43)
+//   "plan"    todo_write with three tasks
+//   "slow"    a reply streamed a word every 0.2 s for ten seconds
+//   anything  "Hello from the fake model."
+//
+// Once a tool result is the last message, it answers with that result's
+// first line.
+
+$path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+$body = json_decode((string) file_get_contents('php://input'), true) ?? [];
+
+if ($path === '/v1/models') {
+    header('Content-Type: application/json');
+    echo json_encode(['data' => [['id' => 'fake-chat']]]);
+
+    return;
+}
+
+if ($path !== '/v1/chat/completions') {
+    http_response_code(404);
+
+    return;
+}
+
+header('Content-Type: text/event-stream');
+$chunk = static fn(array $delta, ?string $finish = null) => 'data: ' . json_encode(['choices' => [['index' => 0, 'delta' => $delta, 'finish_reason' => $finish]]]) . "\n\n";
+$call = static function (string $name, array $arguments) use ($chunk): void {
+    echo $chunk(['role' => 'assistant', 'tool_calls' => [[
+        'index' => 0, 'id' => 'call' . substr(md5($name . json_encode($arguments)), 0, 5), 'type' => 'function',
+        'function' => ['name' => $name, 'arguments' => json_encode($arguments)],
+    ]]]);
+    echo $chunk([], 'tool_calls');
+    echo "data: [DONE]\n\n";
+};
+
+$messages = $body['messages'] ?? [];
+$last = end($messages) ?: [];
+
+if (($last['role'] ?? '') === 'tool') {
+    echo $chunk(['role' => 'assistant', 'content' => 'Done: ' . strtok((string) ($last['content'] ?? ''), "\n")]);
+    echo $chunk([], 'stop');
+    echo "data: [DONE]\n\n";
+
+    return;
+}
+
+$asked = strtolower((string) ($last['content'] ?? ''));
+
+if (str_contains($asked, 'patch')) {
+    $call('file_patch', str_contains($asked, 'again')
+        ? ['path' => 'Invoice.php', 'search' => 'return 42;', 'replace' => 'return 43;']
+        : ['path' => 'Invoice.php', 'search' => 'return 0;', 'replace' => 'return 42;']);
+
+    return;
+}
+
+if (str_contains($asked, 'plan')) {
+    $call('todo_write', ['tasks' => "[x] Read Invoice.php\n[>] Fix subtotal()\n[ ] Run the tests"]);
+
+    return;
+}
+
+if (str_contains($asked, 'slow')) {
+    for ($i = 0; $i < 50; $i++) {
+        echo $chunk(['role' => 'assistant', 'content' => "word{$i} "]);
+        @ob_flush();
+        flush();
+        if (connection_aborted()) {
+            return;
+        }
+        usleep(200_000);
+    }
+    echo $chunk([], 'stop');
+    echo "data: [DONE]\n\n";
+
+    return;
+}
+
+echo $chunk(['role' => 'assistant', 'content' => 'Hello from ']);
+echo $chunk(['content' => 'the fake model.']);
+echo $chunk([], 'stop');
+echo "data: [DONE]\n\n";

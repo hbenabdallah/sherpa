@@ -98,6 +98,36 @@ final class SessionStore
     }
 
     /**
+     * Name the next conversation now rather than at its first save: an editor
+     * is given the id when the session opens, and loads it back by that id.
+     */
+    public function reserve(): string
+    {
+        $this->startNew();
+        $this->startedAt = new \DateTimeImmutable();
+
+        return $this->id = $this->startedAt->format('Ymd-His') . '-' . bin2hex(random_bytes(2));
+    }
+
+    /**
+     * Where this store is writing, to set aside while another conversation of
+     * the same process uses it — an editor holds several — and put back with
+     * resume().
+     *
+     * @return array{0: ?string, 1: ?\DateTimeImmutable, 2: ?string, 3: ?int}
+     */
+    public function cursor(): array
+    {
+        return [$this->id, $this->startedAt, $this->title, $this->inode];
+    }
+
+    /** @param array{0: ?string, 1: ?\DateTimeImmutable, 2: ?string, 3: ?int} $cursor */
+    public function resume(array $cursor): void
+    {
+        [$this->id, $this->startedAt, $this->title, $this->inode] = $cursor;
+    }
+
+    /**
      * @param list<array<string, mixed>>                                              $messages all of them, system included
      * @param list<array{id: int, tool: string, content: string, created_at: string}> $excerpts
      *
