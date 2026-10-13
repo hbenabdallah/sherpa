@@ -8,6 +8,7 @@ use App\Agent\Tool\Permission;
 use App\Project\PathOutsideProjectException;
 use App\Project\ProjectPathResolver;
 use App\Tool\Edit\FileSaver;
+use App\Tool\Edit\LineDiff;
 use App\Tool\Edit\SyntaxGuard;
 
 #[AsTool(
@@ -67,42 +68,6 @@ class FileWriteTool
             return "(new file)\n" . implode("\n", $added);
         }
 
-        $oldContent = file_get_contents($resolved);
-        return $this->unifiedDiff($oldContent, $newContent, $path);
-    }
-
-    private function unifiedDiff(string $old, string $new, string $label): string
-    {
-        $oldLines = explode("\n", $old);
-        $newLines = explode("\n", $new);
-
-        $diff = ["--- a/{$label}", "+++ b/{$label}"];
-        $maxLen = max(count($oldLines), count($newLines));
-
-        $i = 0;
-        $j = 0;
-        while ($i < count($oldLines) || $j < count($newLines)) {
-            $oldLine = $oldLines[$i] ?? null;
-            $newLine = $newLines[$j] ?? null;
-
-            if ($oldLine === $newLine) {
-                $diff[] = "  {$oldLine}";
-                $i++;
-                $j++;
-            } elseif ($oldLine !== null) {
-                $diff[] = "- {$oldLine}";
-                $i++;
-            } else {
-                $diff[] = "+ {$newLine}";
-                $j++;
-            }
-
-            if (count($diff) > 80) {
-                $diff[] = '... (diff truncated)';
-                break;
-            }
-        }
-
-        return implode("\n", $diff);
+        return LineDiff::unified((string) file_get_contents($resolved), $newContent, $this->paths->relative($resolved));
     }
 }

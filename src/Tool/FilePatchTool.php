@@ -9,6 +9,7 @@ use App\Project\PathOutsideProjectException;
 use App\Project\PathSuggestions;
 use App\Project\ProjectPathResolver;
 use App\Tool\Edit\FileSaver;
+use App\Tool\Edit\LineDiff;
 use App\Tool\Edit\PatchOutcome;
 use App\Tool\Edit\SyntaxGuard;
 use App\Tool\Edit\TextPatch;
@@ -84,7 +85,8 @@ class FilePatchTool
         // Surface up front whether this patch can actually apply — and what it
         // will really change when a fallback placed it — so the user is not
         // asked to approve one edit and shown another.
-        $outcome = TextPatch::apply((string) file_get_contents($resolved), $search, $replace);
+        $current = (string) file_get_contents($resolved);
+        $outcome = TextPatch::apply($current, $search, $replace);
 
         if (!$outcome->ok()) {
             $diff = ['!! ' . $outcome->error . ' — this patch will fail', ''];
@@ -96,16 +98,10 @@ class FilePatchTool
             return implode("\n", $diff);
         }
 
+        // The file before and after, not the search and the replacement: the
+        // lines that change, where they are, rather than the whole block sent.
         $diff = $outcome->how === 'exact' ? [] : ["(placed allowing for: {$outcome->how}, line {$outcome->line})", ''];
-        $diff[] = "--- a/{$path}";
-        $diff[] = "+++ b/{$path}";
-
-        foreach (explode("\n", $outcome->matched) as $l) {
-            $diff[] = "- {$l}";
-        }
-        foreach (explode("\n", $outcome->replacement) as $l) {
-            $diff[] = "+ {$l}";
-        }
+        $diff[] = LineDiff::unified($current, (string) $outcome->content, $this->paths->relative($resolved));
 
         return implode("\n", $diff);
     }
