@@ -19,6 +19,9 @@ final class AcpSession
 
     public bool $planning = false;
 
+    /** @var list<string> tools allowed "for this session": this one, not every thread of the editor */
+    public array $grants = [];
+
     public function __construct(
         public readonly string $id,
         /** The project directory, canonical. */

@@ -15,6 +15,7 @@ use App\Mcp\McpException;
 use App\Mcp\McpRegistry;
 use App\Mcp\ServerConfig;
 use App\Memory\ContextStore;
+use App\Permission\SessionPermissions;
 use App\Platform\SwitchablePlatform;
 use App\Project\DockerConfig;
 use App\Project\ProjectStore;
@@ -98,6 +99,7 @@ final class AcpServer
         private readonly ContextBudget $budget,
         private readonly UsageMeter $usage,
         private readonly Files $files,
+        private readonly SessionPermissions $grants,
     ) {}
 
     /** Answer the editor until it closes its end. */
@@ -451,6 +453,10 @@ final class AcpServer
         // The plan was another conversation's.
         $this->todos->clear();
         $session->planning ? $this->planMode->on() : $this->planMode->off();
+        $this->grants->clear();
+        foreach ($session->grants as $tool) {
+            $this->grants->allowForSession($tool);
+        }
 
         $this->current = $session->id;
     }
@@ -466,6 +472,7 @@ final class AcpServer
         $session->cursor = $this->sessions->cursor();
         $session->excerpts = $this->excerpts->export();
         $session->planning = $this->planMode->isActive();
+        $session->grants = $this->grants->all();
         $this->current = null;
     }
 

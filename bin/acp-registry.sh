@@ -13,14 +13,25 @@ set -eu
 version=${1:?usage: bin/acp-registry.sh <version>}
 repo=https://github.com/hbenabdallah/sherpa
 base="$repo/releases/download/v$version"
+download=$(mktemp)
+trap 'rm -f "$download"' EXIT
 
 entry() {
-    # $1: the registry's platform, $2: the executable's
+    # $1: the registry's platform, $2: the executable's. Downloaded to a file
+    # first: through a pipe, a failed download hashed as an empty file.
     file="sherpa-$version-$2"
-    sum=$(curl -fsSL "$base/$file" | sha256sum | cut -d' ' -f1)
+    curl -fsSL -o "$download" "$base/$file"
+    sum=$(sha256sum "$download" | cut -d' ' -f1)
     printf '      "%s": {\n        "archive": "%s",\n        "sha256": "%s",\n        "cmd": "./%s",\n        "args": ["acp"]\n      }' \
         "$1" "$base/$file" "$sum" "$file"
 }
+
+# Each in a variable, so that one failing stops the script: inside the
+# here-document below, a failure would go unnoticed.
+darwin_aarch64=$(entry darwin-aarch64 macos-aarch64)
+darwin_x86_64=$(entry darwin-x86_64 macos-x86_64)
+linux_aarch64=$(entry linux-aarch64 linux-aarch64)
+linux_x86_64=$(entry linux-x86_64 linux-x86_64)
 
 cat <<JSON
 {
@@ -34,10 +45,10 @@ cat <<JSON
   "license_url": "$repo/blob/main/LICENSE",
   "distribution": {
     "binary": {
-$(entry darwin-aarch64 macos-aarch64),
-$(entry darwin-x86_64 macos-x86_64),
-$(entry linux-aarch64 linux-aarch64),
-$(entry linux-x86_64 linux-x86_64)
+$darwin_aarch64,
+$darwin_x86_64,
+$linux_aarch64,
+$linux_x86_64
     }
   }
 }

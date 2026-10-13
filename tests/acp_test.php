@@ -283,6 +283,19 @@ check('and soon', microtime(true) - $started < 5.0, sprintf('%.1f s', microtime(
 $reply = $editor->call('session/prompt', ['sessionId' => $session, 'prompt' => [['type' => 'text', 'text' => 'Say hello']]]);
 check('the session goes on after a cancel', ($reply['result']['stopReason'] ?? '') === 'end_turn', json_encode($reply));
 
+// ---- "for this session" is this session's ----------------------------------------------
+file_put_contents("{$project}/Invoice.php", "<?php\nfunction subtotal(): int\n{\n    return 0;\n}\n");
+$editor->answer = static fn(array $question): ?string => 'allow-session';
+$asked = count($editor->asked);
+$editor->call('session/prompt', ['sessionId' => $session, 'prompt' => [['type' => 'text', 'text' => 'Patch the invoice']]]);
+$other = (string) ($editor->call('session/new', ['cwd' => $project, 'mcpServers' => []])['result']['sessionId'] ?? '');
+$editor->call('session/prompt', ['sessionId' => $other, 'prompt' => [['type' => 'text', 'text' => 'Patch it again']]]);
+check('a tool allowed for one session is asked about again in another', count($editor->asked) === $asked + 2, (string) (count($editor->asked) - $asked));
+file_put_contents("{$project}/Invoice.php", "<?php\nfunction subtotal(): int\n{\n    return 0;\n}\n");
+$editor->call('session/prompt', ['sessionId' => $session, 'prompt' => [['type' => 'text', 'text' => 'Patch the invoice']]]);
+check('and not again in the session it was allowed for', count($editor->asked) === $asked + 2, (string) (count($editor->asked) - $asked));
+check('which still edits', str_contains((string) file_get_contents("{$project}/Invoice.php"), 'return 42;'));
+
 // ---- what is not right ------------------------------------------------------------
 check('an unknown method is said to be unknown', ($editor->call('session/teleport', [])['error']['code'] ?? 0) === -32601);
 check('a prompt to a session that does not exist is refused',
