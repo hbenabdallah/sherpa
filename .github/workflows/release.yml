@@ -121,6 +121,16 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           version="${GITHUB_REF_NAME#v}"
+          # The ACP registry runs a file whose name it never updates, while
+          # it follows each release's URL: an archive per platform holding
+          # just `sherpa` keeps that name the same from one version to the next.
+          for binary in var/release/sherpa-"$version"-*; do
+            case "$binary" in *.sha256) continue ;; esac
+            dir=$(mktemp -d)
+            cp "$binary" "$dir/sherpa"
+            chmod +x "$dir/sherpa"
+            tar -czf "$binary.tar.gz" -C "$dir" sherpa
+          done
           # release-notes.md among the files too: `sherpa update` fetches it
           # from beside the executable and shows it once installed.
           files=(var/release/sherpa-"$version"-* var/release/THIRD-PARTY-NOTICES.md var/release/release-notes.md)
