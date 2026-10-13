@@ -24,18 +24,10 @@
 
 ---
 
-```
-$ cd ~/code/shop
-$ sherpa
-✓ Model: gpt-4o-mini (online, api.openai.com · 32,768 tokens · machine config)
-✓ Project loaded: shop (PHP)
-
-❯ Why is the invoice subtotal wrong when a line has a quantity above 1?
-  → Tool: project_grep pattern=subtotal
-  → Tool: file_read path=src/Billing/Invoice.php
-Sherpa: Invoice::subtotal() adds each product's price once and never multiplies
-        it by $line->quantity (src/Billing/Invoice.php, line 42)…
-```
+<p align="center">
+  <img src="https://raw.githubusercontent.com/hbenabdallah/sherpa/main/public/sherpa-demo.gif" alt="Sherpa finds a bug, fixes it once allowed, and runs the tests" width="800"><br>
+  <sub>A real session: a failing test, the fix approved, the tests run, then <code>git diff</code>. The model's thinking time is shortened.</sub>
+</p>
 
 Sherpa answers in the language of your question; its interface is in English.
 

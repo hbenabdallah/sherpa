@@ -24,18 +24,10 @@
 
 ---
 
-```
-$ cd ~/code/boutique
-$ sherpa
-✓ Model: gpt-4o-mini (online, api.openai.com · 32,768 tokens · machine config)
-✓ Project loaded: boutique (PHP)
-
-❯ Pourquoi le sous-total des factures est faux quand une ligne a une quantité > 1 ?
-  → Tool: project_grep pattern=subtotal
-  → Tool: file_read path=src/Billing/Invoice.php
-Sherpa: Invoice::subtotal() additionne le prix de chaque produit une seule fois,
-        sans le multiplier par $line->quantity (src/Billing/Invoice.php, ligne 42)…
-```
+<p align="center">
+  <img src="https://raw.githubusercontent.com/hbenabdallah/sherpa/main/public/sherpa-demo.gif" alt="Sherpa trouve un bug, le corrige une fois autorisé, et lance les tests" width="800"><br>
+  <sub>Une vraie session : un test qui échoue, la correction approuvée, les tests lancés, puis <code>git diff</code>. Le temps de réflexion du modèle est raccourci.</sub>
+</p>
 
 Sherpa répond dans la langue de votre question ; son interface est en anglais.
 
