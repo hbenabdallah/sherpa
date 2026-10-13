@@ -9,7 +9,6 @@ use App\Agent\Tool\Toolbox;
 use App\Permission\PermissionBroker;
 use App\Platform\PlatformInterface;
 use App\Runtime\Interrupt;
-use App\TUI\ChatPane;
 use App\Usage\UsageMeter;
 
 class AgentLoop
@@ -73,7 +72,8 @@ class AgentLoop
         private readonly PlatformInterface $platform,
         private readonly Toolbox $toolbox,
         private readonly PermissionBroker $permissions,
-        private readonly ChatPane $chat,
+        // The terminal, or an editor over ACP.
+        private readonly AgentOutput $chat,
         private readonly ContextBudget $budget,
         private readonly HistoryCompactor $compactor,
         private readonly Interrupt $interrupt,
@@ -458,13 +458,13 @@ class AgentLoop
         if (isset($this->cutOff[$call->id])) {
             $result = new ToolResult($call->id, sprintf(self::CUT_OFF, number_format($this->cutOff[$call->id])), isError: true);
             $bag->tool($call->name, $result->content, $call->id);
-            $this->chat->showToolResult($call->name, 'arguments cut off: not run', true);
+            $this->chat->showToolResult($call->name, 'arguments cut off: not run', true, $call->id);
 
             return $result;
         }
 
         $def = $this->toolbox->find($call->name);
-        $this->chat->showToolCall($call->name, $call->arguments);
+        $this->chat->showToolCall($call->name, $call->arguments, $call->id);
 
         $result = match (true) {
             $this->planMode?->blocks($def) === true => new ToolResult($call->id, PlanMode::BLOCKED, isError: true),
@@ -472,7 +472,7 @@ class AgentLoop
             default                                 => new ToolResult($call->id, self::REFUSED, isError: true),
         };
 
-        $this->chat->showToolResult($call->name, $result->content, $result->isError);
+        $this->chat->showToolResult($call->name, $result->content, $result->isError, $call->id);
         $this->trace?->observe($call->name, $result->isError);
 
         $bag->tool($call->name, $result->content, $call->id);

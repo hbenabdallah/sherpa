@@ -5,13 +5,13 @@ namespace App\Permission;
 use App\Agent\Tool\Permission;
 use App\Agent\Tool\ToolCall;
 use App\Agent\Tool\ToolDefinition;
-use App\TUI\ConfirmOverlay;
 
 class PermissionBroker
 {
     public function __construct(
         private readonly SessionPermissions $session,
-        private readonly ConfirmOverlay $overlay,
+        // The terminal's overlay, or an editor over ACP.
+        private readonly Approver $approver,
         // Required, not nullable-with-default: a nullable argument that silently
         // fails to autowire would put back exactly the bug being fixed here —
         // an "[p] Always" that quietly grants nothing. Make it a boot failure.
@@ -41,7 +41,7 @@ class PermissionBroker
             return true;
         }
 
-        return match ($this->overlay->show($call, $def)) {
+        return match ($this->approver->confirm($call, $def)) {
             ConfirmChoice::Once    => true,
             ConfirmChoice::Session => $this->grantForSession($call->name),
             ConfirmChoice::Project => $this->grantForProject($call->name),

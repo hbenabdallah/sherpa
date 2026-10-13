@@ -4,12 +4,13 @@ namespace App\TUI;
 
 use App\Agent\Tool\ToolCall;
 use App\Agent\Tool\ToolDefinition;
+use App\Permission\Approver;
 use App\Permission\ConfirmChoice;
 use App\Tool\FilePatchTool;
 use App\Tool\FileWriteTool;
 use App\Tool\ShellExecTool;
 
-class ConfirmOverlay
+class ConfirmOverlay implements Approver
 {
     /** Rows of preview the box holds; past them, it says how many it hid. */
     private const PREVIEW_ROWS = 24;
@@ -19,7 +20,58 @@ class ConfirmOverlay
         private readonly FileWriteTool $fileWriteTool,
         private readonly FilePatchTool $filePatchTool,
         private readonly ShellExecTool $shellExecTool,
+        private readonly MarkdownRenderer $markdown = new MarkdownRenderer(),
     ) {}
+
+    public function confirm(ToolCall $call, ToolDefinition $def): ConfirmChoice
+    {
+        return $this->show($call, $def);
+    }
+
+    /**
+     * The plan in full, then one key: y carries it out, n keeps planning. In
+     * a pipe nobody can press either.
+     */
+    public function approvePlan(string $plan): ?bool
+    {
+        echo "\n" . Terminal::BOLD . Terminal::LIME . 'Plan' . Terminal::RESET . "\n" . $this->markdown->render(trim($plan)) . "\n\n";
+
+        if (!function_exists('posix_isatty') || !posix_isatty(STDIN)) {
+            return null;
+        }
+
+        $approved = $this->askAboutPlan();
+        echo "\r\e[2K" . ($approved
+            ? Terminal::GREEN . '  ✓ Plan approved: carrying it out.'
+            : Terminal::GRAY . '  Plan not approved: say what to change.') . Terminal::RESET . "\n";
+
+        return $approved;
+    }
+
+    private function askAboutPlan(): bool
+    {
+        $this->terminal->rawMode();
+        // A key typed while the plan was being written is no answer to it.
+        $this->terminal->discardPendingInput();
+
+        try {
+            while (true) {
+                echo "\r\e[2K  Carry out this plan? "
+                    . Terminal::GREEN . '[y]' . Terminal::RESET . ' yes, go  '
+                    . Terminal::YELLOW . '[n]' . Terminal::RESET . ' no, keep planning ';
+
+                $key = strtolower($this->terminal->readKey());
+                if (in_array($key, ['y', "\r", "\n"], true)) {
+                    return true;
+                }
+                if (in_array($key, ['n', "\e", ''], true)) {
+                    return false;
+                }
+            }
+        } finally {
+            $this->terminal->restoreMode();
+        }
+    }
 
     /**
      * Ask, in the flow of the conversation: the box is printed where the

@@ -2,9 +2,10 @@
 
 namespace App\TUI;
 
+use App\Agent\AgentOutput;
 use App\Tool\ListDirTool;
 
-class ChatPane
+class ChatPane implements AgentOutput
 {
     private array $history = [];
     private string $spinner = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏';
@@ -84,7 +85,7 @@ class ChatPane
         $this->withheld .= $token;
         $head = ltrim($this->withheld);
 
-        if ($head === '' || $this->couldBecomeToolCall($head)) {
+        if ($head === '' || self::couldBecomeToolCall($head)) {
             return;
         }
 
@@ -94,7 +95,8 @@ class ChatPane
         $this->emitRendered($held);
     }
 
-    private function couldBecomeToolCall(string $head): bool
+    /** Whether the opening of a reply may still turn out to be a tool call written as prose. */
+    public static function couldBecomeToolCall(string $head): bool
     {
         if ($head[0] === '{') {
             return true;
@@ -217,7 +219,7 @@ class ChatPane
         echo "\n";
     }
 
-    public function showToolCall(string $toolName, array $args = []): void
+    public function showToolCall(string $toolName, array $args = [], ?string $callId = null): void
     {
         $this->endWaiting();
 
@@ -243,7 +245,7 @@ class ChatPane
      * Tool output is the least trustworthy text on screen — it is whatever
      * happened to be on disk or on stdout — so it is stripped before display.
      */
-    public function showToolResult(string $toolName, string $result, bool $isError = false): void
+    public function showToolResult(string $toolName, string $result, bool $isError = false, ?string $callId = null): void
     {
         if ($toolName === 'todo_write' && !$isError) {
             $this->showPlan($result);
@@ -324,6 +326,12 @@ class ChatPane
         $this->endWaiting();
 
         echo Terminal::GRAY . "\n  " . Terminal::plain($message) . Terminal::RESET . "\n";
+    }
+
+    /** A sub-agent's work, one line per tool, under the call that started it. */
+    public function forSubagent(): AgentOutput
+    {
+        return new SubagentPane($this->terminal, new MarkdownRenderer());
     }
 
     private function renderLast(): void

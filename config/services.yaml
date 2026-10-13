@@ -106,6 +106,17 @@ services:
     # force. The command switches it; nothing else knows there are two.
     App\Platform\PlatformInterface: '@App\Platform\SwitchablePlatform'
 
+    # Where a turn is shown and who answers its questions: the terminal, or an
+    # editor once `sherpa acp` switches the frontend over.
+    App\Agent\AgentOutput: '@App\Runtime\Frontend'
+    App\Permission\Approver: '@App\Runtime\Frontend'
+
+    App\Tool\ShellExecTool:
+        arguments:
+            # Explicit, as for the platforms: a silent null would leave a
+            # running command deaf to an editor's cancel.
+            $interrupt: '@App\Runtime\Interrupt'
+
     # Measured speed of this machine, shared by everything that used to assume
     # one. Fed by AgentLoop from the platform's own timings; no probe, no flag.
     App\Agent\InferenceSpeed: ~

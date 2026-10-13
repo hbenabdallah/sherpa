@@ -11,6 +11,7 @@ use App\Project\ProjectPathResolver;
 use App\Tool\Edit\FileSaver;
 use App\Tool\Edit\LineDiff;
 use App\Tool\Edit\PatchOutcome;
+use App\Tool\Edit\ProposedEdit;
 use App\Tool\Edit\SyntaxGuard;
 use App\Tool\Edit\TextPatch;
 
@@ -104,5 +105,24 @@ class FilePatchTool
         $diff[] = LineDiff::unified($current, (string) $outcome->content, $this->paths->relative($resolved));
 
         return implode("\n", $diff);
+    }
+
+    /** The file before and after, or null for a patch that will fail. */
+    public function proposal(string $path, string $search, string $replace): ?ProposedEdit
+    {
+        try {
+            $resolved = $this->paths->resolve($path);
+        } catch (PathOutsideProjectException) {
+            return null;
+        }
+
+        if (!is_file($resolved)) {
+            return null;
+        }
+
+        $current = (string) file_get_contents($resolved);
+        $outcome = TextPatch::apply($current, $search, $replace);
+
+        return $outcome->ok() ? new ProposedEdit($resolved, $current, (string) $outcome->content) : null;
     }
 }

@@ -9,6 +9,7 @@ use App\Agent\Tool\Permission;
 use App\Project\DockerConfig;
 use App\Project\PathOutsideProjectException;
 use App\Project\ProjectPathResolver;
+use App\Runtime\Interrupt;
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
 
@@ -57,6 +58,10 @@ class ShellExecTool
         // became a variable.
         private readonly ?ContextBudget $budget = null,
         private readonly BackgroundJobs $jobs = new BackgroundJobs(),
+        // Heard while the command runs. Ctrl+C in a terminal reaches the
+        // command by itself, as a signal; an editor cancels with a message,
+        // which only this hears.
+        private readonly ?Interrupt $interrupt = null,
     ) {}
 
     /** How many bytes of output this window can afford from one command. */
@@ -94,7 +99,11 @@ class ShellExecTool
         $process = new Process($fullCmd, cwd: $workDir, timeout: $this->timeout);
 
         try {
-            $process->run();
+            if (!$this->runUnlessInterrupted($process)) {
+                $partial = trim($process->getOutput() . $process->getErrorOutput());
+
+                return '(command interrupted by the user)' . ($partial === '' ? '' : "\n" . $this->trim($partial));
+            }
         } catch (ProcessTimedOutException) {
             // Whatever it printed before the deadline is usually the answer —
             // a test run that hangs at test 47 has already named test 47.
@@ -118,6 +127,32 @@ class ShellExecTool
         $status = $code === 0 ? '' : "(exit code {$code})\n";
 
         return $status . $this->trim($output);
+    }
+
+    /**
+     * Run to the end, the timeout applied, unless cancelled first: then
+     * stopped, and false.
+     *
+     * @throws ProcessTimedOutException
+     */
+    private function runUnlessInterrupted(Process $process): bool
+    {
+        $process->start();
+
+        // isRunning() also drains the pipes, or a chatty command would stall
+        // on a full one.
+        while ($process->isRunning()) {
+            if ($this->interrupt?->requested()) {
+                $process->stop(1);
+
+                return false;
+            }
+
+            $process->checkTimeout();
+            usleep(20_000);
+        }
+
+        return true;
     }
 
     /**

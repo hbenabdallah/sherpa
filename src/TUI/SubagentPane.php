@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\TUI;
 
+use App\Agent\AgentOutput;
+
 /**
  * What a sub-agent shows while it works: one short line per tool it uses,
  * indented under the call that started it, and nothing of what it writes —
@@ -40,7 +42,7 @@ final class SubagentPane extends ChatPane
         $this->showSpinner(Terminal::GRAY . '    ↳ sub-agent at work…' . Terminal::RESET);
     }
 
-    public function showToolCall(string $toolName, array $args = []): void
+    public function showToolCall(string $toolName, array $args = [], ?string $callId = null): void
     {
         $this->stopSpinning();
 
@@ -50,7 +52,7 @@ final class SubagentPane extends ChatPane
             . Terminal::RESET . "\n";
     }
 
-    public function showToolResult(string $toolName, string $result, bool $isError = false): void
+    public function showToolResult(string $toolName, string $result, bool $isError = false, ?string $callId = null): void
     {
     }
 
@@ -68,6 +70,11 @@ final class SubagentPane extends ChatPane
     {
         $this->stopSpinning();
         echo Terminal::YELLOW . '    ↳ ' . Terminal::plain($message, singleLine: true) . Terminal::RESET . "\n";
+    }
+
+    public function forSubagent(): AgentOutput
+    {
+        return $this;
     }
 
     private function stopSpinning(): void

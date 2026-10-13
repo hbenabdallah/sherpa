@@ -13,6 +13,8 @@ use App\Agent\Tool\AsTool;
 use App\Agent\Tool\Param;
 use App\Agent\Tool\Permission;
 use App\Agent\Tool\Toolbox;
+use App\Permission\Approver;
+use App\Permission\ConfirmChoice;
 use App\Permission\PermissionBroker;
 use App\Permission\ProjectPermissions;
 use App\Permission\SessionPermissions;
@@ -58,6 +60,16 @@ final class ReadIt
 {
     public int $ran = 0;
     public function __invoke(#[Param('what')] string $what = ''): string { $this->ran++; return "read {$what}"; }
+}
+
+/** Answers the plan question as told, and keeps the plans it was shown. */
+final class PlanAnswer implements Approver
+{
+    /** @var list<string> */
+    public array $plans = [];
+    public function __construct(private readonly bool $yes) {}
+    public function confirm(App\Agent\Tool\ToolCall $call, App\Agent\Tool\ToolDefinition $def): ConfirmChoice { return ConfirmChoice::Once; }
+    public function approvePlan(string $plan): ?bool { $this->plans[] = $plan; return $this->yes; }
 }
 
 /** Grants every confirmation, and counts how often it was asked. */
@@ -131,8 +143,8 @@ $plan->on();
 $write = new WriteIt();
 $read = new ReadIt();
 $broker = new YesBroker();
-$approvals = 0;
-$ready = new PlanReadyTool($plan, answer: function () use (&$approvals) { $approvals++; return true; });
+$answer = new PlanAnswer(true);
+$ready = new PlanReadyTool($plan, $answer);
 $model = new Scripted([
     $call('read_it', ['what' => 'Invoice.php']),
     $call('write_it', ['what' => 'too soon']),
@@ -145,8 +157,8 @@ $model = new Scripted([
 $history = json_encode($bag->all());
 check('reading goes ahead while planning', $read->ran === 1);
 check('a write before approval is refused, without asking the user', str_contains($history, 'Plan mode: nothing is changed') && $broker->asked === 1 && $write->ran === 1, $history);
-check('the plan is shown', str_contains($screen, 'Multiply by the quantity'), $screen);
-check('and approved once', $approvals === 1);
+check('the plan is shown', str_contains($answer->plans[0] ?? '', 'Multiply by the quantity'), json_encode($answer->plans));
+check('and approved once', count($answer->plans) === 1);
 check('approval ends plan mode', !$plan->isActive());
 check('and the work goes on in the same turn: the write runs, asked for as usual', $write->ran === 1 && $broker->asked === 1 && $result->content === 'Fixed.', $result->content);
 
@@ -154,11 +166,11 @@ check('and the work goes on in the same turn: the write runs, asked for as usual
 $plan = new PlanMode();
 $plan->on();
 $model = new Scripted([$call('plan_ready', ['plan' => 'Do it.']), ['role' => 'assistant', 'content' => 'What should change?']]);
-[$result] = run($model, [new WriteIt(), new PlanReadyTool($plan, answer: fn() => false)], $plan, new YesBroker());
+[$result] = run($model, [new WriteIt(), new PlanReadyTool($plan, new PlanAnswer(false))], $plan, new YesBroker());
 check('a plan not approved leaves plan mode on', $plan->isActive());
 check('and the model is told to wait', str_contains(json_encode($model->seen[1]), 'did not approve the plan yet'), json_encode(end($model->seen[1])));
 
-check('outside plan mode, plan_ready changes nothing', str_contains((new PlanReadyTool(new PlanMode(), answer: fn() => true))('x'), 'Not in plan mode'));
+check('outside plan mode, plan_ready changes nothing', str_contains((new PlanReadyTool(new PlanMode(), new PlanAnswer(true)))('x'), 'Not in plan mode'));
 
 // ---- the status bar says it -------------------------------------------------------
 $project = new Project(slug: 'p', name: 'p', path: '/tmp', memoryDb: '/tmp/m.db', docker: new DockerConfig(enabled: false),

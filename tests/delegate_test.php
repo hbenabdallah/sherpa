@@ -29,6 +29,7 @@ use App\Tool\ListDirTool;
 use App\Tool\MemoryRecallTool;
 use App\Tool\ProjectGrepTool;
 use App\Tool\ShellExecTool;
+use App\TUI\ChatPane;
 use App\TUI\ConfirmOverlay;
 use App\TUI\MarkdownRenderer;
 use App\TUI\SubagentPane;
@@ -94,6 +95,7 @@ function delegate(PlatformInterface $platform, ProjectPathResolver $paths, Memor
     return new DelegateTool(
         $platform,
         new PermissionBroker(new SessionPermissions(), new ConfirmOverlay(new Terminal(), new FileWriteTool(), new FilePatchTool(), new ShellExecTool()), new ProjectPermissions(new ProjectStore(new StackDetector()))),
+        new ChatPane(new Terminal(), new MarkdownRenderer()),
         $interrupt ?? new Interrupt(),
         $paths,
         new ListDirTool($paths),

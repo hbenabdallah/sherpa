@@ -3,6 +3,7 @@
 namespace App\Tool;
 
 use App\Agent\AgentLoop;
+use App\Agent\AgentOutput;
 use App\Agent\ContextBudget;
 use App\Agent\HistoryCompactor;
 use App\Agent\InferenceSpeed;
@@ -15,9 +16,6 @@ use App\Permission\PermissionBroker;
 use App\Platform\PlatformInterface;
 use App\Project\ProjectPathResolver;
 use App\Runtime\Interrupt;
-use App\TUI\MarkdownRenderer;
-use App\TUI\SubagentPane;
-use App\TUI\Terminal;
 use App\Usage\UsageMeter;
 
 #[AsTool(
@@ -48,6 +46,8 @@ PROMPT;
     public function __construct(
         private readonly PlatformInterface $platform,
         private readonly PermissionBroker $permissions,
+        // Where the main agent shows its work: the sub-agent shows its own there.
+        private readonly AgentOutput $output,
         private readonly Interrupt $interrupt,
         private readonly ProjectPathResolver $paths,
         private readonly ListDirTool $listDir,
@@ -77,7 +77,7 @@ PROMPT;
             $this->platform,
             new Toolbox([$this->listDir, $this->fileFind, $this->grep, $this->fileRead, $this->docSearch, $this->memoryRecall]),
             $this->permissions,
-            new SubagentPane(new Terminal(), new MarkdownRenderer()),
+            $this->output->forSubagent(),
             $budget,
             new HistoryCompactor($this->platform, $budget, $this->speed, $this->interrupt),
             $this->interrupt,

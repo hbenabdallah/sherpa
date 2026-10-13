@@ -9,6 +9,7 @@ use App\Project\PathOutsideProjectException;
 use App\Project\ProjectPathResolver;
 use App\Tool\Edit\FileSaver;
 use App\Tool\Edit\LineDiff;
+use App\Tool\Edit\ProposedEdit;
 use App\Tool\Edit\SyntaxGuard;
 
 #[AsTool(
@@ -69,5 +70,17 @@ class FileWriteTool
         }
 
         return LineDiff::unified((string) file_get_contents($resolved), $newContent, $this->paths->relative($resolved));
+    }
+
+    /** The file before and after, or null for a path the tool will refuse. */
+    public function proposal(string $path, string $newContent): ?ProposedEdit
+    {
+        try {
+            $resolved = $this->paths->resolve($path);
+        } catch (PathOutsideProjectException) {
+            return null;
+        }
+
+        return new ProposedEdit($resolved, is_file($resolved) ? (string) file_get_contents($resolved) : null, $newContent);
     }
 }
