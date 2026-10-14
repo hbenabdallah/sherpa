@@ -26,6 +26,10 @@ tools, same project memory and saved conversations — with the editor's own vie
   project;
 - the plan the model keeps is the editor's task list, and plan mode's plan is
   approved there too;
+- plan mode and the model are chosen beside the prompt box, for each
+  conversation: the models listed are the provider's that can call tools, and
+  a model chosen there holds for the conversations opened after it, until the
+  editor closes Sherpa;
 - a file open in a tab is read and edited as you see it, unsaved changes
   included, when the editor offers that;
 - stopping a turn in the editor stops it, a running command included;
@@ -72,9 +76,9 @@ and give it the full path of the executable:
 ```
 
 The options of `sherpa` work after `acp`: `["acp", "-P", "mistral"]` uses a
-recorded provider, `["acp", "-m", "<model>"]` another model. What Sherpa prints
+recorded provider, `["acp", "-m", "<model>"]` starts on another model. What Sherpa prints
 goes to the editor's agent log (Zed: `dev: open acp logs`); the slash commands
-(`/model`, `/docs`…) stay in the terminal.
+(`/docs`, `/compact`…) stay in the terminal.
 
 ## Use several API providers
 

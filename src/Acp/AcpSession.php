@@ -3,6 +3,7 @@
 namespace App\Acp;
 
 use App\Agent\MessageBag;
+use App\Config\ModelProfile;
 
 /**
  * One conversation an editor holds open. The services behind a turn hold one
@@ -18,6 +19,9 @@ final class AcpSession
     public array $excerpts = [];
 
     public bool $planning = false;
+
+    /** The model its turns run on: each conversation keeps the one chosen for it. */
+    public ?ModelProfile $profile = null;
 
     /** @var list<string> tools allowed "for this session": this one, not every thread of the editor */
     public array $grants = [];

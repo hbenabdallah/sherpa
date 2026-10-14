@@ -2,6 +2,8 @@
 // An OpenAI-compatible provider for `php -S`, scripted by the last user
 // message, so `sherpa acp` can be driven end to end by tests/acp_test.php:
 //
+//   "which model"  "Model: " and the model the request was for
+//   "propose" plan_ready with a two-step plan
 //   "patch"   file_patch on Invoice.php: return 0 → 42 ("again": 42 → 43)
 //   "plan"    todo_write with three tasks
 //   "slow"    a reply streamed a word every 0.2 s for ten seconds
@@ -15,7 +17,7 @@ $body = json_decode((string) file_get_contents('php://input'), true) ?? [];
 
 if ($path === '/v1/models') {
     header('Content-Type: application/json');
-    echo json_encode(['data' => [['id' => 'fake-chat']]]);
+    echo json_encode(['data' => [['id' => 'fake-chat'], ['id' => 'fake-other']]]);
 
     return;
 }
@@ -49,6 +51,21 @@ if (($last['role'] ?? '') === 'tool') {
 }
 
 $asked = strtolower((string) ($last['content'] ?? ''));
+
+// Before "plan": in plan mode, every message carries a reminder that says it.
+if (str_contains($asked, 'which model')) {
+    echo $chunk(['role' => 'assistant', 'content' => 'Model: ' . ($body['model'] ?? '?')]);
+    echo $chunk([], 'stop');
+    echo "data: [DONE]\n\n";
+
+    return;
+}
+
+if (str_contains($asked, 'propose')) {
+    $call('plan_ready', ['plan' => "1. Fix subtotal()\n2. Run the tests"]);
+
+    return;
+}
 
 if (str_contains($asked, 'patch')) {
     $call('file_patch', str_contains($asked, 'again')

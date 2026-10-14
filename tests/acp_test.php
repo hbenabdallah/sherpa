@@ -266,6 +266,68 @@ $plan = $editor->of('plan', $from)[0]['params']['update']['entries'] ?? [];
 check('the plan is the editor\'s own list', array_column($plan, 'status') === ['completed', 'in_progress', 'pending'] && ($plan[1]['content'] ?? '') === 'Fix subtotal()', json_encode($plan));
 check('and no tool card for it', $editor->of('tool_call', $from) === []);
 
+// ---- the mode and the model, beside the prompt box ----------------------------------
+$modes = $new['result']['modes'] ?? [];
+check('a session says its modes: default, and plan', ($modes['currentModeId'] ?? '') === 'default'
+    && array_column($modes['availableModes'] ?? [], 'id') === ['default', 'plan'], json_encode($modes));
+$options = array_column($new['result']['configOptions'] ?? [], null, 'id');
+check('and offers the mode and the model as options', array_keys($options) === ['mode', 'model']
+    && ($options['mode']['category'] ?? '') === 'mode' && ($options['model']['category'] ?? '') === 'model', json_encode($options));
+check('the model in use, among the provider\'s', ($options['model']['currentValue'] ?? '') === 'fake-chat'
+    && array_column($options['model']['options'] ?? [], 'value') === ['fake-chat', 'fake-other'], json_encode($options['model'] ?? null));
+
+$set = $editor->call('session/set_config_option', ['sessionId' => $session, 'configId' => 'model', 'value' => 'fake-other']);
+$model = array_column($set['result']['configOptions'] ?? [], null, 'id')['model'] ?? [];
+check('another model chosen is the current one', ($model['currentValue'] ?? '') === 'fake-other', json_encode($set));
+$from = count($editor->updates);
+$editor->call('session/prompt', ['sessionId' => $session, 'prompt' => [['type' => 'text', 'text' => 'Which model are you?']]]);
+check('and the next turn runs on it', $editor->text('agent_message_chunk', $from) === 'Model: fake-other', $editor->text('agent_message_chunk', $from));
+check('a model the provider does not offer is refused',
+    ($editor->call('session/set_config_option', ['sessionId' => $session, 'configId' => 'model', 'value' => 'gpt-imaginary'])['error']['code'] ?? 0) === -32602);
+
+$third = $editor->call('session/new', ['cwd' => $project, 'mcpServers' => []]);
+$thirdId = (string) ($third['result']['sessionId'] ?? '');
+check('a session opened next starts on the model last chosen',
+    (array_column($third['result']['configOptions'] ?? [], null, 'id')['model']['currentValue'] ?? '') === 'fake-other', json_encode($third));
+$editor->call('session/set_config_option', ['sessionId' => $thirdId, 'configId' => 'model', 'value' => 'fake-chat']);
+$from = count($editor->updates);
+$editor->call('session/prompt', ['sessionId' => $session, 'prompt' => [['type' => 'text', 'text' => 'Which model are you?']]]);
+check('each session keeps its own', $editor->text('agent_message_chunk', $from) === 'Model: fake-other', $editor->text('agent_message_chunk', $from));
+$from = count($editor->updates);
+$editor->call('session/prompt', ['sessionId' => $thirdId, 'prompt' => [['type' => 'text', 'text' => 'Which model are you?']]]);
+check('and switches back with it', $editor->text('agent_message_chunk', $from) === 'Model: fake-chat', $editor->text('agent_message_chunk', $from));
+
+$from = count($editor->updates);
+$set = $editor->call('session/set_mode', ['sessionId' => $thirdId, 'modeId' => 'plan']);
+$synced = $editor->of('config_option_update', $from)[0]['params']['update']['configOptions'] ?? [];
+check('plan mode chosen as a mode: the options follow', array_key_exists('result', $set)
+    && (array_column($synced, null, 'id')['mode']['currentValue'] ?? '') === 'plan', json_encode([$set, $synced]));
+check('an unknown mode is refused', ($editor->call('session/set_mode', ['sessionId' => $thirdId, 'modeId' => 'yolo'])['error']['code'] ?? 0) === -32602);
+
+$asked = count($editor->asked);
+$from = count($editor->updates);
+$invoice = (string) file_get_contents("{$project}/Invoice.php");
+$editor->call('session/prompt', ['sessionId' => $thirdId, 'prompt' => [['type' => 'text', 'text' => 'Patch the invoice']]]);
+check('in plan mode, an edit is not even asked about', count($editor->asked) === $asked, json_encode(array_slice($editor->asked, $asked)));
+check('the model is told to plan instead', str_starts_with($editor->text('agent_message_chunk', $from), 'Done: Plan mode'), $editor->text('agent_message_chunk', $from));
+check('and the file is unchanged', file_get_contents("{$project}/Invoice.php") === $invoice);
+
+$editor->answer = static fn(array $question): ?string => 'plan-go';
+$from = count($editor->updates);
+$editor->call('session/prompt', ['sessionId' => $thirdId, 'prompt' => [['type' => 'text', 'text' => 'Propose something']]]);
+$modeNow = $editor->of('current_mode_update', $from)[0]['params']['update']['currentModeId'] ?? '';
+check('a plan approved ends plan mode, and the editor\'s menu says so', $modeNow === 'default', json_encode($editor->of('current_mode_update', $from)));
+$editor->answer = static fn(array $question): ?string => 'allow-once';
+
+$from = count($editor->updates);
+$set = $editor->call('session/set_config_option', ['sessionId' => $thirdId, 'configId' => 'mode', 'value' => 'plan']);
+check('plan mode chosen as an option: the mode follows',
+    ($editor->of('current_mode_update', $from)[0]['params']['update']['currentModeId'] ?? '') === 'plan'
+    && (array_column($set['result']['configOptions'] ?? [], null, 'id')['mode']['currentValue'] ?? '') === 'plan', json_encode($set));
+check('another session stays as it was', (array_column(
+    $editor->call('session/set_config_option', ['sessionId' => $session, 'configId' => 'model', 'value' => 'fake-other'])['result']['configOptions'] ?? [],
+    null, 'id')['mode']['currentValue'] ?? '') === 'default');
+
 // ---- cancelled mid-reply ----------------------------------------------------------
 $from = count($editor->updates);
 $cancelled = false;
@@ -309,6 +371,8 @@ $again = new Editor($work, $api);
 $again->call('initialize', ['protocolVersion' => 1], 60.0);
 $loaded = $again->call('session/load', ['sessionId' => $session, 'cwd' => $project, 'mcpServers' => []]);
 check('session/load picks the conversation back up', array_key_exists('result', $loaded), json_encode($loaded));
+check('with its mode and model to show', ($loaded['result']['modes']['currentModeId'] ?? '') === 'default'
+    && array_column($loaded['result']['configOptions'] ?? [], 'id') === ['mode', 'model'], json_encode($loaded));
 check('replaying what was asked', str_contains($again->text('user_message_chunk'), 'Say hello') && str_contains($again->text('user_message_chunk'), 'Patch'), $again->text('user_message_chunk'));
 check('and what was answered', str_contains($again->text('agent_message_chunk'), 'Hello from the fake model.'));
 check('and the tools in between', count($again->of('tool_call')) >= 1 && count($again->of('tool_call_update')) >= 1);

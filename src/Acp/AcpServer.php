@@ -10,7 +10,9 @@ use App\Agent\Result;
 use App\Agent\SystemPromptBuilder;
 use App\Agent\TodoList;
 use App\Agent\Tool\Toolbox;
+use App\Command\ModelSession;
 use App\Command\SlashCommands;
+use App\Config\ModelProfile;
 use App\Mcp\McpException;
 use App\Mcp\McpRegistry;
 use App\Mcp\ServerConfig;
@@ -78,6 +80,9 @@ final class AcpServer
     /** The session whose turn is running: a cancel for it is heard. */
     private ?string $running = null;
 
+    /** The model last chosen in the editor: a session opened after it starts on it. */
+    private ?ModelProfile $chosen = null;
+
     private bool $configuredServers = false;
     private bool $warnedAboutSaving = false;
 
@@ -100,6 +105,8 @@ final class AcpServer
         private readonly UsageMeter $usage,
         private readonly Files $files,
         private readonly SessionPermissions $grants,
+        private readonly ModelSession $model,
+        private readonly SessionConfig $config,
     ) {}
 
     /** Answer the editor until it closes its end. */
@@ -155,12 +162,14 @@ final class AcpServer
 
         try {
             $result = match ($method) {
-                'initialize'     => $this->initialize($params),
-                'authenticate'   => [],
-                'session/new'    => $this->newSession($params),
-                'session/load'   => $this->loadSession($params),
-                'session/prompt' => $this->prompt($params),
-                default          => throw new AcpError("Unknown method: {$method}", AcpError::METHOD_NOT_FOUND),
+                'initialize'                => $this->initialize($params),
+                'authenticate'              => [],
+                'session/new'               => $this->newSession($params),
+                'session/load'              => $this->loadSession($params),
+                'session/prompt'            => $this->prompt($params),
+                'session/set_mode'          => $this->setMode($params),
+                'session/set_config_option' => $this->setConfigOption($params),
+                default                     => throw new AcpError("Unknown method: {$method}", AcpError::METHOD_NOT_FOUND),
             };
 
             if ($isRequest) {
@@ -259,10 +268,11 @@ final class AcpServer
 
         $session = new AcpSession($id, $this->working->project()->path, $bag);
         $session->cursor = $this->sessions->cursor();
+        $session->profile = $this->chosen ?? $this->model->profile();
         $this->open[$id] = $session;
         $this->makeCurrent($session);
 
-        return ['sessionId' => $id];
+        return ['sessionId' => $id] + $this->settings($session);
     }
 
     /**
@@ -295,10 +305,40 @@ final class AcpServer
         $session = new AcpSession($id, $this->working->project()->path, $bag);
         $session->cursor = $this->sessions->cursor();
         $session->excerpts = $saved->excerpts;
+        $session->profile = $this->chosen ?? $this->model->profile();
         $this->open[$id] = $session;
         $this->makeCurrent($session);
 
         (new Replay($this->connection, $id))->send($saved->messages);
+
+        return $this->settings($session);
+    }
+
+    /**
+     * The mode and the model, as the editor shows them beside its prompt box.
+     *
+     * @return array{modes: array<string, mixed>, configOptions: list<array<string, mixed>>}
+     */
+    private function settings(AcpSession $session): array
+    {
+        $planning = $this->planning($session);
+
+        return [
+            'modes'         => $this->config->modes($planning),
+            'configOptions' => $this->config->options($planning, $session->profile),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     *
+     * @return array<string, mixed>
+     */
+    private function setMode(array $params): array
+    {
+        $session = $this->session($params);
+        $this->plan($session, SessionConfig::planning($params['modeId'] ?? null));
+        $this->update($session, ['sessionUpdate' => 'config_option_update', 'configOptions' => $this->settings($session)['configOptions']]);
 
         return [];
     }
@@ -308,10 +348,79 @@ final class AcpServer
      *
      * @return array<string, mixed>
      */
-    private function prompt(array $params): array
+    private function setConfigOption(array $params): array
+    {
+        $session = $this->session($params);
+        $value = $params['value'] ?? null;
+
+        switch ($params['configId'] ?? null) {
+            case SessionConfig::MODE:
+                $this->plan($session, SessionConfig::planning($value));
+                $this->update($session, ['sessionUpdate' => 'current_mode_update', 'currentModeId' => SessionConfig::modeId($this->planning($session))]);
+                break;
+
+            case SessionConfig::MODEL:
+                // The conversation carries on: the editor shows all of it, and
+                // a model that no longer saw its start would answer beside it.
+                $session->profile = $this->config->model($value, $session->profile);
+                $this->chosen = $session->profile;
+                if ($this->current === $session->id) {
+                    $this->useModel($session->profile);
+                }
+                break;
+
+            default:
+                throw AcpError::invalidParams('Unknown option: ' . (is_string($params['configId'] ?? null) ? $params['configId'] : '?') . '.');
+        }
+
+        return ['configOptions' => $this->settings($session)['configOptions']];
+    }
+
+    /** @param array<string, mixed> $params */
+    private function session(array $params): AcpSession
     {
         $id = is_string($params['sessionId'] ?? null) ? $params['sessionId'] : '';
-        $session = $this->open[$id] ?? throw new AcpError("No session {$id}: open one with session/new.", AcpError::RESOURCE_NOT_FOUND);
+
+        return $this->open[$id] ?? throw new AcpError("No session {$id}: open one with session/new.", AcpError::RESOURCE_NOT_FOUND);
+    }
+
+    /** Whether $session plans first: the service holds it for the session in use. */
+    private function planning(AcpSession $session): bool
+    {
+        return $this->current === $session->id ? $this->planMode->isActive() : $session->planning;
+    }
+
+    private function plan(AcpSession $session, bool $on): void
+    {
+        $session->planning = $on;
+        if ($this->current === $session->id) {
+            $on ? $this->planMode->on() : $this->planMode->off();
+        }
+    }
+
+    private function useModel(?ModelProfile $profile): void
+    {
+        if ($profile !== null && $profile !== $this->model->profile()) {
+            $this->model->apply($profile);
+            $this->model->announce($profile);
+        }
+    }
+
+    /** @param array<string, mixed> $update */
+    private function update(AcpSession $session, array $update): void
+    {
+        $this->connection->notify('session/update', ['sessionId' => $session->id, 'update' => $update]);
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     *
+     * @return array<string, mixed>
+     */
+    private function prompt(array $params): array
+    {
+        $session = $this->session($params);
+        $id = $session->id;
 
         $text = PromptText::from(is_array($params['prompt'] ?? null) ? $params['prompt'] : [], $session->directory);
         if (trim($text) === '') {
@@ -328,6 +437,7 @@ final class AcpServer
             $this->sessions->resume($cursor);
         }
 
+        $planning = $this->planMode->isActive();
         $session->bag->user($this->planMode->frame($text));
         $this->editor->forSession($id, is_array($this->client['session']['notices'] ?? null));
 
@@ -350,6 +460,12 @@ final class AcpServer
             $this->interrupt->endTurn();
             $this->running = null;
             $this->save($session);
+        }
+
+        // A plan approved ends plan mode: the editor's menu follows.
+        if ($this->planMode->isActive() !== $planning) {
+            $this->update($session, ['sessionUpdate' => 'current_mode_update', 'currentModeId' => SessionConfig::modeId($this->planMode->isActive())]);
+            $this->update($session, ['sessionUpdate' => 'config_option_update', 'configOptions' => $this->settings($session)['configOptions']]);
         }
 
         $this->reportUsage($session);
@@ -392,7 +508,7 @@ final class AcpServer
             $update['cost'] = ['amount' => round($cost, 6), 'currency' => 'USD'];
         }
 
-        $this->connection->notify('session/update', ['sessionId' => $session->id, 'update' => $update]);
+        $this->update($session, $update);
     }
 
     /** The editor's text of a file — unsaved changes included — or null to read it from disk. */
@@ -453,6 +569,7 @@ final class AcpServer
         // The plan was another conversation's.
         $this->todos->clear();
         $session->planning ? $this->planMode->on() : $this->planMode->off();
+        $this->useModel($session->profile);
         $this->grants->clear();
         foreach ($session->grants as $tool) {
             $this->grants->allowForSession($tool);
