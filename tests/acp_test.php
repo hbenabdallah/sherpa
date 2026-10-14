@@ -22,6 +22,8 @@ $work = sys_get_temp_dir() . '/sherpa-acp-' . bin2hex(random_bytes(4));
 mkdir("{$work}/home", 0777, true);
 mkdir("{$work}/project", 0777, true);
 file_put_contents("{$work}/project/Invoice.php", "<?php\nfunction subtotal(): int\n{\n    return 0;\n}\n");
+mkdir("{$work}/project/.sherpa/skills", 0777, true);
+file_put_contents("{$work}/project/.sherpa/skills/greet.md", "Greet the user warmly.\n\nSay hello, by name if known.\n");
 $project = realpath("{$work}/project");
 
 $port = 21000 + getmypid() % 9000;
@@ -106,10 +108,14 @@ final class Editor
         fwrite($this->pipes[0], json_encode(['jsonrpc' => '2.0', 'id' => $id, 'method' => $method, 'params' => $params === [] ? new stdClass() : $params]) . "\n");
 
         $deadline = microtime(true) + $timeout;
+        $response = null;
         while (microtime(true) < $deadline) {
+            // The whole batch read, even past the response: what follows it
+            // in the same read is the next thing the editor would see.
             foreach ($this->read() as $message) {
                 if (($message['id'] ?? null) === $id && !isset($message['method'])) {
-                    return $message;
+                    $response = $message;
+                    continue;
                 }
                 if (($message['method'] ?? '') === 'session/request_permission') {
                     $option = ($this->answer)($message['params']);
@@ -134,6 +140,9 @@ final class Editor
                         $during($message);
                     }
                 }
+            }
+            if ($response !== null) {
+                return $response;
             }
             usleep(5_000);
         }
@@ -327,6 +336,35 @@ check('plan mode chosen as an option: the mode follows',
 check('another session stays as it was', (array_column(
     $editor->call('session/set_config_option', ['sessionId' => $session, 'configId' => 'model', 'value' => 'fake-other'])['result']['configOptions'] ?? [],
     null, 'id')['mode']['currentValue'] ?? '') === 'default');
+
+// ---- "/" in the editor -----------------------------------------------------------
+$offered = array_column($editor->of('available_commands_update')[0]['params']['update']['availableCommands'] ?? [], null, 'name');
+check('the commands are offered under "/", named without it', isset($offered['help'], $offered['compact'], $offered['memory'], $offered['plan']), json_encode(array_keys($offered)));
+check('with the project\'s skills', str_starts_with((string) ($offered['greet']['description'] ?? ''), 'skill · Greet the user'), json_encode($offered['greet'] ?? null));
+check('but none that needs the terminal\'s keyboard', !isset($offered['model']) && !isset($offered['reset']) && !isset($offered['provider']));
+check('a command that takes an argument says which', ($offered['remember']['input']['hint'] ?? '') === '<key> <value>', json_encode($offered['remember'] ?? null));
+
+$command = static function (string $typed) use ($editor, $session): array {
+    $from = count($editor->updates);
+    $reply = $editor->call('session/prompt', ['sessionId' => $session, 'prompt' => [['type' => 'text', 'text' => $typed]]]);
+
+    return [$reply['result']['stopReason'] ?? json_encode($reply), $editor->text('agent_message_chunk', $from), $from];
+};
+[$stop, $said] = $command('/remember deploy-target staging');
+check('a command runs in the editor and its output is the reply', $stop === 'end_turn' && str_contains($said, 'Remembered: deploy-target'), $said);
+[, $said] = $command('/memory');
+check('as the terminal prints it, in a block', str_starts_with($said, '```') && str_contains($said, 'deploy-target: staging'), $said);
+[, $said] = $command('/model');
+check('a command of the menus says where the menu is', str_contains($said, 'menu beside the prompt box'), $said);
+[, $said, $from] = $command('/plan');
+check('/plan turns plan mode on, and the menu follows', str_starts_with($said, 'Plan mode on')
+    && ($editor->of('current_mode_update', $from)[0]['params']['update']['currentModeId'] ?? '') === 'plan', $said);
+[, $said, $from] = $command('/plan off');
+check('/plan off turns it off', ($editor->of('current_mode_update', $from)[0]['params']['update']['currentModeId'] ?? '') === 'default', $said);
+[, $said] = $command('/greet the new colleague');
+check('a skill run as a command goes to the model with its text', $said === 'Skill applied: greet', $said);
+[$stop, $said] = $command('/etc/hosts is wrong here');
+check('a slash that names nothing is a message like any other', $stop === 'end_turn' && $said === 'Hello from the fake model.', $said);
 
 // ---- cancelled mid-reply ----------------------------------------------------------
 $from = count($editor->updates);

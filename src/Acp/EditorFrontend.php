@@ -151,6 +151,22 @@ final class EditorFrontend implements AgentOutput, Approver
         ]);
     }
 
+    /** A reply that is not the model's: what a command says. */
+    public function say(string $text): void
+    {
+        $this->update([
+            'sessionUpdate' => 'agent_message_chunk',
+            'messageId'     => self::newId('msg'),
+            'content'       => ['type' => 'text', 'text' => $text],
+        ]);
+    }
+
+    /** What a command printed, as the reply: a block, as the terminal lines it up. */
+    public function showOutput(string $text): void
+    {
+        $this->say(self::fenced(Terminal::plain($text)));
+    }
+
     public function forSubagent(): AgentOutput
     {
         return new SubagentThoughts($this->connection, $this->sessionId);

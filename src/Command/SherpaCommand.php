@@ -653,11 +653,7 @@ class SherpaCommand extends Command
             return null;
         }
 
-        $request = trim($request);
-
-        return "Apply the skill \"{$skill->name}\" below"
-            . ($request !== '' ? " to this request:\n\n{$request}" : ' to the current work.')
-            . "\n\n<skill name=\"{$skill->name}\">\n" . trim($skill->content) . "\n</skill>";
+        return $skill->applyTo($request);
     }
 
     private function readUserInput(): ?string

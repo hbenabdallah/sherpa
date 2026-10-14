@@ -4,6 +4,7 @@
 //
 //   "which model"  "Model: " and the model the request was for
 //   "propose" plan_ready with a two-step plan
+//   a skill   "Skill applied: " and its name
 //   "patch"   file_patch on Invoice.php: return 0 → 42 ("again": 42 → 43)
 //   "plan"    todo_write with three tasks
 //   "slow"    a reply streamed a word every 0.2 s for ten seconds
@@ -55,6 +56,14 @@ $asked = strtolower((string) ($last['content'] ?? ''));
 // Before "plan": in plan mode, every message carries a reminder that says it.
 if (str_contains($asked, 'which model')) {
     echo $chunk(['role' => 'assistant', 'content' => 'Model: ' . ($body['model'] ?? '?')]);
+    echo $chunk([], 'stop');
+    echo "data: [DONE]\n\n";
+
+    return;
+}
+
+if (preg_match('/<skill name="([^"]+)">/', $asked, $skill) === 1) {
+    echo $chunk(['role' => 'assistant', 'content' => 'Skill applied: ' . $skill[1]]);
     echo $chunk([], 'stop');
     echo "data: [DONE]\n\n";
 

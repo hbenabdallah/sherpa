@@ -83,6 +83,9 @@ final class AcpServer
     /** The model last chosen in the editor: a session opened after it starts on it. */
     private ?ModelProfile $chosen = null;
 
+    /** @var list<\Closure(): void> what is said once the response is sent: updates about a session the editor must know first */
+    private array $then = [];
+
     private bool $configuredServers = false;
     private bool $warnedAboutSaving = false;
 
@@ -107,6 +110,7 @@ final class AcpServer
         private readonly SessionPermissions $grants,
         private readonly ModelSession $model,
         private readonly SessionConfig $config,
+        private readonly EditorCommands $commands,
     ) {}
 
     /** Answer the editor until it closes its end. */
@@ -175,6 +179,10 @@ final class AcpServer
             if ($isRequest) {
                 $this->connection->respond($message['id'], $result);
             }
+
+            foreach ($this->then as $next) {
+                $next();
+            }
         } catch (AcpError $e) {
             if ($isRequest) {
                 $this->connection->fail($message['id'], $e);
@@ -184,6 +192,8 @@ final class AcpServer
             if ($isRequest) {
                 $this->connection->fail($message['id'], new AcpError($e->getMessage()));
             }
+        } finally {
+            $this->then = [];
         }
     }
 
@@ -271,6 +281,7 @@ final class AcpServer
         $session->profile = $this->chosen ?? $this->model->profile();
         $this->open[$id] = $session;
         $this->makeCurrent($session);
+        $this->then[] = fn() => $this->advertise($session);
 
         return ['sessionId' => $id] + $this->settings($session);
     }
@@ -310,8 +321,15 @@ final class AcpServer
         $this->makeCurrent($session);
 
         (new Replay($this->connection, $id))->send($saved->messages);
+        $this->then[] = fn() => $this->advertise($session);
 
         return $this->settings($session);
+    }
+
+    /** What "/" offers in the editor: the commands, the project's skills, the MCP servers' prompts. */
+    private function advertise(AcpSession $session): void
+    {
+        $this->update($session, ['sessionUpdate' => 'available_commands_update', 'availableCommands' => $this->commands->available()]);
     }
 
     /**
@@ -428,6 +446,23 @@ final class AcpServer
         }
 
         $this->makeCurrent($session);
+        $this->editor->forSession($id, is_array($this->client['session']['notices'] ?? null));
+
+        if (str_starts_with(ltrim($text), '/')) {
+            // A command decides nothing about the project: whatever it saves,
+            // this conversation keeps the name the editor has.
+            $cursor = $this->sessions->cursor();
+            $route = $this->commands->resolve($text, $session->bag, $this->working->project());
+            $this->sessions->resume($cursor);
+
+            if (!isset($route['prompt'])) {
+                $this->answer($session, $route);
+
+                return ['stopReason' => 'end_turn'];
+            }
+
+            $text = $route['prompt'];
+        }
 
         // The first message is the decision to work here, as in the terminal.
         // Saving the project rebinds where conversations go: this one keeps
@@ -439,7 +474,6 @@ final class AcpServer
 
         $planning = $this->planMode->isActive();
         $session->bag->user($this->planMode->frame($text));
-        $this->editor->forSession($id, is_array($this->client['session']['notices'] ?? null));
 
         $this->running = $id;
         $this->interrupt->beginTurn();
@@ -464,13 +498,41 @@ final class AcpServer
 
         // A plan approved ends plan mode: the editor's menu follows.
         if ($this->planMode->isActive() !== $planning) {
-            $this->update($session, ['sessionUpdate' => 'current_mode_update', 'currentModeId' => SessionConfig::modeId($this->planMode->isActive())]);
-            $this->update($session, ['sessionUpdate' => 'config_option_update', 'configOptions' => $this->settings($session)['configOptions']]);
+            $this->modeChanged($session);
         }
 
         $this->reportUsage($session);
 
         return ['stopReason' => $stop];
+    }
+
+    /**
+     * A command's answer, in place of a turn.
+     *
+     * @param array{reply: string}|array{output: string}|array{plan: bool|null} $route
+     */
+    private function answer(AcpSession $session, array $route): void
+    {
+        if (array_key_exists('plan', $route)) {
+            $on = $route['plan'] ?? !$this->planMode->isActive();
+            $this->plan($session, $on);
+            $this->modeChanged($session);
+            $this->editor->say($on
+                ? 'Plan mode on: the model reads and proposes; nothing is written or run until you approve its plan.'
+                : 'Plan mode off: the model can change things again, asking as usual.');
+
+            return;
+        }
+
+        isset($route['output']) ? $this->editor->showOutput($route['output']) : $this->editor->say($route['reply'] ?? '');
+        // /compact changed the conversation; the others leave it as it was.
+        $this->save($session);
+    }
+
+    private function modeChanged(AcpSession $session): void
+    {
+        $this->update($session, ['sessionUpdate' => 'current_mode_update', 'currentModeId' => SessionConfig::modeId($this->planning($session))]);
+        $this->update($session, ['sessionUpdate' => 'config_option_update', 'configOptions' => $this->settings($session)['configOptions']]);
     }
 
     /** How the turn ended, as ACP names it — and said, when the reply did not say it. */

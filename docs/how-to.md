@@ -33,7 +33,11 @@ tools, same project memory and saved conversations — with the editor's own vie
 - a file open in a tab is read and edited as you see it, unsaved changes
   included, when the editor offers that;
 - stopping a turn in the editor stops it, a running command included;
-- a conversation from the editor's history is picked back up where it was left.
+- a conversation from the editor's history is picked back up where it was left;
+- "/" offers the commands that ask nothing (`/compact`, `/memory`, `/docs`,
+  `/plan`…), the skills and the MCP servers' prompts, as in the terminal;
+  `/help` lists them. Those that ask questions — `/provider`, `/mcp add` — are
+  for the terminal.
 
 **Set it up once.** The editor asks nothing, so Sherpa has to know its model
 before: run `sherpa acp --setup` in a terminal (the provider, its key, the
@@ -77,8 +81,7 @@ and give it the full path of the executable:
 
 The options of `sherpa` work after `acp`: `["acp", "-P", "mistral"]` uses a
 recorded provider, `["acp", "-m", "<model>"]` starts on another model. What Sherpa prints
-goes to the editor's agent log (Zed: `dev: open acp logs`); the slash commands
-(`/docs`, `/compact`…) stay in the terminal.
+goes to the editor's agent log (Zed: `dev: open acp logs`).
 
 ## Use several API providers
 

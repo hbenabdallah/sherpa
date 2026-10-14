@@ -71,7 +71,8 @@ Sherpa answers in the language of your question; its interface is in English.
 - **In your editor**: `sherpa acp` runs the same agent in Zed, PhpStorm and the
   other JetBrains IDEs, or any client of the Agent Client Protocol — edits
   approved from the editor's diff view, files open in a tab edited as you see
-  them ([set it up](docs/how-to.md#use-sherpa-in-your-editor-zed-jetbrains)).
+  them, the model and plan mode in the editor's menus, the commands and skills
+  under "/" ([set it up](docs/how-to.md#use-sherpa-in-your-editor-zed-jetbrains)).
 
 ## Quick start
 
