@@ -7,13 +7,20 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class OllamaPlatform implements PlatformInterface, EmbeddingBackend
 {
+    use LastCall;
+
     /**
      * Token counts from the server's own tokenizer: the only accurate figure a
      * PHP client can get, and what ContextBudget calibrates against.
      *
      * @var array{prompt: int, completion: int}|null
      */
-    private ?array $lastUsage = null;
+    private ?array $lastUsage {
+        get => $this->lastOf('usage');
+        set(?array $value) {
+            $this->keepLast('usage', $value);
+        }
+    }
 
     /**
      * Throughput of the last request, in tokens per second, from the durations
@@ -22,7 +29,12 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
      *
      * @var array{prefill: float, decode: float}|null
      */
-    private ?array $lastTimings = null;
+    private ?array $lastTimings {
+        get => $this->lastOf('timings');
+        set(?array $value) {
+            $this->keepLast('timings', $value);
+        }
+    }
 
     /**
      * Liveness probes, not inference. These answer instantly or not at all, so
@@ -161,7 +173,7 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
         while ($silence) {
             $silence = false;
 
-            foreach ($this->client->stream($response, self::POLL_SECONDS) as $chunk) {
+            foreach ($this->client->stream($response, Interrupt::poll(self::POLL_SECONDS)) as $chunk) {
                 // Must come first on every chunk: it is also what marks a
                 // timeout chunk as handled, and an unhandled one throws when it
                 // is destroyed. On a genuine transport error it throws here.

@@ -65,7 +65,7 @@ Sherpa answers in the language of your question; its interface is in English.
 - **Plan mode**: the model reads and proposes, and nothing is written or run until
   you approve its plan.
 - **Sub-agents** for questions that need a lot of reading, which report back only
-  their findings.
+  their findings. Several asked for at once run at the same time.
 - **Skills** (Markdown files) and **MCP servers** (tools, resources and prompts),
   in the `mcpServers` format other clients use.
 - **In your editor**: `sherpa acp` runs the same agent in Zed, PhpStorm and the

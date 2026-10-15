@@ -22,6 +22,8 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBackend
 {
+    use LastCall;
+
     /** Liveness and catalogue probes: they answer at once or not at all. */
     private const PROBE_TIMEOUT = 10;
 
@@ -47,10 +49,20 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
     private const MAX_RATE_LIMIT_WAIT_SECONDS = 60;
 
     /** @var array{prompt: int, completion: int}|null */
-    private ?array $lastUsage = null;
+    private ?array $lastUsage {
+        get => $this->lastOf('usage');
+        set(?array $value) {
+            $this->keepLast('usage', $value);
+        }
+    }
 
     /** @var array{prefill: float, decode: float}|null */
-    private ?array $lastTimings = null;
+    private ?array $lastTimings {
+        get => $this->lastOf('timings');
+        set(?array $value) {
+            $this->keepLast('timings', $value);
+        }
+    }
 
     /**
      * What this particular server turned out to accept. Learned from its own
@@ -364,7 +376,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
     {
         $sleep = $this->sleep ?? static fn(float $s) => usleep((int) ($s * 1_000_000));
 
-        for ($left = (float) $seconds; $left > 0; $left -= self::POLL_SECONDS) {
+        for ($left = (float) $seconds; $left > 0; $left -= Interrupt::poll(self::POLL_SECONDS)) {
             if ($this->interrupt?->requested()) {
                 return false;
             }
@@ -373,7 +385,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
                 $onWait(false, sprintf('%s, trying again in %d s…', $why, (int) ceil($left)));
             }
 
-            $sleep(min(self::POLL_SECONDS, $left));
+            $sleep(min(Interrupt::poll(self::POLL_SECONDS), $left));
         }
 
         return !$this->interrupt?->requested();
@@ -391,7 +403,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
     {
         while (true) {
             try {
-                foreach ($this->client->stream($response, self::POLL_SECONDS) as $chunk) {
+                foreach ($this->client->stream($response, Interrupt::poll(self::POLL_SECONDS)) as $chunk) {
                     if ($chunk->isTimeout()) {
                         if ($onWait !== null) {
                             $onWait(false);
@@ -547,7 +559,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
         while ($silence) {
             $silence = false;
 
-            foreach ($this->client->stream($response, self::POLL_SECONDS) as $chunk) {
+            foreach ($this->client->stream($response, Interrupt::poll(self::POLL_SECONDS)) as $chunk) {
                 if ($chunk->isTimeout()) {
                     $silence = true;
                     if ($onWait !== null) {
@@ -631,16 +643,12 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
                 (int) ($usage['prompt_tokens_details']['cached_tokens'] ?? 0),
             );
 
+            // Only when there is something to say: a provider's cache is what
+            // makes a long session cheaper, and zero is not news.
             $this->lastUsage = [
                 'prompt'     => max($this->lastUsage['prompt'] ?? 0, (int) ($usage['prompt_tokens'] ?? 0)),
                 'completion' => max($this->lastUsage['completion'] ?? 0, (int) ($usage['completion_tokens'] ?? 0)),
-            ];
-
-            // Only when there is something to say: a provider's cache is what
-            // makes a long session cheaper, and zero is not news.
-            if ($cached > 0) {
-                $this->lastUsage['cached'] = $cached;
-            }
+            ] + ($cached > 0 ? ['cached' => $cached] : []);
         }
 
         $delta = $data['choices'][0]['delta'] ?? [];

@@ -104,8 +104,12 @@ no web, and no sub-agent of its own. Then it reports what it found, with
 `path:line` references. Only that report enters the main conversation. On
 screen, each of its steps is one short line under the call.
 
+Sub-agents asked for in the same reply run at the same time: three questions
+take about as long as the slowest one, not as long as all three. Their reports
+come back in the order they were asked for.
+
 Its requests count toward the session's tokens like any other. Ctrl+C stops it
-too.
+too, and every sub-agent running beside it.
 
 ## The context window
 

@@ -21,6 +21,9 @@ class Interrupt
 
     private const LISTEN_SECONDS = 0.02;
 
+    /** The longest a wait holds on in a Fiber: every other one waits as long. */
+    private const FIBER_POLL_SECONDS = 0.05;
+
     /** @var (\Closure(): void)|null */
     private ?\Closure $quit = null;
 
@@ -84,8 +87,17 @@ class Interrupt
         return $replaced;
     }
 
+    /**
+     * Also where a sub-agent running beside others lets them go on: every
+     * wait of a request already comes through here, a chunk or half a second
+     * of silence at a time, so this is where its Fiber gives way.
+     */
     public function requested(): bool
     {
+        if (\Fiber::getCurrent() !== null) {
+            \Fiber::suspend();
+        }
+
         if (!$this->requested && $this->meanwhile !== null) {
             ($this->meanwhile)();
         }
@@ -98,6 +110,16 @@ class Interrupt
         }
 
         return $this->requested;
+    }
+
+    /**
+     * How long one wait may block before coming back through requested():
+     * $seconds alone, much less beside other sub-agents, whose requests
+     * would not even leave until it gives way.
+     */
+    public static function poll(float $seconds): float
+    {
+        return \Fiber::getCurrent() === null ? $seconds : min($seconds, self::FIBER_POLL_SECONDS);
     }
 
     /** Raise cancellation without a signal — used by callers and by tests. */

@@ -68,7 +68,8 @@ Sherpa répond dans la langue de votre question ; son interface est en anglais.
 - **Mode plan** : le modèle lit et propose, et rien n'est écrit ni lancé avant que
   vous approuviez son plan.
 - **Sous-agents** pour les questions qui demandent beaucoup de lecture, qui ne
-  rapportent que leurs conclusions.
+  rapportent que leurs conclusions. Plusieurs demandés d'un coup tournent en même
+  temps.
 - **Skills** (fichiers Markdown) et **serveurs MCP** (outils, resources et
   prompts), au format `mcpServers` des autres clients.
 - **Dans votre éditeur** : `sherpa acp` fait tourner le même agent dans Zed,

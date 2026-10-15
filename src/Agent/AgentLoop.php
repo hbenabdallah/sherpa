@@ -69,7 +69,9 @@ class AgentLoop
     private const OUT_OF_STEPS = 'this turn has reached its limit of steps';
 
     /** Tools that show their own work, or wait on the user: no "running" line over them. */
-    private const SHOW_THEMSELVES = ['delegate', 'plan_ready'];
+    private const SHOW_THEMSELVES = [self::SUB_AGENT, 'plan_ready'];
+
+    private const SUB_AGENT = 'delegate';
 
     /** How long a tool runs before it is said to be running: a read never shows it. */
     private const QUIET_SECONDS = 1.0;
@@ -403,12 +405,14 @@ class AgentLoop
     /** @param array<int, array<string, mixed>> $calls */
     private function runCalls(MessageBag $bag, array $calls, TurnState $state): void
     {
-        foreach ($calls as $rawCall) {
-            $call = new ToolCall(
-                id: $rawCall['id'],
-                name: $rawCall['function']['name'],
-                arguments: $rawCall['function']['arguments'],
-            );
+        $calls = array_map(fn(array $raw) => new ToolCall(
+            id: $raw['id'],
+            name: $raw['function']['name'],
+            arguments: $raw['function']['arguments'],
+        ), array_values($calls));
+
+        for ($i = 0; $i < count($calls); $i++) {
+            $call = $calls[$i];
 
             // Every call in history needs a matching tool message or the next
             // request is malformed. Cancelled calls get a stub, not a gap.
@@ -417,8 +421,80 @@ class AgentLoop
                 continue;
             }
 
+            $together = $this->togetherFrom($calls, $i);
+            if (count($together) > 1) {
+                foreach ($this->runTogether($bag, $together) as $result) {
+                    $this->noteError($state, $result);
+                }
+                $i += count($together) - 1;
+
+                continue;
+            }
+
             $this->noteError($state, $this->runCall($bag, $call));
         }
+    }
+
+    /**
+     * The calls from $from on that can run at the same time: sub-agents asked
+     * for one after another, each only reading, and each a conversation with
+     * the model of its own — minutes, waited for one by one.
+     *
+     * @param list<ToolCall> $calls
+     *
+     * @return list<ToolCall>
+     */
+    private function togetherFrom(array $calls, int $from): array
+    {
+        $together = [];
+        for ($i = $from; $i < count($calls) && $calls[$i]->name === self::SUB_AGENT && !isset($this->cutOff[$calls[$i]->id]); $i++) {
+            $together[] = $calls[$i];
+        }
+
+        return $together;
+    }
+
+    /**
+     * Each call in a Fiber of its own, all of them going on while any waits on
+     * the model: a request gives way at every chunk, in Interrupt::requested().
+     * Shown and recorded in the order they were asked for.
+     *
+     * @param list<ToolCall> $calls
+     *
+     * @return list<ToolResult>
+     */
+    private function runTogether(MessageBag $bag, array $calls): array
+    {
+        $fibers = [];
+        foreach ($calls as $i => $call) {
+            $this->chat->showToolCall($call->name, $call->arguments, $call->id);
+            $fibers[$i] = new \Fiber(fn() => $this->decide($call));
+        }
+
+        $results = [];
+        while ($fibers !== []) {
+            foreach ($fibers as $i => $fiber) {
+                try {
+                    $fiber->isStarted() ? $fiber->resume() : $fiber->start();
+                    if ($fiber->isTerminated()) {
+                        $results[$i] = $fiber->getReturn();
+                    }
+                } catch (\Throwable $e) {
+                    $results[$i] = new ToolResult($calls[$i]->id, 'Error: ' . $e->getMessage(), isError: true);
+                }
+
+                if (isset($results[$i])) {
+                    unset($fibers[$i]);
+                }
+            }
+        }
+
+        ksort($results);
+        foreach ($results as $i => $result) {
+            $this->record($bag, $calls[$i], $result);
+        }
+
+        return array_values($results);
     }
 
     /**
@@ -469,15 +545,26 @@ class AgentLoop
             return $result;
         }
 
-        $def = $this->toolbox->find($call->name);
         $this->chat->showToolCall($call->name, $call->arguments, $call->id);
 
-        $result = match (true) {
+        return $this->record($bag, $call, $this->decide($call));
+    }
+
+    /** Run, unless plan mode or the user says not to. */
+    private function decide(ToolCall $call): ToolResult
+    {
+        $def = $this->toolbox->find($call->name);
+
+        return match (true) {
             $this->planMode?->blocks($def) === true => new ToolResult($call->id, PlanMode::BLOCKED, isError: true),
             $this->permissions->check($call, $def)  => $this->execute($call),
             default                                 => new ToolResult($call->id, self::REFUSED, isError: true),
         };
+    }
 
+    /** A result: shown, observed, into history. */
+    private function record(MessageBag $bag, ToolCall $call, ToolResult $result): ToolResult
+    {
         $this->chat->showToolResult($call->name, $result->content, $result->isError, $call->id);
         $this->trace?->observe($call->name, $result->isError);
 
@@ -492,7 +579,8 @@ class AgentLoop
      */
     private function execute(ToolCall $call): ToolResult
     {
-        if (in_array($call->name, self::SHOW_THEMSELVES, true)) {
+        // In a Fiber, beside others: the line would be theirs as much as its own.
+        if (in_array($call->name, self::SHOW_THEMSELVES, true) || \Fiber::getCurrent() !== null) {
             return $this->toolbox->execute($call);
         }
 

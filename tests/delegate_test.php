@@ -4,6 +4,10 @@
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
+use App\Agent\AgentLoop;
+use App\Agent\ContextBudget;
+use App\Agent\HistoryCompactor;
+use App\Agent\MessageBag;
 use App\Agent\Tool\Permission;
 use App\Agent\Tool\Toolbox;
 use App\Memory\MemoryStore;
@@ -173,6 +177,122 @@ $main[] = ['role' => 'user', 'content' => 'q3'];
 $claude->stream($main, [], fn() => null);
 check("a sub-agent's requests in between do not strip the main conversation's thinking", str_contains($sent[2], 'MAIN-SIG'), $sent[2]);
 
+// ---- sub-agents asked for together run together -----------------------------------
+
+/** What each request took, as SwitchablePlatform reads it: right after, in the same Fiber. */
+final class Counted implements PlatformInterface
+{
+    /** @var list<array<string, int>|null> */
+    public array $usages = [];
+
+    public function __construct(private readonly PlatformInterface $inner) {}
+
+    public function stream(array $messages, array $tools = [], ?callable $onToken = null, ?callable $onWait = null): array
+    {
+        $reply = $this->inner->stream($messages, $tools, $onToken, $onWait);
+        $this->usages[] = $this->inner->lastUsage();
+
+        return $reply;
+    }
+    public function lastUsage(): ?array { return $this->inner->lastUsage(); }
+    public function lastTimings(): ?array { return $this->inner->lastTimings(); }
+    public function residency(): ?ModelResidency { return null; }
+    public function modelName(): string { return 'm'; }
+    public function contextWindow(): int { return 32768; }
+    public function catalogue(): array { return []; }
+    public function describeModel(string $model): ?ModelInfo { return null; }
+    public function useModel(string $model, int $contextWindow): void {}
+    public function name(): string { return 'counted'; }
+    public function isAvailable(): bool { return true; }
+}
+
+$port = 20000 + (getmypid() + 7) % 10000;
+$server = proc_open(['env', 'PHP_CLI_SERVER_WORKERS=4', PHP_BINARY, '-S', "127.0.0.1:{$port}", __DIR__ . '/fixtures/subagent_provider.php'], [1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes);
+for ($i = 0; $i < 50 && @fsockopen('127.0.0.1', $port) === false; $i++) {
+    usleep(100_000);
+}
+
+$interrupt = new Interrupt();
+$sub = new Counted(new OpenAiCompatiblePlatform(Symfony\Component\HttpClient\HttpClient::create(), "http://127.0.0.1:{$port}/v1", 'm', 'k', 32768, 30.0, $interrupt));
+$asks = fn(array $tasks) => new Scripted([
+    ['role' => 'assistant', 'content' => '', 'tool_calls' => array_map(
+        fn(string $task, int $i) => ['id' => "d{$i}", 'function' => ['name' => 'delegate', 'arguments' => ['task' => $task]]],
+        $tasks, array_keys($tasks),
+    )],
+    ['role' => 'assistant', 'content' => 'all read'],
+]);
+
+function mainLoop(PlatformInterface $main, DelegateTool $delegate, Interrupt $interrupt): AgentLoop
+{
+    $budget = new ContextBudget();
+
+    return new AgentLoop(
+        $main,
+        new Toolbox([$delegate]),
+        new PermissionBroker(new SessionPermissions(), new ConfirmOverlay(new Terminal(), new FileWriteTool(), new FilePatchTool(), new ShellExecTool()), new ProjectPermissions(new ProjectStore(new StackDetector()))),
+        new ChatPane(new Terminal(), new MarkdownRenderer()),
+        $budget,
+        new HistoryCompactor($main, $budget),
+        $interrupt,
+    );
+}
+
+$bag = new MessageBag();
+$bag->user('read three things');
+$started = microtime(true);
+ob_start();
+$result = mainLoop($asks(['alpha', 'beta-beta', 'gamma-gamma-gamma']), delegate($sub, $paths, $memory, $interrupt), $interrupt)->run($bag);
+$screen = Terminal::plain((string) ob_get_clean());
+$took = microtime(true) - $started;
+
+$reports = array_values(array_filter($bag->all(), fn(array $m) => $m['role'] === 'tool'));
+check('three sub-agents of a second each take about a second, not three', $took < 1.6, sprintf('%.1f s', $took));
+check('each report comes back to its own call, in the order asked',
+    array_column($reports, 'tool_call_id') === ['d0', 'd1', 'd2']
+    && str_contains($reports[0]['content'], 'report on alpha')
+    && str_contains($reports[1]['content'], 'report on beta-beta')
+    && str_contains($reports[2]['content'], 'report on gamma-gamma-gamma'),
+    json_encode($reports));
+check('the turn goes on once all are back', $result->content === 'all read', $result->content);
+$prompts = array_map(fn($u) => $u['prompt'] ?? null, $sub->usages);
+sort($prompts);
+check("each request's token count is its own, not another's finishing beside it", $prompts === [5, 9, 17], json_encode($sub->usages));
+check('the three calls are shown before any result', substr_count(substr($screen, 0, (int) strpos($screen, '✓')), 'Tool: delegate') === 3, $screen);
+
+// One alone runs as before, outside any Fiber.
+$bag = new MessageBag();
+$bag->user('read one thing');
+ob_start();
+mainLoop($asks(['solo']), delegate($sub, $paths, $memory, $interrupt), $interrupt)->run($bag);
+ob_end_clean();
+check('a sub-agent asked for alone still reports', str_contains(json_encode($bag->all()), 'report on solo'));
+
+// Ctrl+C stops them all.
+$interrupt = new Interrupt();
+$interrupt->beginTurn();
+$sub = new OpenAiCompatiblePlatform(Symfony\Component\HttpClient\HttpClient::create(), "http://127.0.0.1:{$port}/v1", 'm', 'k', 32768, 30.0, $interrupt);
+$cancelling = new Scripted([
+    ['role' => 'assistant', 'content' => '', 'tool_calls' => [
+        ['id' => 'x0', 'function' => ['name' => 'delegate', 'arguments' => ['task' => 'one']]],
+        ['id' => 'x1', 'function' => ['name' => 'delegate', 'arguments' => ['task' => 'two']]],
+    ]],
+]);
+$bag = new MessageBag();
+$bag->user('read two things');
+$timer = $interrupt->meanwhile(null);
+pcntl_async_signals(true);
+pcntl_signal(SIGALRM, fn() => $interrupt->request());
+pcntl_alarm(1);
+$started = microtime(true);
+ob_start();
+$result = mainLoop($cancelling, delegate($sub, $paths, $memory, $interrupt), $interrupt)->run($bag);
+ob_end_clean();
+$reports = array_values(array_filter($bag->all(), fn(array $m) => $m['role'] === 'tool'));
+check('Ctrl+C stops every sub-agent running together',
+    $result->interrupted && count($reports) === 2 && str_contains($reports[0]['content'], 'interrupted') && str_contains($reports[1]['content'], 'interrupted'),
+    json_encode($reports));
+
+proc_terminate($server);
 exec('rm -rf ' . escapeshellarg($root));
 
 printf("\n%d passed, %d failed\n", $pass, $fail);
