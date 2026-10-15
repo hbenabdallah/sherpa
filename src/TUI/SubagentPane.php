@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\TUI;
 
 use App\Agent\AgentOutput;
+use App\Agent\Lanes;
 
 /**
  * What a sub-agent shows while it works: one short line per tool it uses,
@@ -47,7 +48,7 @@ final class SubagentPane extends ChatPane
         $this->stopSpinning();
 
         $first = $args === [] ? '' : (string) (is_string(reset($args)) ? reset($args) : json_encode(reset($args), JSON_UNESCAPED_UNICODE));
-        echo Terminal::GRAY . '    ↳ ' . Terminal::plain($toolName, singleLine: true)
+        echo Terminal::GRAY . '    ↳ ' . Lanes::prefix() . Terminal::plain($toolName, singleLine: true)
             . ($first === '' ? '' : ' ' . Terminal::plain(mb_strimwidth($first, 0, 60, '…'), singleLine: true))
             . Terminal::RESET . "\n";
     }
@@ -63,13 +64,13 @@ final class SubagentPane extends ChatPane
     public function showInfo(string $message): void
     {
         $this->stopSpinning();
-        echo Terminal::GRAY . '    ↳ ' . Terminal::plain($message, singleLine: true) . Terminal::RESET . "\n";
+        echo Terminal::GRAY . '    ↳ ' . Lanes::prefix() . Terminal::plain($message, singleLine: true) . Terminal::RESET . "\n";
     }
 
     public function showError(string $message): void
     {
         $this->stopSpinning();
-        echo Terminal::YELLOW . '    ↳ ' . Terminal::plain($message, singleLine: true) . Terminal::RESET . "\n";
+        echo Terminal::YELLOW . '    ↳ ' . Lanes::prefix() . Terminal::plain($message, singleLine: true) . Terminal::RESET . "\n";
     }
 
     public function forSubagent(): AgentOutput

@@ -263,7 +263,19 @@ check('the turn goes on once all are back', $result->content === 'all read', $re
 $prompts = array_map(fn($u) => $u['prompt'] ?? null, $sub->usages);
 sort($prompts);
 check("each request's token count is its own, not another's finishing beside it", $prompts === [5, 9, 17], json_encode($sub->usages));
-check('the three calls are shown before any result', substr_count(substr($screen, 0, (int) strpos($screen, '✓')), 'Tool: delegate') === 3, $screen);
+check('the three calls are shown before any result, numbered in the order asked',
+    preg_match('/Tool: \\[1\\] delegate.*Tool: \\[2\\] delegate.*Tool: \\[3\\] delegate/s', substr($screen, 0, (int) strpos($screen, '✓'))) === 1, $screen);
+
+// Their lines carry the same number: they interleave, and would be anyone's.
+$pane = new SubagentPane(new Terminal(), new MarkdownRenderer());
+$lines = '';
+foreach ([1, 2] as $n) {
+    $fiber = new Fiber(function () use ($pane) { ob_start(); $pane->showToolCall('project_grep', ['pattern' => 'subtotal']); return ob_get_clean(); });
+    App\Agent\Lanes::assign($fiber, $n);
+    $fiber->start();
+    $lines .= Terminal::plain((string) $fiber->getReturn());
+}
+check("each sub-agent's lines carry its number", str_contains($lines, '↳ [1] project_grep subtotal') && str_contains($lines, '↳ [2] project_grep subtotal'), $lines);
 
 // A provider that takes one at a time gets them one at a time, shown as before.
 $bag = new MessageBag();
@@ -276,7 +288,7 @@ mainLoop($one, delegate($sub, $paths, $memory, $interrupt), $interrupt)->run($ba
 $screen = Terminal::plain((string) ob_get_clean());
 $took = microtime(true) - $started;
 check('a provider that takes one at a time gets them one after the other', $took >= 1.9, sprintf('%.1f s', $took));
-check('each shown with its result under it', substr_count(substr($screen, 0, (int) strpos($screen, '✓')), 'Tool: delegate') === 1, $screen);
+check('each shown with its result under it, and no number', substr_count(substr($screen, 0, (int) strpos($screen, '✓')), 'Tool: delegate') === 1 && !str_contains($screen, '[1]'), $screen);
 
 // A rate limit met while they run lowers how many go on at once.
 $bag = new MessageBag();

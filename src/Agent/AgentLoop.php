@@ -458,8 +458,8 @@ class AgentLoop
      * Each call in a Fiber of its own, as many going on at once as the
      * provider takes — asked again as each one ends, since a rate limit met
      * meanwhile lowers it — the rest waiting their turn. A request gives way
-     * at every chunk, in Interrupt::requested(). Shown and recorded in the
-     * order they were asked for.
+     * at every chunk, in Interrupt::requested(). Each shown as it starts,
+     * numbered in the order asked, and recorded in that order.
      *
      * @param list<ToolCall> $calls
      *
@@ -467,10 +467,6 @@ class AgentLoop
      */
     private function runTogether(MessageBag $bag, array $calls): array
     {
-        foreach ($calls as $call) {
-            $this->chat->showToolCall($call->name, $call->arguments, $call->id);
-        }
-
         $waiting = $calls;
         $running = [];
         $results = [];
@@ -479,7 +475,13 @@ class AgentLoop
                 $i = array_key_first($waiting);
                 $call = $waiting[$i];
                 unset($waiting[$i]);
-                $running[$i] = new \Fiber(fn() => $this->decide($call));
+                // Shown as it starts, with the number its lines will carry.
+                $running[$i] = new \Fiber(function () use ($call): ToolResult {
+                    $this->chat->showToolCall($call->name, $call->arguments, $call->id);
+
+                    return $this->decide($call);
+                });
+                Lanes::assign($running[$i], $i + 1);
             }
 
             foreach ($running as $i => $fiber) {

@@ -3,6 +3,7 @@
 namespace App\Acp;
 
 use App\Agent\AgentOutput;
+use App\Agent\Lanes;
 use App\Agent\TodoList;
 use App\Agent\Tool\ToolCall;
 use App\Agent\Tool\ToolDefinition;
@@ -199,7 +200,7 @@ final class EditorFrontend implements AgentOutput, Approver
         $update = [
             'sessionUpdate' => 'tool_call',
             'toolCallId'    => $id,
-            'title'         => ToolDescriptions::title($toolName, $args),
+            'title'         => Lanes::prefix() . ToolDescriptions::title($toolName, $args),
             'kind'          => ToolDescriptions::kind($toolName),
             'status'        => 'pending',
             'rawInput'      => $args === [] ? new \stdClass() : $args,

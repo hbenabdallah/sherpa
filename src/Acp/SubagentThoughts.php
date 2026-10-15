@@ -3,6 +3,7 @@
 namespace App\Acp;
 
 use App\Agent\AgentOutput;
+use App\Agent\Lanes;
 use App\TUI\Terminal;
 
 /**
@@ -41,7 +42,7 @@ final class SubagentThoughts implements AgentOutput
 
     public function showToolCall(string $toolName, array $args = [], ?string $callId = null): void
     {
-        $this->say('↳ ' . ToolDescriptions::title($toolName, $args));
+        $this->say('↳ ' . Lanes::prefix() . ToolDescriptions::title($toolName, $args));
     }
 
     public function showToolResult(string $toolName, string $result, bool $isError = false, ?string $callId = null): void
@@ -50,12 +51,12 @@ final class SubagentThoughts implements AgentOutput
 
     public function showInfo(string $message): void
     {
-        $this->say('↳ ' . $message);
+        $this->say('↳ ' . Lanes::prefix() . $message);
     }
 
     public function showError(string $message): void
     {
-        $this->say('↳ ⚠ ' . $message);
+        $this->say('↳ ' . Lanes::prefix() . '⚠ ' . $message);
     }
 
     public function forSubagent(): AgentOutput

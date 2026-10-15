@@ -3,6 +3,7 @@
 namespace App\TUI;
 
 use App\Agent\AgentOutput;
+use App\Agent\Lanes;
 use App\Tool\ListDirTool;
 
 class ChatPane implements AgentOutput
@@ -248,7 +249,7 @@ class ChatPane implements AgentOutput
                 . '=' . Terminal::ITALIC . $val . Terminal::RESET . Terminal::GRAY;
         }
 
-        echo Terminal::GRAY . '  → Tool: ' . Terminal::YELLOW . Terminal::plain($toolName, singleLine: true)
+        echo Terminal::GRAY . '  → Tool: ' . Lanes::prefix() . Terminal::YELLOW . Terminal::plain($toolName, singleLine: true)
             . Terminal::GRAY . $argStr . Terminal::RESET . "\n";
     }
 
