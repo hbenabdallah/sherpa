@@ -78,7 +78,7 @@ final class SessionConfig
                 'category'     => 'model',
                 'type'         => 'select',
                 'currentValue' => $model->model,
-                'options'      => $this->models($model),
+                'options'      => self::grouped($this->models($model)),
             ];
         }
 
@@ -120,6 +120,33 @@ final class SessionConfig
         }
 
         return ModelProfile::suggestFor($info, 'chosen in the editor', $this->platform->backend());
+    }
+
+    /**
+     * A provider's ids under their vendor: "meta/llama-3.3-70b-instruct" is
+     * shown "llama-3.3-70b-instruct" under "meta". An editor's menu is
+     * narrow, and the vendor, repeated on every line, is what it would keep.
+     * A list with no vendor in its ids stays as it is.
+     *
+     * @param list<array<string, string>> $options
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function grouped(array $options): array
+    {
+        $groups = [];
+        foreach ($options as $option) {
+            $slash = strpos($option['value'], '/');
+            if ($slash === false) {
+                return $options;
+            }
+
+            $vendor = substr($option['value'], 0, $slash);
+            $groups[$vendor] ??= ['group' => $vendor, 'name' => $vendor, 'options' => []];
+            $groups[$vendor]['options'][] = ['name' => substr($option['value'], $slash + 1)] + $option;
+        }
+
+        return array_values($groups);
     }
 
     /** @return list<array<string, string>> */

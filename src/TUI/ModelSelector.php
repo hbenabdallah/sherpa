@@ -30,6 +30,9 @@ class ModelSelector
     /** Whose models are on screen. Set by run(), read by every step after it. */
     private Backend $backend = Backend::DEFAULT;
 
+    /** The names' column, as wide as the longest the screen allows. */
+    private int $nameWidth = 30;
+
     public function __construct(
         private readonly Terminal $terminal,
         private readonly LineEditor $editor,
@@ -269,13 +272,24 @@ class ModelSelector
             echo Terminal::YELLOW . "  ⚠ Very wide window: watch \"ollama ps\" on the first turn.\n" . Terminal::RESET;
         }
 
-        return new ModelProfile($info->name, $window, 'choisi ici', $this->backend);
+        return new ModelProfile($info->name, $window, 'chosen here', $this->backend);
     }
 
     private function render(array $models, int $selected, ?ModelProfile $current, bool $firstRun): void
     {
         [$cols, $rows] = $this->terminal->size();
-        $width = min(78, max(48, $cols - 4));
+
+        // As wide as the longest name needs, up to the terminal's width: a
+        // provider's ids — "meta/llama-3.3-70b-instruct" — are most of the line,
+        // and cut at a fixed width they could not be told apart.
+        $nameWidth = 0;
+        $metaWidth = 0;
+        foreach ($models as $model) {
+            $nameWidth = max($nameWidth, mb_strlen(Terminal::plain($model->name, singleLine: true)));
+            $metaWidth = max($metaWidth, mb_strlen($this->meta($model)));
+        }
+        $width = min(max(48, $cols - 4), max(56, $nameWidth + $metaWidth + 10));
+        $this->nameWidth = max(16, min($nameWidth, $width - 4 - $metaWidth - 6));
         $x = (int) (($cols - $width) / 2);
         $y = max(2, (int) ($rows / 6));
 
@@ -334,13 +348,9 @@ class ModelSelector
             : $count . ($current === null ? '' : ' — current: ' . $current->model);
     }
 
-    private function renderLine(int $x, int $y, int $width, ModelInfo $model, bool $selected, ?ModelProfile $current): void
+    /** Size, weight and window, and whether it can call tools. */
+    private function meta(ModelInfo $model): string
     {
-        $this->terminal->moveTo($y, $x);
-
-        $name = mb_substr(Terminal::plain($model->name, singleLine: true), 0, 30);
-        $isCurrent = $current !== null && $current->model === $model->name;
-
         $meta = trim(sprintf(
             '%8s %8s %6s',
             self::shown($model->parameterSize ?? ''),
@@ -350,9 +360,19 @@ class ModelSelector
 
         // Named, not merely coloured: a model that cannot call tools is the one
         // thing on this screen that would waste an entire session.
-        if (!$model->supportsTools()) {
-            $meta .= '  no tools';
+        return $model->supportsTools() ? $meta : $meta . '  no tools';
+    }
+
+    private function renderLine(int $x, int $y, int $width, ModelInfo $model, bool $selected, ?ModelProfile $current): void
+    {
+        $this->terminal->moveTo($y, $x);
+
+        $name = Terminal::plain($model->name, singleLine: true);
+        if (mb_strlen($name) > $this->nameWidth) {
+            $name = mb_substr($name, 0, $this->nameWidth - 1) . '…';
         }
+        $isCurrent = $current !== null && $current->model === $model->name;
+        $meta = $this->meta($model);
 
         $arrow = $selected ? Terminal::BOLD . Terminal::YELLOW . '> ' : '  ';
         $nameColour = match (true) {
@@ -361,8 +381,8 @@ class ModelSelector
             default                 => Terminal::WHITE,
         };
 
-        echo $arrow . $nameColour . str_pad($name, 32) . Terminal::RESET
-            . Terminal::GRAY . mb_substr($meta, 0, max(1, $width - 34)) . Terminal::RESET
+        echo $arrow . $nameColour . $name . str_repeat(' ', $this->nameWidth + 2 - mb_strlen($name)) . Terminal::RESET
+            . Terminal::GRAY . mb_substr($meta, 0, max(1, $width - $this->nameWidth - 4)) . Terminal::RESET
             . ($isCurrent ? Terminal::CYAN . ' ●' . Terminal::RESET : '');
     }
 

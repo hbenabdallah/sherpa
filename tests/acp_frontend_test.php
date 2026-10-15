@@ -201,6 +201,18 @@ $orphan = new EditorFrontend(new Connection($sherpa, $sherpa), new EditPreview(n
 check('no editor to answer: refused', $orphan->confirm($call, $def) === ConfirmChoice::Deny);
 check('and no plan approved', $orphan->approvePlan('x') === null);
 
+// ---- the model menu ------------------------------------------------------------------
+$menu = App\Acp\SessionConfig::grouped([
+    ['value' => 'meta/llama-3.3-70b-instruct', 'name' => 'meta/llama-3.3-70b-instruct'],
+    ['value' => 'qwen/qwen3-coder', 'name' => 'qwen/qwen3-coder', 'description' => '256k context'],
+    ['value' => 'meta/llama-3.1-8b-instruct', 'name' => 'meta/llama-3.1-8b-instruct'],
+]);
+check('a provider\'s models are grouped under their vendor', array_column($menu, 'name') === ['meta', 'qwen'], json_encode($menu));
+check('each shown without it, chosen by its whole id', ($menu[0]['options'][1] ?? []) === ['name' => 'llama-3.1-8b-instruct', 'value' => 'meta/llama-3.1-8b-instruct'], json_encode($menu[0]));
+check('its details kept', ($menu[1]['options'][0]['description'] ?? '') === '256k context');
+$flat = [['value' => 'fake-chat', 'name' => 'fake-chat'], ['value' => 'acme/x', 'name' => 'acme/x']];
+check('a list with ids that name no vendor stays flat', App\Acp\SessionConfig::grouped($flat) === $flat);
+
 exec('rm -rf ' . escapeshellarg($project));
 
 echo "\n{$pass} passed, {$fail} failed\n";

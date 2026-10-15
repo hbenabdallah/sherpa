@@ -198,6 +198,29 @@ check('a model name from the server cannot clear the screen', !str_contains($hea
 check('nor draw a line of its own', !str_contains($heading, "piège\n"), $heading);
 check('and its details are still shown', str_contains(Terminal::plain($heading), 'piège') && str_contains(Terminal::plain($heading), '7B'), $heading);
 
+// A provider's ids are long: the list is as wide as they need, up to the screen.
+$wide = new class extends Terminal {
+    public int $cols = 160;
+
+    public function size(): array
+    {
+        return [$this->cols, 40];
+    }
+};
+$render = new ReflectionMethod($selector, 'render');
+$long = [new App\Platform\ModelInfo('nvidia/llama-3.3-nemotron-super-49b-v1.5-instruct', 131072), new App\Platform\ModelInfo('qwen/qwen3-coder', 262144)];
+$drawn = static function () use ($render, $wide, $long): string {
+    $selector = new App\TUI\ModelSelector($wide, new App\TUI\LineEditor(), new App\Platform\OllamaPlatform(
+        new Symfony\Component\HttpClient\MockHttpClient(), 'http://ollama.test', 'x'));
+    ob_start();
+    $render->invoke($selector, $long, 0, null, false);
+
+    return Terminal::plain((string) ob_get_clean());
+};
+check('a long model name is shown whole on a wide screen', str_contains($drawn(), 'nvidia/llama-3.3-nemotron-super-49b-v1.5-instruct'), $drawn());
+$wide->cols = 60;
+check('and cut, marked, on a narrow one', str_contains($drawn(), 'nvidia/llama-3.3-nemo') && str_contains($drawn(), '…'), $drawn());
+
 // The label is owed only if something is actually streamed.
 $out = captured(function () {
     $p = pane();
