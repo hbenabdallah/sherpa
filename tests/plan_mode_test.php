@@ -97,6 +97,7 @@ final class Scripted implements PlatformInterface
 
         return array_shift($this->replies) ?? ['role' => 'assistant', 'content' => 'done'];
     }
+    public function concurrency(): int { return 1; }
     public function lastUsage(): ?array { return null; }
     public function lastTimings(): ?array { return null; }
     public function residency(): ?ModelResidency { return null; }

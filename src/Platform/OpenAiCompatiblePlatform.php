@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Platform;
 
+use App\Config\ApiEndpoint;
 use App\Runtime\Interrupt;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -48,6 +49,12 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
 
     private const MAX_RATE_LIMIT_WAIT_SECONDS = 60;
 
+    /** Requests at once to a provider with room to spare. */
+    private const CONCURRENCY = 3;
+
+    /** How long one at a time holds after the provider said slow down. */
+    private const STRAINED_SECONDS = 120;
+
     /** @var array{prompt: int, completion: int}|null */
     private ?array $lastUsage {
         get => $this->lastOf('usage');
@@ -90,6 +97,16 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
 
     /** What the provider last said about its limits; null when it never did. */
     private ?RateLimits $rateLimits = null;
+
+    /**
+     * Until when nothing is sent, after a 429: shared by every request, so
+     * that sub-agents running together wait out one rate limit together
+     * rather than each spending the next minute's requests on retries.
+     */
+    private float $limitedUntil = 0.0;
+
+    /** When the provider last said slow down — a 429, or overloaded. */
+    private float $strainedAt = 0.0;
 
     public function __construct(
         private readonly HttpClientInterface $client,
@@ -311,7 +328,16 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
 
         $headers = $this->headers($accept);
 
+        $refused = null;
         for ($attempt = 1; ; $attempt++) {
+            // This request, or another beside it, ran into the limit: wait it
+            // out. Cut short, the refusal is the answer — or, with none yet,
+            // a request the next wait cancels at once.
+            $held = $this->limitedUntil - microtime(true);
+            if ($held > 0 && !$this->pause((int) ceil($held), 'Rate limit reached', $onWait) && $refused !== null) {
+                return $refused;
+            }
+
             $response = $this->client->request('POST', $this->baseUrl . $path, [
                 'headers' => $headers,
                 'json'    => $payload,
@@ -330,13 +356,20 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
                 return $response;
             }
 
+            $this->strainedAt = microtime(true);
             $wait = $this->retryAfter($response, $attempt, $limited);
             if ($wait === null) {
                 return $response;
             }
             $response->cancel();
 
-            if (!$this->pause($wait, $limited ? 'Rate limit reached' : $this->name() . ' is failing', $onWait)) {
+            if ($limited) {
+                $this->limitedUntil = max($this->limitedUntil, microtime(true) + $wait);
+                $refused = $response;
+                continue;
+            }
+
+            if (!$this->pause($wait, $this->name() . ' is failing', $onWait)) {
                 return $response;
             }
         }
@@ -433,6 +466,17 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
         } catch (\Throwable) {
             // No headers to read is no news.
         }
+    }
+
+    public function concurrency(): int
+    {
+        return match (true) {
+            // One GPU behind it, as with Ollama.
+            ApiEndpoint::isLocal($this->baseUrl)                              => 1,
+            microtime(true) - $this->strainedAt < self::STRAINED_SECONDS      => 1,
+            $this->rateLimits?->roomFor(self::CONCURRENCY) === false          => 1,
+            default                                                           => self::CONCURRENCY,
+        };
     }
 
     /** What the provider says is left of its rate limits and quotas, if it says. */

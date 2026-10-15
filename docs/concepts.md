@@ -106,7 +106,24 @@ screen, each of its steps is one short line under the call.
 
 Sub-agents asked for in the same reply run at the same time: three questions
 take about as long as the slowest one, not as long as all three. Their reports
-come back in the order they were asked for.
+come back in the order they were asked for. How many run at once depends on
+the provider:
+
+- **A hosted API with room to spare**: up to three.
+- **Ollama, or a server on your machine or network** (llama.cpp, LM Studio,
+  vLLM): one at a time. One GPU answers requests one after the other anyway,
+  or slows them all down.
+- **A provider that has just answered 429** (rate limit) or said it is
+  overloaded: one at a time for the next two minutes. Every request waits out
+  the delay the provider asked for, together, instead of each one spending
+  the next requests of the window on retries.
+- **A provider whose headers say its window is nearly spent**
+  (`x-ratelimit-remaining-*`): one at a time.
+- **A session close to `SHERPA_MAX_SESSION_TOKENS`**: one at a time, so that
+  three requests at once do not each go past the cap.
+
+A quota spent for the day, or a 402 for credits run out, is reported at once,
+as for any other request.
 
 Its requests count toward the session's tokens like any other. Ctrl+C stops it
 too, and every sub-agent running beside it.

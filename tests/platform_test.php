@@ -104,6 +104,7 @@ final class ScriptedPlatform implements PlatformInterface
         return $reply;
     }
 
+    public function concurrency(): int { return 1; }
     public function lastUsage(): ?array { return $this->usage; }
     public function lastTimings(): ?array { return $this->timings; }
     public function residency(): ?ModelResidency { return null; }
@@ -258,9 +259,10 @@ sort($methods);
 // Still a guard, not a rubber stamp: every name below has a caller in src/.
 // catalogue/describeModel/useModel/contextWindow arrived with model selection —
 // the note at the foot of PlatformInterface said they would, once something
-// asked. Anything added here without a caller is what this check is for.
+// asked — and concurrency with sub-agents run together. Anything added here
+// without a caller is what this check is for.
 check('the contract is only what callers actually need',
-    $methods === ['catalogue', 'contextWindow', 'describeModel', 'isAvailable', 'lastTimings', 'lastUsage', 'modelName', 'name', 'residency', 'stream', 'useModel'],
+    $methods === ['catalogue', 'concurrency', 'contextWindow', 'describeModel', 'isAvailable', 'lastTimings', 'lastUsage', 'modelName', 'name', 'residency', 'stream', 'useModel'],
     implode(',', $methods));
 
 // chat() left under the rule that put the others here. Its one caller was the

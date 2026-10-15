@@ -422,7 +422,7 @@ class AgentLoop
             }
 
             $together = $this->togetherFrom($calls, $i);
-            if (count($together) > 1) {
+            if (count($together) > 1 && $this->platform->concurrency() > 1) {
                 foreach ($this->runTogether($bag, $together) as $result) {
                     $this->noteError($state, $result);
                 }
@@ -455,9 +455,11 @@ class AgentLoop
     }
 
     /**
-     * Each call in a Fiber of its own, all of them going on while any waits on
-     * the model: a request gives way at every chunk, in Interrupt::requested().
-     * Shown and recorded in the order they were asked for.
+     * Each call in a Fiber of its own, as many going on at once as the
+     * provider takes — asked again as each one ends, since a rate limit met
+     * meanwhile lowers it — the rest waiting their turn. A request gives way
+     * at every chunk, in Interrupt::requested(). Shown and recorded in the
+     * order they were asked for.
      *
      * @param list<ToolCall> $calls
      *
@@ -465,15 +467,22 @@ class AgentLoop
      */
     private function runTogether(MessageBag $bag, array $calls): array
     {
-        $fibers = [];
-        foreach ($calls as $i => $call) {
+        foreach ($calls as $call) {
             $this->chat->showToolCall($call->name, $call->arguments, $call->id);
-            $fibers[$i] = new \Fiber(fn() => $this->decide($call));
         }
 
+        $waiting = $calls;
+        $running = [];
         $results = [];
-        while ($fibers !== []) {
-            foreach ($fibers as $i => $fiber) {
+        while ($waiting !== [] || $running !== []) {
+            while ($waiting !== [] && count($running) < max(1, $this->platform->concurrency())) {
+                $i = array_key_first($waiting);
+                $call = $waiting[$i];
+                unset($waiting[$i]);
+                $running[$i] = new \Fiber(fn() => $this->decide($call));
+            }
+
+            foreach ($running as $i => $fiber) {
                 try {
                     $fiber->isStarted() ? $fiber->resume() : $fiber->start();
                     if ($fiber->isTerminated()) {
@@ -484,7 +493,7 @@ class AgentLoop
                 }
 
                 if (isset($results[$i])) {
-                    unset($fibers[$i]);
+                    unset($running[$i]);
                 }
             }
         }

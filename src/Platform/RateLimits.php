@@ -22,6 +22,9 @@ final class RateLimits
      */
     private function __construct(public readonly array $windows) {}
 
+    /** A window with less than this share left is not one to spend fast. */
+    private const NEARLY_SPENT = 0.1;
+
     /**
      * @param array<string, list<string>|string> $headers as the HTTP client hands them, names lowercase
      */
@@ -74,6 +77,23 @@ final class RateLimits
         }
 
         return ['name' => (string) $name, 'percentLeft' => (int) floor($share * 100)];
+    }
+
+    /**
+     * Whether $requests more, sent at once, leave the provider room: none of
+     * its windows nearly spent, and twice as many requests left as are about
+     * to go — each sub-agent asks more than once.
+     */
+    public function roomFor(int $requests): bool
+    {
+        foreach ($this->windows as $name => $w) {
+            if ($w['remaining'] < $w['limit'] * self::NEARLY_SPENT
+                || str_starts_with($name, 'requests') && $w['remaining'] < 2 * $requests) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static function number(string $value): ?int

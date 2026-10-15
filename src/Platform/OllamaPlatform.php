@@ -335,6 +335,12 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
     /**
      * @return array{prefill: float, decode: float}|null
      */
+    /** One machine, one model: requests at once queue, or slow each other down. */
+    public function concurrency(): int
+    {
+        return 1;
+    }
+
     public function lastTimings(): ?array
     {
         return $this->lastTimings;

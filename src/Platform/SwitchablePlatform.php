@@ -120,6 +120,12 @@ final class SwitchablePlatform implements PlatformInterface, EmbeddingBackend
         };
     }
 
+    /** One at a time near the session's cap: three at once would each pass it. */
+    public function concurrency(): int
+    {
+        return $this->meter?->nearlySpent() ? 1 : $this->active()->concurrency();
+    }
+
     public function lastUsage(): ?array
     {
         return $this->active()->lastUsage();

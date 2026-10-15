@@ -411,6 +411,43 @@ $down = fn() => new MockResponse('{"error":{"message":"down"}}', ['http_code' =>
 $reply = patient([$down(), $down(), $down(), $ok()], $sent, $waits, $said);
 check('a 503 is still tried three times, each wait capped at 20 s', count($sent) === 3 && abs(array_sum($waits) - 40) < 0.01, json_encode([count($sent), array_sum($waits)]));
 
+// ---- how many requests at once ------------------------------------------------
+// Sub-agents asked for together run together, as many as the provider takes.
+$at = fn(string $url, array $responses = []) => new OpenAiCompatiblePlatform(
+    new MockHttpClient($responses === [] ? [new MockResponse('')] : $responses), $url, 'm', 'k', 64000, 30.0, sleep: fn() => null);
+check('a provider with room takes three at once', $at('https://api.example.com/v1')->concurrency() === 3);
+foreach (['http://localhost:8080/v1', 'http://127.0.0.1:1234/v1', 'http://192.168.1.20:8000/v1', 'http://host.docker.internal:11434/v1', 'http://llm/v1'] as $local) {
+    check("a server on this machine or network takes one: {$local}", $at($local)->concurrency() === 1);
+}
+check('as does Ollama', (new App\Platform\OllamaPlatform(new MockHttpClient(), 'http://x', 'm'))->concurrency() === 1);
+
+$limited = $at('https://api.example.com/v1', [$limit(['retry-after' => '1']), $ok(), $ok()]);
+$limited->stream([['role' => 'user', 'content' => 'x']], [], fn() => null);
+check('after a rate limit, one at a time', $limited->concurrency() === 1);
+$said = [];
+$limited->stream([['role' => 'user', 'content' => 'y']], [], fn() => null,
+    function (bool $reasoning, ?string $why = null) use (&$said) { if ($why !== null) { $said[] = $why; } });
+check('and a request beside the limited one waits it out before it is sent, not after a refusal of its own',
+    str_starts_with($said[0] ?? '', 'Rate limit reached'), json_encode($said));
+
+$few = textChunk('ok') . 'data: [DONE]' . "\n\n";
+$tight = $at('https://api.example.com/v1', [new MockResponse($few, ['response_headers' => [
+    'content-type' => 'text/event-stream', 'x-ratelimit-limit-requests' => '30', 'x-ratelimit-remaining-requests' => '4']])]);
+$tight->stream([['role' => 'user', 'content' => 'x']], [], fn() => null);
+check('with few requests left in the window, one at a time', $tight->concurrency() === 1);
+
+$roomy = $at('https://api.example.com/v1', [new MockResponse($few, ['response_headers' => [
+    'content-type' => 'text/event-stream', 'x-ratelimit-limit-requests' => '1000', 'x-ratelimit-remaining-requests' => '990']])]);
+$roomy->stream([['role' => 'user', 'content' => 'x']], [], fn() => null);
+check('with plenty left, three', $roomy->concurrency() === 3);
+
+$meter = new App\Usage\UsageMeter(1000);
+$capped = new App\Platform\SwitchablePlatform(new App\Platform\OllamaPlatform(new MockHttpClient(), 'http://x', 'm'), $roomy, $meter);
+$capped->switchTo(App\Config\Backend::Api);
+check('a session far from its token cap goes on three at a time', $capped->concurrency() === 3);
+$meter->record(['prompt' => 500, 'completion' => 100]);
+check('one near it, one at a time: three at once would each pass it', $capped->concurrency() === 1);
+
 // ---- 7. Ctrl+C -------------------------------------------------------------
 $interrupt = new Interrupt();
 $interrupt->beginTurn();

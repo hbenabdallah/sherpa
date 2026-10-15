@@ -64,16 +64,27 @@ final class ApiEndpoint
             return false;
         }
 
-        $host = strtolower(trim($parts['host'] ?? '', '[]'));
+        return !self::isLocal($url);
+    }
+
+    /**
+     * Whether $url is a server on this machine or its network — llama.cpp,
+     * LM Studio, vLLM on the GPU box under the desk — rather than a provider.
+     * Judged from the address as written, as above.
+     */
+    public static function isLocal(string $url): bool
+    {
+        $parts = parse_url($url);
+        $host = strtolower(trim(is_array($parts) ? $parts['host'] ?? '' : '', '[]'));
         if ($host === '' || $host === 'localhost' || str_ends_with($host, '.localhost')
             || str_ends_with($host, '.local') || str_ends_with($host, '.internal') || !str_contains($host, '.') && !str_contains($host, ':')) {
-            return false;
+            return true;
         }
 
         if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
-            return filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false;
+            return filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false;
         }
 
-        return true;
+        return false;
     }
 }

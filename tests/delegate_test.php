@@ -58,7 +58,12 @@ final class Scripted implements PlatformInterface
 {
     public array $seen = [];
 
+    /** @var list<int> what concurrency() answers, one call after another; the last one holds */
+    public array $concurrency = [3];
+
     public function __construct(private array $replies, private ?Interrupt $cancel = null) {}
+
+    public function concurrency(): int { return count($this->concurrency) > 1 ? array_shift($this->concurrency) : $this->concurrency[0]; }
 
     public function stream(array $messages, array $tools = [], ?callable $onToken = null, ?callable $onWait = null): array
     {
@@ -194,6 +199,7 @@ final class Counted implements PlatformInterface
 
         return $reply;
     }
+    public function concurrency(): int { return $this->inner->concurrency(); }
     public function lastUsage(): ?array { return $this->inner->lastUsage(); }
     public function lastTimings(): ?array { return $this->inner->lastTimings(); }
     public function residency(): ?ModelResidency { return null; }
@@ -258,6 +264,32 @@ $prompts = array_map(fn($u) => $u['prompt'] ?? null, $sub->usages);
 sort($prompts);
 check("each request's token count is its own, not another's finishing beside it", $prompts === [5, 9, 17], json_encode($sub->usages));
 check('the three calls are shown before any result', substr_count(substr($screen, 0, (int) strpos($screen, '✓')), 'Tool: delegate') === 3, $screen);
+
+// A provider that takes one at a time gets them one at a time, shown as before.
+$bag = new MessageBag();
+$bag->user('read two things');
+$one = $asks(['alpha', 'beta-beta']);
+$one->concurrency = [1];
+$started = microtime(true);
+ob_start();
+mainLoop($one, delegate($sub, $paths, $memory, $interrupt), $interrupt)->run($bag);
+$screen = Terminal::plain((string) ob_get_clean());
+$took = microtime(true) - $started;
+check('a provider that takes one at a time gets them one after the other', $took >= 1.9, sprintf('%.1f s', $took));
+check('each shown with its result under it', substr_count(substr($screen, 0, (int) strpos($screen, '✓')), 'Tool: delegate') === 1, $screen);
+
+// A rate limit met while they run lowers how many go on at once.
+$bag = new MessageBag();
+$bag->user('read three things');
+$lowered = $asks(['alpha', 'beta-beta', 'gamma-gamma-gamma']);
+$lowered->concurrency = [3, 3, 3, 1];
+$started = microtime(true);
+ob_start();
+mainLoop($lowered, delegate($sub, $paths, $memory, $interrupt), $interrupt)->run($bag);
+ob_end_clean();
+$took = microtime(true) - $started;
+check('the third waits for the first two once the provider says slow down', $took >= 1.9 && $took < 2.6, sprintf('%.1f s', $took));
+check('and all three still report', substr_count(json_encode($bag->all()), 'report on ') === 3);
 
 // One alone runs as before, outside any Fiber.
 $bag = new MessageBag();

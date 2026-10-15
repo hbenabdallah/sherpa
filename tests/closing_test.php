@@ -73,6 +73,7 @@ final class Reader implements PlatformInterface
 
         return ($this->reply)($messages, $this->requests);
     }
+    public function concurrency(): int { return 1; }
     public function lastUsage(): ?array { return null; }
     public function lastTimings(): ?array { return null; }
     public function residency(): ?ModelResidency { return null; }

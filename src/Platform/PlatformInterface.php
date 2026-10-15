@@ -47,6 +47,13 @@ interface PlatformInterface
     public function stream(array $messages, array $tools = [], ?callable $onToken = null, ?callable $onWait = null): array;
 
     /**
+     * How many requests may be in flight at once — sub-agents asked for
+     * together — as far as Sherpa can tell: one for a model on the user's own
+     * hardware, or a provider that has just said slow down.
+     */
+    public function concurrency(): int;
+
+    /**
      * Token counts as the server counted them: what ContextBudget calibrates
      * against, and the only accurate figure a PHP client can have. Null leaves
      * the estimate uncalibrated rather than wrong.
