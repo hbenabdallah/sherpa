@@ -181,6 +181,30 @@ check('only a yes forgets', (confirmForget("o\n")['confirmed'] ?? null) === true
 if ($realHome !== null) {
     $_SERVER['HOME'] = $realHome;
 }
+// ---- opened from an editor: nobody to ask about Docker -------------------------------
+// A docker on the PATH that lists this directory's containers, as compose names them.
+mkdir("{$root}/bin");
+file_put_contents("{$root}/bin/docker", "#!/bin/sh\nprintf 'shop-app-1\\nshop-db-1\\nother-web-1\\n'\n");
+chmod("{$root}/bin/docker", 0755);
+$path = getenv('PATH');
+putenv("PATH={$root}/bin:{$path}");
+mkdir("{$root}/shop");
+mkdir("{$root}/plain");
+file_put_contents("{$root}/plain/compose.yaml", "services: {}\n");
+$questions = new App\Project\ProjectQuestions(new App\TUI\LineEditor(), new ProjectStore(new StackDetector()));
+
+[$docker, $note] = $questions->guessDocker("{$root}/shop");
+check('its containers running, the app\'s is where commands run', $docker->enabled && $docker->container === 'shop-app-1' && $docker->dbContainer === 'shop-db-1', json_encode($docker));
+check('and the user is told, with how to change it', str_contains($note, 'container shop-app-1') && str_contains($note, '/project edit'), $note);
+
+[$docker, $note] = $questions->guessDocker("{$root}/plain");
+check('a compose file with nothing running: this machine', !$docker->enabled && str_contains($note, 'none of its containers is running'), $note);
+
+file_put_contents("{$root}/shop/Makefile", "test:\n\tdocker compose exec app php tests/run.php\n");
+[$docker, $note] = $questions->guessDocker("{$root}/shop");
+check('a Makefile that goes through docker itself: this machine', !$docker->enabled && str_contains($note, 'Makefile'), $note);
+putenv("PATH={$path}");
+
 exec('rm -rf ' . escapeshellarg($root));
 
 printf("\n%d passed, %d failed\n", $pass, $fail);

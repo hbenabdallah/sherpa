@@ -68,6 +68,36 @@ class ProjectQuestions
         return in_array($answer, ['o', 'oui', 'y', 'yes'], true);
     }
 
+    /**
+     * Docker for a directory nobody can be asked about — opened from an
+     * editor: what the terminal would offer with Enter, without the
+     * questions. On only when the directory's containers are running, since a
+     * stopped one runs nothing; said either way.
+     *
+     * @return array{DockerConfig, string} the setting, and what to tell the user of it
+     */
+    public function guessDocker(string $path): array
+    {
+        $running = $this->runningContainers($path);
+        $wrapper = $running !== [] || $this->hasCompose($path) ? DockerWrapper::in($path) : null;
+        $container = $wrapper === null ? $this->pick($running, self::APP_HINTS) : null;
+        $change = 'To change it: sherpa in a terminal, in this directory, then /project edit.';
+
+        if ($container !== null) {
+            return [
+                new DockerConfig(enabled: true, container: $container, dbContainer: $this->pick($running, self::DB_HINTS, required: false), user: DockerConfig::USER_HOST),
+                "New project: its commands run in the container {$container}, which is running. {$change}",
+            ];
+        }
+
+        return [new DockerConfig(enabled: false), 'New project: its commands run on this machine' . match (true) {
+            $wrapper !== null => ", its {$wrapper} going through docker itself. ",
+            $running !== []   => ': none of its running containers looks like the app\'s. ',
+            $this->hasCompose($path) => ': it has a docker compose file, but none of its containers is running. ',
+            default => '. ',
+        } . $change];
+    }
+
     private function askDocker(string $path, ?DockerConfig $current): DockerConfig
     {
         $running = $this->runningContainers($path);

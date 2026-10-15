@@ -37,16 +37,21 @@ tools, same project memory and saved conversations — with the editor's own vie
 - "/" offers the commands that ask nothing (`/compact`, `/memory`, `/docs`,
   `/plan`…), the skills and the MCP servers' prompts, as in the terminal;
   `/help` lists them. Those that ask questions — `/provider`, `/mcp add` — are
-  for the terminal.
+  for the terminal;
+- what a conversation taught is remembered, as when leaving the terminal: an
+  editor never says a conversation is over, so its facts are taken when you
+  open another one.
 
 **Set it up once.** The editor asks nothing, so Sherpa has to know its model
 before: run `sherpa acp --setup` in a terminal (the provider, its key, the
 model), or simply `sherpa` once. The key is kept in `keys.yaml`, which the editor
 reads; a `SHERPA_API_KEY` exported in your shell often is not seen by an editor
 started from the desktop. An editor that supports it offers the same setup
-itself, in a terminal, when Sherpa is not set up yet. For a project that runs in
-a container, run `sherpa` once in its directory and answer yes to Docker: the
-editor then runs its commands there too.
+itself, in a terminal, when Sherpa is not set up yet. A project Sherpa has
+never seen takes what the terminal would offer: its commands run in its app
+container when the directory's containers are running, on this machine
+otherwise, and the first reply says which. `sherpa` in a terminal, then
+`/project edit`, changes it.
 
 **Zed.** In Agent Settings, External Agents, *Add Agent* then *Add Custom Agent*,
 and give it the full path of the executable:

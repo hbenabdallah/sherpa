@@ -43,6 +43,27 @@ $call = static function (string $name, array $arguments) use ($chunk): void {
 $messages = $body['messages'] ?? [];
 $last = end($messages) ?: [];
 
+// The facts of a conversation, asked for once another one opens.
+if (str_contains((string) ($messages[0]['content'] ?? ''), 'lasting technical facts')) {
+    // A long one, from a conversation that said "take your time": ten seconds.
+    if (str_contains(strtolower((string) ($last['content'] ?? '')), 'take your time')) {
+        echo $chunk(['role' => 'assistant', 'content' => '[']);
+        for ($i = 0; $i < 50; $i++) {
+            @ob_flush();
+            flush();
+            if (connection_aborted()) {
+                return;
+            }
+            usleep(200_000);
+        }
+    }
+    echo $chunk(['role' => 'assistant', 'content' => '[{"key": "test-command", "value": "php tests/run.php"}]']);
+    echo $chunk([], 'stop');
+    echo "data: [DONE]\n\n";
+
+    return;
+}
+
 if (($last['role'] ?? '') === 'tool') {
     echo $chunk(['role' => 'assistant', 'content' => 'Done: ' . strtok((string) ($last['content'] ?? ''), "\n")]);
     echo $chunk([], 'stop');

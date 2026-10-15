@@ -23,6 +23,9 @@ final class AcpSession
     /** The model its turns run on: each conversation keeps the one chosen for it. */
     public ?ModelProfile $profile = null;
 
+    /** Messages its facts were last taken from: grown past it, it has more to give. */
+    public int $remembered = 0;
+
     /** @var list<string> tools allowed "for this session": this one, not every thread of the editor */
     public array $grants = [];
 

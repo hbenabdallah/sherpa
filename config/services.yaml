@@ -96,6 +96,10 @@ services:
             # model what was worth remembering.
             $extractFacts: '%env(bool:SHERPA_FACT_EXTRACTION)%'
 
+    App\Acp\AcpServer:
+        arguments:
+            $extractFacts: '%env(bool:SHERPA_FACT_EXTRACTION)%'
+
     # One per session, shared by the platform switch that feeds it and the
     # command that shows it. 0 means no cap.
     App\Usage\UsageMeter:

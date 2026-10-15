@@ -17,9 +17,10 @@ use App\Mcp\McpException;
 use App\Mcp\McpRegistry;
 use App\Mcp\ServerConfig;
 use App\Memory\ContextStore;
+use App\Memory\FactExtractor;
 use App\Permission\SessionPermissions;
 use App\Platform\SwitchablePlatform;
-use App\Project\DockerConfig;
+use App\Project\ProjectQuestions;
 use App\Project\ProjectStore;
 use App\Project\WorkingProject;
 use App\Runtime\Frontend;
@@ -86,6 +87,12 @@ final class AcpServer
     /** @var list<\Closure(): void> what is said once the response is sent: updates about a session the editor must know first */
     private array $then = [];
 
+    /** Facts being taken from a conversation: a prompt arriving stops it, rather than wait behind it. */
+    private bool $extracting = false;
+
+    /** @var array<string, string> what was decided for a new project, said at its first prompt: directory => note */
+    private array $notes = [];
+
     private bool $configuredServers = false;
     private bool $warnedAboutSaving = false;
 
@@ -111,6 +118,10 @@ final class AcpServer
         private readonly ModelSession $model,
         private readonly SessionConfig $config,
         private readonly EditorCommands $commands,
+        private readonly ProjectQuestions $questions,
+        private readonly FactExtractor $facts,
+        /** As in the terminal: what a conversation taught is kept, at one request per conversation. SHERPA_FACT_EXTRACTION. */
+        private readonly bool $extractFacts = true,
     ) {}
 
     /** Answer the editor until it closes its end. */
@@ -134,6 +145,9 @@ final class AcpServer
         if ($this->current !== null) {
             $this->save($this->open[$this->current]);
         }
+
+        // The editor closed: what is left to remember, if it waits for it.
+        $this->rememberFacts(null);
     }
 
     /**
@@ -143,6 +157,12 @@ final class AcpServer
      */
     private function intercept(array $message): bool
     {
+        if ($this->extracting && $message['method'] === 'session/prompt') {
+            $this->interrupt->request();
+
+            return false;
+        }
+
         if ($message['method'] === 'session/cancel') {
             $session = $message['params']['sessionId'] ?? null;
             if ($this->running !== null && $session === $this->running) {
@@ -282,6 +302,7 @@ final class AcpServer
         $this->open[$id] = $session;
         $this->makeCurrent($session);
         $this->then[] = fn() => $this->advertise($session);
+        $this->then[] = fn() => $this->rememberFacts($session);
 
         return ['sessionId' => $id] + $this->settings($session);
     }
@@ -321,9 +342,54 @@ final class AcpServer
         $this->makeCurrent($session);
 
         (new Replay($this->connection, $id))->send($saved->messages);
+        $session->remembered = $bag->count();
         $this->then[] = fn() => $this->advertise($session);
+        $this->then[] = fn() => $this->rememberFacts($session);
 
         return $this->settings($session);
+    }
+
+    /**
+     * The lasting facts of the conversations that moved on since theirs were
+     * last taken. An editor never says a conversation is over, as leaving the
+     * terminal does: opening another one is the sign. Stopped by a prompt,
+     * and taken up again next time.
+     *
+     * @param AcpSession|null $opened the session just opened, which stays current
+     */
+    private function rememberFacts(?AcpSession $opened): void
+    {
+        if (!$this->extractFacts) {
+            return;
+        }
+
+        try {
+            foreach ($this->open as $session) {
+                if ($session === $opened || $session->bag->count() <= $session->remembered || $session->bag->conversationSize() === 0) {
+                    continue;
+                }
+
+                $this->makeCurrent($session);
+                $this->extracting = true;
+                $this->interrupt->beginTurn();
+                try {
+                    $summary = $this->facts->extract($session->bag)->summary();
+                    if ($this->interrupt->requested()) {
+                        return;
+                    }
+                } finally {
+                    $this->interrupt->endTurn();
+                    $this->extracting = false;
+                }
+
+                $session->remembered = $session->bag->count();
+                fwrite(STDERR, "sherpa acp: {$session->id}: {$summary}\n");
+            }
+        } finally {
+            if ($opened !== null) {
+                $this->makeCurrent($opened);
+            }
+        }
     }
 
     /** What "/" offers in the editor: the commands, the project's skills, the MCP servers' prompts. */
@@ -447,6 +513,12 @@ final class AcpServer
 
         $this->makeCurrent($session);
         $this->editor->forSession($id, is_array($this->client['session']['notices'] ?? null));
+
+        $note = $this->notes[$session->directory] ?? null;
+        if ($note !== null) {
+            unset($this->notes[$session->directory]);
+            $this->editor->showInfo($note);
+        }
 
         if (str_starts_with(ltrim($text), '/')) {
             // A command decides nothing about the project: whatever it saves,
@@ -701,8 +773,8 @@ final class AcpServer
     /**
      * The project for $directory: the one Sherpa knows there, or a new one
      * held until the first message. Nothing is asked — an editor has no
-     * terminal — so a new one runs its commands on this machine; `sherpa` in
-     * a terminal sets up a container once, and the editor follows.
+     * terminal — so a new one takes what the terminal would offer, and says
+     * so at its first prompt.
      */
     private function openProject(string $directory): void
     {
@@ -714,7 +786,8 @@ final class AcpServer
         if ($known !== null) {
             $this->working->open($known);
         } else {
-            $this->working->hold($this->projects->draft($directory, basename($directory), new DockerConfig(enabled: false)));
+            [$docker, $this->notes[$directory]] = $this->questions->guessDocker($directory);
+            $this->working->hold($this->projects->draft($directory, basename($directory), $docker));
         }
 
         $this->directory = $this->working->project()->path;

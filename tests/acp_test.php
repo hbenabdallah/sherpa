@@ -27,7 +27,7 @@ file_put_contents("{$work}/project/.sherpa/skills/greet.md", "Greet the user war
 $project = realpath("{$work}/project");
 
 $port = 21000 + getmypid() % 9000;
-$server = proc_open([PHP_BINARY, '-S', "127.0.0.1:{$port}", __DIR__ . '/fixtures/acp_provider.php'], [1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $serverPipes);
+$server = proc_open([PHP_BINARY, '-S', "127.0.0.1:{$port}", __DIR__ . '/fixtures/acp_provider.php'], [1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $serverPipes, null, ['PHP_CLI_SERVER_WORKERS' => '4'] + getenv());
 for ($i = 0; $i < 50 && @fsockopen('127.0.0.1', $port) === false; $i++) {
     usleep(100_000);
 }
@@ -67,7 +67,7 @@ final class Editor
     public array $written = [];
 
     /** @param string|null $apiUrl null: nothing set up at all */
-    public function __construct(string $work, ?string $apiUrl, string $home = 'home')
+    public function __construct(string $work, ?string $apiUrl, string $home = 'home', bool $facts = false)
     {
         $env = array_filter([
             'PATH'                   => getenv('PATH') ?: '/usr/bin:/bin',
@@ -76,7 +76,7 @@ final class Editor
             'SHERPA_API_KEY'         => $apiUrl === null ? null : 'test',
             'SHERPA_API_MODEL'       => $apiUrl === null ? null : 'fake-chat',
             'SHERPA_BACKEND'         => 'api',
-            'SHERPA_FACT_EXTRACTION' => 'off',
+            'SHERPA_FACT_EXTRACTION' => $facts ? 'on' : 'off',
         ], static fn(?string $value) => $value !== null);
         $this->process = proc_open([PHP_BINARY, dirname(__DIR__) . '/bin/sherpa', 'acp'], [
             0 => ['pipe', 'r'],
@@ -230,6 +230,9 @@ check('session/new opens a session in the project', preg_match('/^\d{8}-\d{6}-[0
 $from = count($editor->updates);
 $reply = $editor->call('session/prompt', ['sessionId' => $session, 'prompt' => [['type' => 'text', 'text' => 'Say hello']]]);
 check('a prompt ends its turn', ($reply['result']['stopReason'] ?? '') === 'end_turn', json_encode($reply));
+$said = $editor->text('agent_thought_chunk', $from);
+check('a new project says, at its first prompt, where its commands run, and how to change it',
+    str_contains($said, 'New project: its commands run on this machine') && str_contains($said, '/project edit'), $said);
 check('with the reply streamed as message chunks', $editor->text('agent_message_chunk', $from) === 'Hello from the fake model.', $editor->text('agent_message_chunk', $from));
 $chunks = $editor->of('agent_message_chunk', $from);
 check('one message id across its chunks', count($chunks) === 2 && $chunks[0]['params']['update']['messageId'] === $chunks[1]['params']['update']['messageId']);
@@ -380,7 +383,9 @@ $reply = $editor->call('session/prompt', ['sessionId' => $session, 'prompt' => [
 check('a cancel ends the turn as cancelled, not as an error', ($reply['result']['stopReason'] ?? '') === 'cancelled', json_encode($reply));
 check('and soon', microtime(true) - $started < 5.0, sprintf('%.1f s', microtime(true) - $started));
 
+$from = count($editor->updates);
 $reply = $editor->call('session/prompt', ['sessionId' => $session, 'prompt' => [['type' => 'text', 'text' => 'Say hello']]]);
+check('said once', !str_contains($editor->text('agent_thought_chunk', $from), 'New project'));
 check('the session goes on after a cancel', ($reply['result']['stopReason'] ?? '') === 'end_turn', json_encode($reply));
 
 // ---- "for this session" is this session's ----------------------------------------------
@@ -442,6 +447,32 @@ $from = count($tabs->updates);
 $tabs->call('session/prompt', ['sessionId' => $tabSession, 'prompt' => [['type' => 'text', 'text' => 'Patch the invoice']]]);
 check('a file the editor cannot give is read from disk', str_starts_with($tabs->text('agent_message_chunk', $from), 'Done: Patched'), $tabs->text('agent_message_chunk', $from));
 $tabs->close();
+
+// ---- what a conversation taught, kept ----------------------------------------------
+// Opening another conversation is when the last one's facts are taken: an
+// editor never says it is over.
+mkdir("{$work}/memory-home", 0777, true);
+$memory = new Editor($work, $api, 'memory-home', facts: true);
+$memory->call('initialize', ['protocolVersion' => 1], 60.0);
+$first = (string) ($memory->call('session/new', ['cwd' => $project, 'mcpServers' => []])['result']['sessionId'] ?? '');
+$memory->call('session/prompt', ['sessionId' => $first, 'prompt' => [['type' => 'text', 'text' => 'Say hello']]]);
+$memory->call('session/prompt', ['sessionId' => $first, 'prompt' => [['type' => 'text', 'text' => 'Say hello again']]]);
+$second = (string) ($memory->call('session/new', ['cwd' => $project, 'mcpServers' => []])['result']['sessionId'] ?? '');
+$from = count($memory->updates);
+$memory->call('session/prompt', ['sessionId' => $second, 'prompt' => [['type' => 'text', 'text' => '/memory']]]);
+check('the facts of a conversation are kept once another opens', str_contains($memory->text('agent_message_chunk', $from), 'test-command: php tests/run.php'),
+    $memory->text('agent_message_chunk', $from));
+
+$slow = (string) ($memory->call('session/new', ['cwd' => $project, 'mcpServers' => []])['result']['sessionId'] ?? '');
+$memory->call('session/prompt', ['sessionId' => $slow, 'prompt' => [['type' => 'text', 'text' => 'Say hello, take your time']]]);
+$memory->call('session/prompt', ['sessionId' => $slow, 'prompt' => [['type' => 'text', 'text' => 'Say hello']]]);
+$next = (string) ($memory->call('session/new', ['cwd' => $project, 'mcpServers' => []])['result']['sessionId'] ?? '');
+$started = microtime(true);
+$from = count($memory->updates);
+$reply = $memory->call('session/prompt', ['sessionId' => $next, 'prompt' => [['type' => 'text', 'text' => 'Say hello']]]);
+check('a prompt sent while facts are taken does not wait for them', microtime(true) - $started < 4.0
+    && $memory->text('agent_message_chunk', $from) === 'Hello from the fake model.', sprintf('%.1f s, %s', microtime(true) - $started, json_encode($reply)));
+$memory->close();
 
 // ---- no model -------------------------------------------------------------------
 $dead = new Editor($work, 'http://127.0.0.1:9/v1');
