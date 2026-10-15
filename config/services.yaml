@@ -54,6 +54,11 @@ parameters:
     # the last time that happened here.
     reply_max_tokens: '%env(int:SHERPA_MAX_TOKENS)%'
 
+    # Where sherpa update looks for releases. Not a setting: what install.sh's
+    # SHERPA_DOWNLOAD_BASE is to it, an update tried against a local copy
+    # without counting as an install.
+    releases_url: !php/const App\Update\Releases::URL
+
 services:
     _defaults:
         autowire: true
@@ -105,6 +110,10 @@ services:
     App\Usage\UsageMeter:
         arguments:
             $cap: '%env(int:SHERPA_MAX_SESSION_TOKENS)%'
+
+    App\Update\Releases:
+        arguments:
+            $url: '%env(default:releases_url:SHERPA_RELEASES_URL)%'
 
     # Everything asks for the interface and gets whichever backend is in
     # force. The command switches it; nothing else knows there are two.

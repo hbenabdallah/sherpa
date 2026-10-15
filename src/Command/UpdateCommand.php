@@ -86,22 +86,30 @@ final class UpdateCommand extends Command
 
         $output->writeln("Downloading Sherpa {$version} for {$platform}…");
 
+        // This process reads its classes from the archive it runs from, as it
+        // needs them — and once replaced, that file is the new release, laid
+        // out differently: a class loaded then comes from the wrong offsets,
+        // source printed and a fatal error after it. So all that is said
+        // afterwards is written out before, while the old file is still there,
+        // and only copied to the screen once the new one is in place.
+        $said = [];
+        $formatter = $output->getFormatter();
         try {
-            $notes = $this->updater->install($version, $platform, $executable);
+            $this->updater->install($version, $platform, $executable, function (?string $notes) use (&$said, $formatter, $version, $executable, $current): void {
+                $lines = ["<info>✓</info> Sherpa {$version} installed in " . OutputFormatter::escape($executable) . " (was {$current})."];
+                if ($notes !== null) {
+                    $lines = [...$lines, '', ...self::shown($notes)];
+                }
+                $said = array_map(fn(string $line) => $formatter->format($line) . "\n", $lines);
+            });
         } catch (UpdateFailed $e) {
             return $this->fail($output, $e->getMessage() . '. Nothing was changed.');
         }
 
-        $output->writeln("<info>✓</info> Sherpa {$version} installed in " . OutputFormatter::escape($executable) . " (was {$current}).");
-        if ($notes !== null) {
-            $output->writeln(['', ...self::shown($notes)]);
-        }
+        $output->write(implode('', $said), false, OutputInterface::OUTPUT_RAW);
 
-        // This process reads its classes from the archive it runs from, as it
-        // needs them — and that file is now the new release, laid out
-        // differently. Carrying on through the console's own teardown loaded
-        // a class from the wrong offsets: source printed, then a fatal error.
-        // Nothing is left to do: stop here, before anything else is loaded.
+        // Nothing is left to do: stop here, before the console's own teardown
+        // loads anything else.
         if ($executable === \Phar::running(false)) {
             exit(Command::SUCCESS);
         }

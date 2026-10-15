@@ -117,6 +117,16 @@ check('fetched from the release, checksum beside it, then its notes',
     $requested === [$base, $base . '.sha256', Releases::URL . '/download/v1.0.2/release-notes.md'], json_encode($requested));
 check('and nothing is left beside it', glob(dirname($target) . '/.sherpa-update-*') === []);
 
+// What is said afterwards is prepared before: once the file is replaced, this
+// process can no longer load a class from it.
+file_put_contents($target, "old sherpa\n");
+$client = serving([$base => $binary, $base . '.sha256' => $sum, Releases::URL . '/download/v1.0.2/release-notes.md' => "- notes\n"]);
+$seen = null;
+(new SelfUpdater($client, new Releases($client)))->install('1.0.2', 'linux-x86_64', $target, function (?string $notes) use (&$seen, $target) {
+    $seen = [$notes, file_get_contents($target)];
+});
+check('the notes are handed over while the old executable is still in place', $seen === ["- notes\n", "old sherpa\n"], json_encode($seen));
+
 /** The reason an install failed, or null when it did not. */
 function refused(MockHttpClient $client, string $target): ?string
 {
