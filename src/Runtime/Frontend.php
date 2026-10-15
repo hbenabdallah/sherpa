@@ -53,6 +53,11 @@ class Frontend implements AgentOutput, Approver
         $this->output->showWaiting($reasoning, $why);
     }
 
+    public function showRunning(string $toolName, float $seconds): void
+    {
+        $this->output->showRunning($toolName, $seconds);
+    }
+
     public function showToolCall(string $toolName, array $args = [], ?string $callId = null): void
     {
         $this->output->showToolCall($toolName, $args, $callId);

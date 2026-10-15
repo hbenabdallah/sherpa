@@ -35,6 +35,10 @@ final class SubagentThoughts implements AgentOutput
     {
     }
 
+    public function showRunning(string $toolName, float $seconds): void
+    {
+    }
+
     public function showToolCall(string $toolName, array $args = [], ?string $callId = null): void
     {
         $this->say('↳ ' . ToolDescriptions::title($toolName, $args));

@@ -51,6 +51,7 @@ final class Recorder implements AgentOutput, Approver
     public function appendToken(string $token): void { $this->seen[] = "token:{$token}"; }
     public function flushBuffer(bool $wasToolCall = false): void { $this->seen[] = 'flush'; }
     public function showWaiting(bool $reasoning = false, ?string $why = null): void {}
+    public function showRunning(string $toolName, float $seconds): void {}
     public function showToolCall(string $toolName, array $args = [], ?string $callId = null): void { $this->seen[] = "call:{$toolName}:{$callId}"; }
     public function showToolResult(string $toolName, string $result, bool $isError = false, ?string $callId = null): void { $this->seen[] = "result:{$toolName}:{$callId}"; }
     public function showInfo(string $message): void { $this->seen[] = "info:{$message}"; }

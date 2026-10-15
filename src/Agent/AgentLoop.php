@@ -68,6 +68,12 @@ class AgentLoop
     private const OUT_OF_TOKENS = 'the token budget of this session is nearly spent';
     private const OUT_OF_STEPS = 'this turn has reached its limit of steps';
 
+    /** Tools that show their own work, or wait on the user: no "running" line over them. */
+    private const SHOW_THEMSELVES = ['delegate', 'plan_ready'];
+
+    /** How long a tool runs before it is said to be running: a read never shows it. */
+    private const QUIET_SECONDS = 1.0;
+
     public function __construct(
         private readonly PlatformInterface $platform,
         private readonly Toolbox $toolbox,
@@ -468,7 +474,7 @@ class AgentLoop
 
         $result = match (true) {
             $this->planMode?->blocks($def) === true => new ToolResult($call->id, PlanMode::BLOCKED, isError: true),
-            $this->permissions->check($call, $def)  => $this->toolbox->execute($call),
+            $this->permissions->check($call, $def)  => $this->execute($call),
             default                                 => new ToolResult($call->id, self::REFUSED, isError: true),
         };
 
@@ -478,6 +484,31 @@ class AgentLoop
         $bag->tool($call->name, $result->content, $call->id);
 
         return $result;
+    }
+
+    /**
+     * Run, said to be running once it takes long enough to wonder. Not for a
+     * sub-agent, which shows its own work, nor a plan waiting on the user.
+     */
+    private function execute(ToolCall $call): ToolResult
+    {
+        if (in_array($call->name, self::SHOW_THEMSELVES, true)) {
+            return $this->toolbox->execute($call);
+        }
+
+        $started = microtime(true);
+        $replaced = $this->interrupt->meanwhile(function () use ($call, $started): void {
+            $seconds = microtime(true) - $started;
+            if ($seconds >= self::QUIET_SECONDS) {
+                $this->chat->showRunning($call->name, $seconds);
+            }
+        });
+
+        try {
+            return $this->toolbox->execute($call);
+        } finally {
+            $this->interrupt->meanwhile($replaced);
+        }
     }
 
     /**

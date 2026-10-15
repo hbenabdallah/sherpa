@@ -27,6 +27,9 @@ interface AgentOutput
      */
     public function showWaiting(bool $reasoning = false, ?string $why = null): void;
 
+    /** A tool has been running for $seconds, and has nothing to show until it ends. */
+    public function showRunning(string $toolName, float $seconds): void;
+
     /** @param array<string, mixed> $args */
     public function showToolCall(string $toolName, array $args = [], ?string $callId = null): void;
 

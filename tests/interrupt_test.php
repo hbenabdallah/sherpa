@@ -133,7 +133,9 @@ final class AfterTool
 
 function loopWith(Interrupt $interrupt, array $tools, array $chunks): array
 {
-    $platform = new OllamaPlatform(new MockHttpClient(new MockResponse($chunks)), 'http://x', 'm', 32768, -1.0, $interrupt);
+    // A list of lists: one response per request of the turn.
+    $responses = is_array($chunks[0] ?? null) ? array_map(fn(array $c) => new MockResponse($c), $chunks) : new MockResponse($chunks);
+    $platform = new OllamaPlatform(new MockHttpClient($responses), 'http://x', 'm', 32768, -1.0, $interrupt);
     $budget = new ContextBudget();
     $broker = new PermissionBroker(
         new SessionPermissions(),
@@ -157,9 +159,9 @@ function loopWith(Interrupt $interrupt, array $tools, array $chunks): array
 
     ob_start();
     $result = $loop->run($bag);
-    ob_end_clean();
+    $shown = (string) ob_get_clean();
 
-    return [$result, $bag];
+    return [$result, $bag, $shown];
 }
 
 $twoCalls = ['{"message":{"role":"assistant","content":"","tool_calls":['
@@ -207,6 +209,44 @@ $calm = new Interrupt();
 [$result, $bag] = loopWith($calm, [], ['{"message":{"content":"salut"},"done":true}']);
 check('an uninterrupted turn is not marked interrupted', !$result->interrupted);
 check('and returns the reply', $result->content === 'salut', $result->content);
+
+// ---- a long tool says it is running ---------------------------------------
+
+/** Waits as a command does: checking for Ctrl+C every 20 ms. */
+#[AsTool(name: 'slow', description: 'Prend son temps', permission: Permission::AUTO)]
+final class SlowTool
+{
+    public function __construct(private readonly Interrupt $interrupt, private readonly float $seconds) {}
+
+    public function __invoke(#[Param('unused')] string $note = ''): string
+    {
+        $until = microtime(true) + $this->seconds;
+        while (microtime(true) < $until && !$this->interrupt->requested()) {
+            usleep(20_000);
+        }
+
+        return 'done';
+    }
+}
+
+$oneCall = [['{"message":{"role":"assistant","content":"","tool_calls":['
+    . '{"function":{"name":"slow","arguments":{"note":"x"}}}'
+    . ']},"done":true}'], ['{"message":{"content":"fini"},"done":true}']];
+
+$waiting = new Interrupt();
+[, , $shown] = loopWith($waiting, [new SlowTool($waiting, 1.3)], $oneCall);
+check('a tool still running after a second is said to be', str_contains($shown, 'slow running… 1 s · Ctrl+C stops it'), Terminal::plain($shown));
+
+$brief = new Interrupt();
+[, , $shown] = loopWith($brief, [new SlowTool($brief, 0.2)], $oneCall);
+check('a quick one is not', !str_contains($shown, 'running…'), Terminal::plain($shown));
+
+$ticks = 0;
+$before = function () use (&$ticks): void { $ticks++; };
+$kept = new Interrupt();
+$kept->meanwhile($before);
+loopWith($kept, [new SlowTool($kept, 0.1)], $oneCall);
+check('what was done meanwhile before the tool is put back after it', $kept->meanwhile(null) === $before);
 
 // ---- cleanup ---------------------------------------------------------------
 if ($realHome !== null) {

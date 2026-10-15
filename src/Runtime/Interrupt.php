@@ -28,6 +28,9 @@ class Interrupt
     private ?\Closure $listen = null;
     private float $listenedAt = 0.0;
 
+    /** @var (\Closure(): void)|null */
+    private ?\Closure $meanwhile = null;
+
     public function install(callable $quit): void
     {
         $this->quit = $quit(...);
@@ -64,8 +67,29 @@ class Interrupt
         $this->listen = $listen;
     }
 
+    /**
+     * What to do at each check while something long runs: a command waits
+     * here every 20 ms, and the screen has nothing else to say it is alive.
+     * Returns the one it replaces, to be put back.
+     *
+     * @param (\Closure(): void)|null $tick
+     *
+     * @return (\Closure(): void)|null
+     */
+    public function meanwhile(?\Closure $tick): ?\Closure
+    {
+        $replaced = $this->meanwhile;
+        $this->meanwhile = $tick;
+
+        return $replaced;
+    }
+
     public function requested(): bool
     {
+        if (!$this->requested && $this->meanwhile !== null) {
+            ($this->meanwhile)();
+        }
+
         // Every chunk of a reply asks: at most fifty times a second is heard
         // soon enough, and costs nothing.
         if (!$this->requested && $this->listen !== null && microtime(true) - $this->listenedAt >= self::LISTEN_SECONDS) {

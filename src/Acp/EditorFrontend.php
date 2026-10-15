@@ -174,6 +174,11 @@ final class EditorFrontend implements AgentOutput, Approver
 
     // ---- the tools --------------------------------------------------------------
 
+    /** The editor shows the tool call as in progress already. */
+    public function showRunning(string $toolName, float $seconds): void
+    {
+    }
+
     public function showToolCall(string $toolName, array $args = [], ?string $callId = null): void
     {
         $id = $callId ?? self::newId('call');

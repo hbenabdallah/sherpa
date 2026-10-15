@@ -219,6 +219,17 @@ class ChatPane implements AgentOutput
         echo "\n";
     }
 
+    /**
+     * A command that runs for minutes — a test suite, a build — left the
+     * screen as still as a hung one. Said with the time it has taken, and how
+     * to stop it.
+     */
+    public function showRunning(string $toolName, float $seconds): void
+    {
+        $name = mb_strimwidth(Terminal::plain($toolName, singleLine: true), 0, 20, '…');
+        $this->showWaiting(why: sprintf('%s running… %d s · Ctrl+C stops it', $name, (int) $seconds));
+    }
+
     public function showToolCall(string $toolName, array $args = [], ?string $callId = null): void
     {
         $this->endWaiting();
@@ -247,6 +258,8 @@ class ChatPane implements AgentOutput
      */
     public function showToolResult(string $toolName, string $result, bool $isError = false, ?string $callId = null): void
     {
+        $this->endWaiting();
+
         if ($toolName === 'todo_write' && !$isError) {
             $this->showPlan($result);
 
