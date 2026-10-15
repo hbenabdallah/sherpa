@@ -7,6 +7,8 @@ use App\Agent\Tool\AsTool;
 use App\Agent\Tool\Param;
 use App\Agent\Tool\Permission;
 use App\Rag\Parser\HtmlParser;
+use App\Runtime\Interrupt;
+use App\Runtime\InterruptibleHttpClient;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -28,6 +30,9 @@ class WebFetchTool
     /** Share of the window one read may take, with a floor and a ceiling. */
     private const SHARE = 0.25;
     private const MIN_CHARS = 8_000;
+
+    /** How often a page arriving slowly is let go of, to hear Ctrl+C. */
+    private const POLL_SECONDS = 0.1;
     private const MAX_CHARS = 60_000;
 
     /** @var array<string, array{type: string, text: string}> pages read this session, for reading on without fetching again */
@@ -39,8 +44,11 @@ class WebFetchTool
         ?HttpClientInterface $http = null,
         private readonly ?ContextBudget $budget = null,
         private readonly HtmlParser $html = new HtmlParser(),
+        // Heard while a slow server makes up its mind, and the wait shown.
+        private readonly ?Interrupt $interrupt = null,
     ) {
-        $this->http = $http ?? HttpClient::create();
+        $http ??= HttpClient::create();
+        $this->http = $interrupt === null ? $http : new InterruptibleHttpClient($http, $interrupt);
     }
 
     public function __invoke(
@@ -111,12 +119,26 @@ class WebFetchTool
                 $url = $next;
             }
 
+            // stream() ends at each silence: asked again until the page is in.
             $body = '';
-            foreach ($this->http->stream($response) as $chunk) {
-                $body .= $chunk->getContent();
-                if (strlen($body) > self::MAX_BYTES) {
-                    $response->cancel();
-                    break;
+            for ($more = true; $more;) {
+                $more = false;
+                foreach ($this->http->stream($response, self::POLL_SECONDS) as $chunk) {
+                    if ($chunk->isTimeout()) {
+                        if ($this->interrupt?->requested()) {
+                            $response->cancel();
+
+                            throw new \RuntimeException("{$url}: interrupted by the user.");
+                        }
+                        $more = true;
+                        break;
+                    }
+
+                    $body .= $chunk->getContent();
+                    if (strlen($body) > self::MAX_BYTES) {
+                        $response->cancel();
+                        break;
+                    }
                 }
             }
             $type = strtolower(trim(explode(';', $response->getHeaders(false)['content-type'][0] ?? 'text/plain')[0]));

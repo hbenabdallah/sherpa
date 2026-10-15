@@ -21,6 +21,7 @@
  *   protoerror  answers tools/call with a JSON-RPC error, having logged a token
  *   env         answers tools/call with the environment it was started with
  *   templates   offers resource templates, and no resource listed
+ *   slow        takes five seconds over every tools/call
  */
 
 $protocol = require __DIR__ . '/mcp_protocol.php';
@@ -73,6 +74,10 @@ while (($line = fgets(STDIN)) !== false) {
             'content' => [['type' => 'text', 'text' => json_encode(getenv())]],
         ]]);
         continue;
+    }
+
+    if ($mode === 'slow' && $method === 'tools/call') {
+        sleep(5);
     }
 
     $answer = $protocol->answer($request, $mode);

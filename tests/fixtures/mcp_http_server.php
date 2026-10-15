@@ -15,6 +15,7 @@
  *   /mcp/protoerror  answers tools/call with a JSON-RPC error
  *   /mcp/http500     answers the handshake with a server error
  *   /mcp/unauth      demands an Authorization header, and says so
+ *   /mcp/slow        takes five seconds over every tools/call
  */
 
 $protocol = require __DIR__ . '/mcp_protocol.php';
@@ -53,6 +54,10 @@ if (!is_array($request)) {
     http_response_code(400);
 
     return;
+}
+
+if ($mode === 'slow' && ($request['method'] ?? '') === 'tools/call') {
+    sleep(5);
 }
 
 $answer = $protocol->answer($request, $mode);

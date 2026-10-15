@@ -18,7 +18,9 @@ The reply streams to the terminal as it is generated. Three things end a turn
 early:
 
 - **Ctrl+C.** The partial reply is not kept, because it may be half a tool
-  call.
+  call. It also stops a tool still running: a command, a page being fetched,
+  a call to an MCP server (which is not told, and finishes on its own). A
+  tool that runs for more than a second says so, with the time it has taken.
 - **Repetition.** The model makes the same calls with the same arguments three
   turns in a row. At that point it is going in circles, and more turns will not
   tell it anything new. If it wrote a reply along the way, that reply is kept as

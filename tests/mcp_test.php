@@ -11,6 +11,7 @@ use App\Agent\Tool\Toolbox;
 use App\Agent\Tool\ToolCall;
 use App\Agent\Tool\Permission;
 use App\Mcp\McpClient;
+use App\Runtime\Interrupt;
 use App\Mcp\McpConfig;
 use App\Mcp\McpException;
 use App\Mcp\McpRegistry;
@@ -417,6 +418,36 @@ function freePort(): int
     return $port;
 }
 
+/** A call cut short by Ctrl+C a second in, as the user would. */
+function interruptedCall(McpClient $client): array
+{
+    $interrupt = $GLOBALS['interrupt'];
+    $client->listTools();
+    $interrupt->beginTurn();
+    $ticks = 0;
+    $interrupt->meanwhile(function () use (&$ticks) { $ticks++; });
+    pcntl_async_signals(true);
+    pcntl_signal(SIGALRM, fn() => $interrupt->request());
+    pcntl_alarm(1);
+    $started = microtime(true);
+    try {
+        $client->callTool('echo', ['text' => 'x']);
+        $said = 'answered';
+    } catch (Throwable $e) {
+        $said = $e->getMessage();
+    }
+    $seconds = microtime(true) - $started;
+    $interrupt->meanwhile(null);
+    $interrupt->endTurn();
+    $client->close();
+
+    return ['seconds' => round($seconds, 2), 'said' => $said, 'ticks' => $ticks];
+}
+
+$slow = interruptedCall(McpClient::for(server('slow'), 5.0, 30.0, $GLOBALS['interrupt'] = new Interrupt()));
+check('Ctrl+C stops a slow MCP call at once', $slow['seconds'] < 3 && str_contains($slow['said'], 'Interrupted'), json_encode($slow));
+check('the wait for it was heard throughout', $slow['ticks'] > 5, json_encode($slow));
+
 $port = freePort();
 $httpServer = proc_open(
     [PHP_BINARY, '-S', "127.0.0.1:{$port}", dirname(__DIR__) . '/tests/fixtures/mcp_http_server.php'],
@@ -463,6 +494,11 @@ $threw = false;
 try { $unauth->listTools(); } catch (McpException $e) { $threw = true; $message = $e->getMessage(); }
 check('a server that refuses the call is reported', $threw, $message ?? '');
 $unauth->close();
+
+// Ctrl+C reaches a server that takes its time, and the wait is shown meanwhile.
+$slowHttp = interruptedCall(McpClient::for(new ServerConfig(name: 'distant', url: $base . '/slow'), 5.0, 30.0, $GLOBALS['interrupt'] = new Interrupt()));
+check('Ctrl+C stops a slow call over HTTP at once', $slowHttp['seconds'] < 3 && str_contains($slowHttp['said'], 'Interrupted'), json_encode($slowHttp));
+check('the wait for it was heard throughout', $slowHttp['ticks'] > 5, json_encode($slowHttp));
 
 $authed = McpClient::for(
     new ServerConfig(name: 'distant', url: $base . '/unauth', headers: ['Authorization' => 'Bearer jeton-de-test']),

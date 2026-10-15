@@ -20,11 +20,18 @@ final class Lanes
         self::$numbers[$fiber] = $number;
     }
 
+    /** The number of the sub-agent the current code works for, or null outside one running beside others. */
+    public static function number(): ?int
+    {
+        $fiber = \Fiber::getCurrent();
+
+        return $fiber === null ? null : self::$numbers[$fiber] ?? null;
+    }
+
     /** "[2] ", or nothing outside sub-agents running together. */
     public static function prefix(): string
     {
-        $fiber = \Fiber::getCurrent();
-        $number = $fiber === null ? null : self::$numbers[$fiber] ?? null;
+        $number = self::number();
 
         return $number === null ? '' : "[{$number}] ";
     }

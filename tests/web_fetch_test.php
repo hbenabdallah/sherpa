@@ -6,6 +6,7 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 
 use App\Agent\Tool\Permission;
 use App\Agent\Tool\Toolbox;
+use App\Runtime\Interrupt;
 use App\Tool\WebFetchTool;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
@@ -112,6 +113,37 @@ check('a long page is cut, with where to read on', preg_match('/call web_fetch w
 $second = $fetch('https://example.test/long', (int) ($m[1] ?? 0));
 check('reading on starts where the first part stopped', str_contains($second, 'from ' . number_format((int) ($m[1] ?? 0))), substr($second, 0, 160));
 check('without fetching the page again', $requests - $before === 1, (string) ($requests - $before));
+
+// ---- a slow server, listened to ----------------------------------------------
+$port = 20000 + (getmypid() + 11) % 10000;
+$server = proc_open([PHP_BINARY, '-S', "127.0.0.1:{$port}", __DIR__ . '/fixtures/slow_page.php'], [1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes);
+for ($i = 0; $i < 50 && @fsockopen('127.0.0.1', $port) === false; $i++) {
+    usleep(100_000);
+}
+
+$interrupt = new Interrupt();
+$ticks = 0;
+$interrupt->meanwhile(function () use (&$ticks) { $ticks++; });
+$slow = new WebFetchTool(interrupt: $interrupt);
+$page = $slow("http://127.0.0.1:{$port}/pause");
+check('a page that pauses halfway is read whole', str_contains($page, 'first half, second half'), $page);
+check('and the pause was listened through', $ticks > 5, (string) $ticks);
+
+$interrupt->beginTurn();
+pcntl_async_signals(true);
+pcntl_signal(SIGALRM, fn() => $interrupt->request());
+pcntl_alarm(1);
+$started = microtime(true);
+try {
+    $slow("http://127.0.0.1:{$port}/silent");
+    $said = 'answered';
+} catch (RuntimeException $e) {
+    $said = $e->getMessage();
+}
+$took = microtime(true) - $started;
+check('Ctrl+C stops a fetch the server is silent on, at once', $took < 3 && str_contains($said, 'Interrupted'), sprintf('%.1f s: %s', $took, $said));
+$interrupt->endTurn();
+proc_terminate($server);
 
 // ---- asked for, every time ------------------------------------------------------
 $def = (new Toolbox([$fetch]))->find('web_fetch');

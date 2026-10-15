@@ -12,10 +12,12 @@ use Mcp\Client\Transport\StdioTransport;
  * request is written to a pipe nobody reads, PHP prints a "Broken pipe" notice
  * over the user's screen, and the call then waits out its whole timeout for an
  * answer that cannot come. Here the failed write is the news, and it arrives as
- * ServerGone, at once.
+ * ServerGone, at once. Its waits hear Ctrl+C, as Listens says.
  */
 final class ServerProcess extends StdioTransport
 {
+    use Listens;
+
     public function send(string $data): void
     {
         set_error_handler(static function (int $severity, string $message): never {

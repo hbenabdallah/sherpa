@@ -5,6 +5,7 @@ namespace App\Mcp;
 use App\Agent\Tool\Permission;
 use App\Agent\Tool\Toolbox;
 use App\Agent\Tool\ToolDefinition;
+use App\Runtime\Interrupt;
 
 /**
  * Brings the configured MCP servers into the session: their tools and a reader
@@ -57,6 +58,7 @@ class McpRegistry
         private readonly McpConfig $config,
         private readonly float $handshakeTimeout = 15.0,
         private readonly float $callTimeout = 120.0,
+        private readonly ?Interrupt $interrupt = null,
     ) {}
 
     public function load(Toolbox $toolbox): void
@@ -150,7 +152,7 @@ class McpRegistry
 
     private function register(ServerConfig $server, Toolbox $toolbox): string
     {
-        $client = McpClient::for($server, $this->handshakeTimeout, $this->callTimeout);
+        $client = McpClient::for($server, $this->handshakeTimeout, $this->callTimeout, $this->interrupt);
         $this->clients[$server->name] = $client;
         $this->toolNames[$server->name] = [];
 

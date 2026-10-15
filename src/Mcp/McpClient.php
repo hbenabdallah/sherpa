@@ -2,8 +2,9 @@
 
 namespace App\Mcp;
 
+use App\Runtime\Interrupt;
+use App\Runtime\InterruptibleHttpClient;
 use Mcp\Client as Sdk;
-use Mcp\Client\Transport\HttpTransport;
 use Mcp\Client\Transport\TransportInterface;
 use Mcp\Exception\ExceptionInterface as SdkException;
 use Mcp\Schema\Content\AudioContent;
@@ -55,13 +56,15 @@ final class McpClient
         public readonly ServerConfig $config,
         private readonly float $handshakeTimeout = 15.0,
         private readonly float $callTimeout = 120.0,
+        // Heard while a server works, and the wait shown.
+        private readonly ?Interrupt $interrupt = null,
     ) {
         $this->log = new ServerLog();
     }
 
-    public static function for(ServerConfig $config, float $handshakeTimeout = 15.0, float $callTimeout = 120.0): self
+    public static function for(ServerConfig $config, float $handshakeTimeout = 15.0, float $callTimeout = 120.0, ?Interrupt $interrupt = null): self
     {
-        return new self($config, $handshakeTimeout, $callTimeout);
+        return new self($config, $handshakeTimeout, $callTimeout, $interrupt);
     }
 
     public function connect(): void
@@ -383,13 +386,13 @@ final class McpClient
             );
         }
 
-        return new ServerProcess(
+        return (new ServerProcess(
             command: $this->config->command,
             args: $this->config->args,
             cwd: null,
             env: $this->config->env + $this->inheritedEnv(),
             logger: $this->log,
-        );
+        ))->listenTo($this->interrupt);
     }
 
     /**
@@ -397,18 +400,21 @@ final class McpClient
      * whatever php-http/discovery finds: a transport that depends on which
      * packages happen to be installed works on one machine.
      */
-    private function http(): HttpTransport
+    private function http(): RemoteServer
     {
         $factory = new Psr17Factory();
+        // The SDK sends and waits for the answer in one call: the client
+        // itself has to listen while the server takes its time.
+        $client = $this->interrupt === null ? HttpClient::create() : new InterruptibleHttpClient(HttpClient::create(), $this->interrupt);
 
-        return new HttpTransport(
+        return (new RemoteServer(
             endpoint: $this->config->url,
             headers: $this->config->headers,
-            httpClient: new Psr18Client(HttpClient::create(), $factory, $factory),
+            httpClient: new Psr18Client($client, $factory, $factory),
             requestFactory: $factory,
             streamFactory: $factory,
             logger: $this->log,
-        );
+        ))->listenTo($this->interrupt);
     }
 
     /**

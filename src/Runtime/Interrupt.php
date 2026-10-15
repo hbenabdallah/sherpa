@@ -2,6 +2,8 @@
 
 namespace App\Runtime;
 
+use App\Agent\Lanes;
+
 /**
  * Ctrl+C, scoped to the turn rather than to the process: inference is unbounded
  * here, and exiting on SIGINT made "this is taking too long" and "throw the
@@ -94,7 +96,9 @@ class Interrupt
      */
     public function requested(): bool
     {
-        if (\Fiber::getCurrent() !== null) {
+        // Only a sub-agent's: a Fiber of the MCP SDK, waiting on its own
+        // answer, would be resumed with nothing.
+        if (Lanes::number() !== null) {
             \Fiber::suspend();
         }
 
@@ -119,7 +123,7 @@ class Interrupt
      */
     public static function poll(float $seconds): float
     {
-        return \Fiber::getCurrent() === null ? $seconds : min($seconds, self::FIBER_POLL_SECONDS);
+        return Lanes::number() === null ? $seconds : min($seconds, self::FIBER_POLL_SECONDS);
     }
 
     /** Raise cancellation without a signal — used by callers and by tests. */

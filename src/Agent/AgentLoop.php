@@ -591,7 +591,7 @@ class AgentLoop
     private function execute(ToolCall $call): ToolResult
     {
         // In a Fiber, beside others: the line would be theirs as much as its own.
-        if (in_array($call->name, self::SHOW_THEMSELVES, true) || \Fiber::getCurrent() !== null) {
+        if (in_array($call->name, self::SHOW_THEMSELVES, true) || Lanes::number() !== null) {
             return $this->toolbox->execute($call);
         }
 
