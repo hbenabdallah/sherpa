@@ -27,6 +27,9 @@ final class ContextBudget
     /** Per-message overhead for chat-template markers (<|im_start|>role etc.). */
     private const MESSAGE_OVERHEAD_TOKENS = 5;
 
+    /** What an image costs, as providers bill a screenshot: its base64 is no measure of it. */
+    private const IMAGE_TOKENS = 1600;
+
     private float $charsPerToken = self::INITIAL_CHARS_PER_TOKEN;
     private int $calibrations = 0;
     private ?int $lastMeasured = null;
@@ -113,6 +116,7 @@ final class ContextBudget
         foreach ($messages as $message) {
             $total += self::MESSAGE_OVERHEAD_TOKENS;
             $total += $this->estimateText((string) ($message['content'] ?? ''));
+            $total += count($message['images'] ?? []) * self::IMAGE_TOKENS;
 
             // Tool calls travel as JSON and are far from free.
             if (!empty($message['tool_calls'])) {

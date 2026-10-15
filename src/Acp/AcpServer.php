@@ -47,6 +47,9 @@ final class AcpServer
 {
     private const PROTOCOL_VERSION = 1;
 
+    /** Conversations per page of session/list. */
+    private const LIST_PAGE = 50;
+
     /**
      * Setting Sherpa up is answering questions in a terminal — the provider,
      * its key, the model — which an editor runs for its user: ACP's terminal
@@ -190,6 +193,7 @@ final class AcpServer
                 'authenticate'              => [],
                 'session/new'               => $this->newSession($params),
                 'session/load'              => $this->loadSession($params),
+                'session/list'              => $this->listSessions($params),
                 'session/prompt'            => $this->prompt($params),
                 'session/set_mode'          => $this->setMode($params),
                 'session/set_config_option' => $this->setConfigOption($params),
@@ -238,8 +242,10 @@ final class AcpServer
             'protocolVersion'   => self::PROTOCOL_VERSION,
             'agentCapabilities' => [
                 'loadSession'        => true,
-                'promptCapabilities' => ['image' => false, 'audio' => false, 'embeddedContext' => true],
+                'promptCapabilities' => ['image' => true, 'audio' => false, 'embeddedContext' => true],
                 'mcpCapabilities'    => ['http' => true, 'sse' => false],
+                // The terminal's conversations too: the editor's history picks them up.
+                'sessionCapabilities' => ['list' => new \stdClass()],
             ],
             'agentInfo'   => ['name' => 'sherpa', 'title' => 'Sherpa', 'version' => Version::current()],
             'authMethods' => $this->setupMethods(),
@@ -337,6 +343,7 @@ final class AcpServer
         $session = new AcpSession($id, $this->working->project()->path, $bag);
         $session->cursor = $this->sessions->cursor();
         $session->excerpts = $saved->excerpts;
+        $session->title = $saved->title;
         $session->profile = $this->chosen ?? $this->model->profile();
         $this->open[$id] = $session;
         $this->makeCurrent($session);
@@ -347,6 +354,54 @@ final class AcpServer
         $this->then[] = fn() => $this->rememberFacts($session);
 
         return $this->settings($session);
+    }
+
+    /**
+     * The conversations kept for a project — the terminal's and the editor's
+     * alike — or for every project Sherpa knows, the most recent first.
+     *
+     * @param array<string, mixed> $params
+     *
+     * @return array<string, mixed>
+     */
+    private function listSessions(array $params): array
+    {
+        $projects = $this->projects->all();
+        if (($params['cwd'] ?? null) !== null) {
+            try {
+                $project = $this->projects->forDirectory($this->directoryOf($params['cwd']));
+            } catch (AcpError) {
+                $project = null;
+            }
+            $projects = $project === null ? [] : [$project];
+        }
+
+        $sessions = [];
+        foreach ($projects as $project) {
+            // A store of its own: the one the turns use stays where it is.
+            $store = new SessionStore();
+            $store->bind($project);
+            foreach ($store->all() as $saved) {
+                $sessions[] = [
+                    'sessionId' => $saved->id,
+                    'cwd'       => $project->path,
+                    'title'     => $saved->title,
+                    'updatedAt' => $saved->updatedAt->format(\DateTimeInterface::ATOM),
+                    'at'        => $saved->updatedAt,
+                ];
+            }
+        }
+
+        usort($sessions, static fn(array $a, array $b) => $b['at'] <=> $a['at']);
+
+        $offset = is_string($params['cursor'] ?? null) && ctype_digit($params['cursor']) ? (int) $params['cursor'] : 0;
+        $page = array_map(static function (array $session): array {
+            unset($session['at']);
+
+            return $session;
+        }, array_slice($sessions, $offset, self::LIST_PAGE));
+
+        return ['sessions' => $page] + (count($sessions) > $offset + self::LIST_PAGE ? ['nextCursor' => (string) ($offset + self::LIST_PAGE)] : []);
     }
 
     /**
@@ -506,8 +561,11 @@ final class AcpServer
         $session = $this->session($params);
         $id = $session->id;
 
-        $text = PromptText::from(is_array($params['prompt'] ?? null) ? $params['prompt'] : [], $session->directory);
-        if (trim($text) === '') {
+        $blocks = is_array($params['prompt'] ?? null) ? $params['prompt'] : [];
+        $sees = $this->config->seesImages($session->profile);
+        $text = PromptText::from($blocks, $session->directory, $sees);
+        $images = $sees ? PromptText::images($blocks) : [];
+        if (trim($text) === '' && $images === []) {
             throw AcpError::invalidParams('The prompt is empty.');
         }
 
@@ -545,7 +603,7 @@ final class AcpServer
         }
 
         $planning = $this->planMode->isActive();
-        $session->bag->user($this->planMode->frame($text));
+        $session->bag->user($this->planMode->frame($text), $images);
 
         $this->running = $id;
         $this->interrupt->beginTurn();
@@ -566,6 +624,13 @@ final class AcpServer
             $this->interrupt->endTurn();
             $this->running = null;
             $this->save($session);
+        }
+
+        // Named after its first request, once saved: the editor's history shows it.
+        $title = $this->sessions->cursor()[2];
+        if (is_string($title) && $title !== '' && $title !== $session->title) {
+            $session->title = $title;
+            $this->update($session, ['sessionUpdate' => 'session_info_update', 'title' => $title, 'updatedAt' => (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM)]);
         }
 
         // A plan approved ends plan mode: the editor's menu follows.

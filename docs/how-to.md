@@ -33,7 +33,11 @@ tools, same project memory and saved conversations — with the editor's own vie
 - a file open in a tab is read and edited as you see it, unsaved changes
   included, when the editor offers that;
 - stopping a turn in the editor stops it, a running command included;
-- a conversation from the editor's history is picked back up where it was left;
+- the editor's history lists the project's conversations, those of the
+  terminal included, and picks one back up where it was left;
+- a screenshot pasted in the prompt goes to the model with it, when the model
+  reads images (PNG, JPEG, GIF, WebP, 5 MB at most); the conversation is saved
+  without it;
 - "/" offers the commands that ask nothing (`/compact`, `/memory`, `/docs`,
   `/plan`…), the skills and the MCP servers' prompts, as in the terminal;
   `/help` lists them. Those that ask questions — `/provider`, `/mcp add` — are

@@ -92,9 +92,9 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
     }
 
     /**
-     * The history, in the one respect where PHP and Ollama's decoder disagree:
-     * a call with no arguments holds [], which json_encode writes as a list
-     * where the decoder wants an object. Only that field is touched.
+     * The history, in the two respects where Ollama's format differs: a call
+     * with no arguments holds [], which json_encode writes as a list where the
+     * decoder wants an object; and images are bare base64.
      *
      * @param array<int, array<string, mixed>> $messages
      *
@@ -103,6 +103,11 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
     private function wireMessages(array $messages): array
     {
         foreach ($messages as $i => $message) {
+            // Ollama takes a message's images as bare base64.
+            if (!empty($message['images'])) {
+                $messages[$i]['images'] = array_column($message['images'], 'data');
+            }
+
             foreach ($message['tool_calls'] ?? [] as $j => $call) {
                 if (($call['function']['arguments'] ?? null) === []) {
                     $messages[$i]['tool_calls'][$j]['function']['arguments'] = new \stdClass();

@@ -75,7 +75,8 @@ Sherpa répond dans la langue de votre question ; son interface est en anglais.
   PhpStorm et les autres IDE JetBrains, ou tout client de l'Agent Client
   Protocol — modifications approuvées depuis la vue de diff de l'éditeur,
   fichiers ouverts dans un onglet modifiés tels que vous les voyez, modèle et
-  mode plan dans les menus de l'éditeur, commandes et skills sous « / »
+  mode plan dans les menus de l'éditeur, commandes et skills sous « / »,
+  conversations du terminal dans l'historique de l'éditeur, captures d'écran
   ([mise en place](docs/how-to.md#use-sherpa-in-your-editor-zed-jetbrains)).
 
 ## Démarrage rapide

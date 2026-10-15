@@ -26,6 +26,9 @@ final class AcpSession
     /** Messages its facts were last taken from: grown past it, it has more to give. */
     public int $remembered = 0;
 
+    /** The title the editor was given for it: said once the conversation has one. */
+    public ?string $title = null;
+
     /** @var list<string> tools allowed "for this session": this one, not every thread of the editor */
     public array $grants = [];
 

@@ -153,8 +153,15 @@ final class AnthropicWire
                 continue;
             }
 
+            $blocks = [];
+            foreach ($message['images'] ?? [] as $image) {
+                $blocks[] = ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => $image['mimeType'], 'data' => $image['data']]];
+            }
             if (trim($content) !== '') {
-                self::append($turns, 'user', [['type' => 'text', 'text' => $content]]);
+                $blocks[] = ['type' => 'text', 'text' => $content];
+            }
+            if ($blocks !== []) {
+                self::append($turns, 'user', $blocks);
             }
         }
 

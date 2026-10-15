@@ -230,6 +230,8 @@ check('session/new opens a session in the project', preg_match('/^\d{8}-\d{6}-[0
 $from = count($editor->updates);
 $reply = $editor->call('session/prompt', ['sessionId' => $session, 'prompt' => [['type' => 'text', 'text' => 'Say hello']]]);
 check('a prompt ends its turn', ($reply['result']['stopReason'] ?? '') === 'end_turn', json_encode($reply));
+$info = $editor->of('session_info_update', $from)[0]['params']['update'] ?? [];
+check('the conversation is named after its first request', ($info['title'] ?? '') === 'Say hello', json_encode($info));
 $said = $editor->text('agent_thought_chunk', $from);
 check('a new project says, at its first prompt, where its commands run, and how to change it',
     str_contains($said, 'New project: its commands run on this machine') && str_contains($said, '/project edit'), $said);
@@ -238,6 +240,19 @@ $chunks = $editor->of('agent_message_chunk', $from);
 check('one message id across its chunks', count($chunks) === 2 && $chunks[0]['params']['update']['messageId'] === $chunks[1]['params']['update']['messageId']);
 $usage = $editor->of('usage_update', $from);
 check('and how full the context is, after the turn', count($usage) === 1 && $usage[0]['params']['update']['size'] > 0 && $usage[0]['params']['update']['used'] > 0, json_encode($usage));
+
+// ---- an image -----------------------------------------------------------------------
+check('Sherpa says it takes images', ($init['result']['agentCapabilities']['promptCapabilities']['image'] ?? false) === true);
+$png = base64_encode((string) hex2bin('89504e470d0a1a0a0000000d49484452'));
+$from = count($editor->updates);
+$editor->call('session/prompt', ['sessionId' => $session, 'prompt' => [
+    ['type' => 'text', 'text' => 'What is on this screenshot?'],
+    ['type' => 'image', 'mimeType' => 'image/png', 'data' => $png],
+]]);
+check('an image goes to the model with the text', $editor->text('agent_message_chunk', $from) === 'Saw 1 image(s) with: What is on this screenshot?', $editor->text('agent_message_chunk', $from));
+$files = array_filter(glob("{$work}/home/.config/sherpa/projects/*/sessions/*.json") ?: [], static fn(string $f) => str_contains((string) file_get_contents($f), 'screenshot'));
+$kept = (string) file_get_contents((string) reset($files));
+check('the conversation is saved without the image\'s data, saying one was there', $files !== [] && !str_contains($kept, $png) && str_contains($kept, 'an image was attached here'), implode(', ', $files));
 
 // ---- an edit, allowed -------------------------------------------------------------
 $from = count($editor->updates);
@@ -407,6 +422,15 @@ check('a prompt to a session that does not exist is refused',
     ($editor->call('session/prompt', ['sessionId' => 'nope', 'prompt' => [['type' => 'text', 'text' => 'x']]])['error']['code'] ?? 0) === -32002);
 
 check('nothing but JSON-RPC messages on stdout', $editor->stray === [], implode("\n", $editor->stray));
+// ---- the conversations kept, listed -----------------------------------------------------
+check('Sherpa says it lists its conversations', isset($init['result']['agentCapabilities']['sessionCapabilities']['list']), json_encode($init['result']['agentCapabilities'] ?? null));
+$listed = array_column($editor->call('session/list', ['cwd' => $project])['result']['sessions'] ?? [], null, 'sessionId');
+check('the project\'s conversations are listed, named, in the project', ($listed[$session]['title'] ?? '') === 'Say hello'
+    && ($listed[$session]['cwd'] ?? '') === $project && isset($listed[$other]), json_encode($listed));
+check('with when they last moved', strtotime((string) ($listed[$session]['updatedAt'] ?? '')) > time() - 600);
+check('every project\'s, with no directory given', isset(array_column($editor->call('session/list', [])['result']['sessions'] ?? [], null, 'sessionId')[$session]));
+check('none for a directory Sherpa does not know', ($editor->call('session/list', ['cwd' => "{$work}/blank"])['result']['sessions'] ?? null) === []);
+
 $editor->close();
 
 // ---- loaded back in a new process --------------------------------------------------

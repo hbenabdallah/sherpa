@@ -302,5 +302,12 @@ try {
 }
 check('no embedding model, said the way detection understands', $threw);
 
+// An image travels before its text, as a base64 source.
+$seen = AnthropicWire::payload('m', [['role' => 'user', 'content' => 'What is this?', 'images' => [['mimeType' => 'image/png', 'data' => 'iVBO']]]], [], 1000)['messages'];
+check('an image goes as a base64 block before its text', ($seen[0]['content'] ?? null) === [
+    ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => 'image/png', 'data' => 'iVBO']],
+    ['type' => 'text', 'text' => 'What is this?'],
+], json_encode($seen));
+
 printf("\n%d passed, %d failed\n", $pass, $fail);
 exit($fail === 0 ? 0 : 1);

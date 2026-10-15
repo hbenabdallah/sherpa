@@ -591,5 +591,9 @@ if ($realHome !== null) {
 }
 exec('rm -rf ' . escapeshellarg($home));
 
+// Ollama takes images as bare base64 on the message.
+$wire = (new ReflectionMethod(OllamaPlatform::class, 'wireMessages'))->invoke($local, [['role' => 'user', 'content' => 'Look', 'images' => [['mimeType' => 'image/png', 'data' => 'iVBO']]]]);
+check('Ollama gets an image as bare base64', ($wire[0]['images'] ?? null) === ['iVBO'], json_encode($wire));
+
 printf("\n%d passed, %d failed\n", $pass, $fail);
 exit($fail === 0 ? 0 : 1);

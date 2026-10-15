@@ -413,5 +413,9 @@ for ($i = 0; $i < 8; $i++) {
 check('with no store, the stub still says to re-run the tool',
     str_contains(json_encode($lossyBag->all(), JSON_UNESCAPED_UNICODE), 'Call the tool again'));
 
+$withImage = $b->estimateMessages([['role' => 'user', 'content' => 'Look', 'images' => [['mimeType' => 'image/png', 'data' => str_repeat('A', 400000)]]]]);
+$without = $b->estimateMessages([['role' => 'user', 'content' => 'Look']]);
+check('an image counts as providers bill it, not as its base64', $withImage - $without === 1600, (string) ($withImage - $without));
+
 printf("\n%d passed, %d failed\n", $pass, $fail);
 exit($fail === 0 ? 0 : 1);

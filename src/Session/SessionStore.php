@@ -140,9 +140,9 @@ final class SessionStore
             return false;
         }
 
-        $conversation = array_values(array_filter(
-            $messages,
-            static fn(array $m) => ($m['role'] ?? '') !== 'system',
+        $conversation = array_values(array_map(
+            self::withoutImages(...),
+            array_filter($messages, static fn(array $m) => ($m['role'] ?? '') !== 'system'),
         ));
 
         $title = $this->title ?? $this->title($conversation);
@@ -257,6 +257,27 @@ final class SessionStore
         $file = $this->file($id);
 
         return is_file($file) ? $this->read($file) : null;
+    }
+
+    /**
+     * An image's base64 is megabytes, and a file every save rewrites:
+     * where one was is said, and the image itself is not kept.
+     *
+     * @param array<string, mixed> $message
+     *
+     * @return array<string, mixed>
+     */
+    private static function withoutImages(array $message): array
+    {
+        if (empty($message['images'])) {
+            return $message;
+        }
+
+        $count = count($message['images']);
+        $message['content'] = rtrim((string) ($message['content'] ?? '')) . "\n\n(" . ($count > 1 ? "{$count} images were" : 'an image was') . ' attached here; it is not kept)';
+        unset($message['images']);
+
+        return $message;
     }
 
     public function directory(): ?string

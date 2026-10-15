@@ -51,8 +51,16 @@ $embedded = PromptText::from([
     ['type' => 'resource', 'resource' => ['uri' => 'file:///work/shop/a.php', 'text' => "<?php\necho 1;\n"]],
 ], '/work/shop');
 check('a file sent whole is given whole, after the request', $embedded === "Explain this\n\n<file path=\"a.php\">\n<?php\necho 1;\n</file>", $embedded);
-check('an image is said to be unreadable rather than dropped',
-    str_contains(PromptText::from([['type' => 'text', 'text' => 'Look'], ['type' => 'image', 'mimeType' => 'image/png', 'data' => 'xx']], '/w'), 'cannot read'));
+$png = base64_encode((string) hex2bin('89504e470d0a1a0a'));
+$look = [['type' => 'text', 'text' => 'Look'], ['type' => 'image', 'mimeType' => 'image/png', 'data' => $png]];
+check('an image goes with the text to a model that sees', PromptText::from($look, '/w', seesImages: true) === 'Look'
+    && PromptText::images($look) === [['mimeType' => 'image/png', 'data' => $png]]);
+check('to one that does not, it is said to be there rather than dropped',
+    str_contains(PromptText::from($look, '/w'), 'an image was attached, which this model cannot see'));
+$tiff = [['type' => 'image', 'mimeType' => 'image/tiff', 'data' => $png]];
+check('a type providers refuse is not sent, and said', PromptText::images($tiff) === [] && str_contains(PromptText::from($tiff, '/w', true), 'image/tiff'));
+$huge = [['type' => 'image', 'mimeType' => 'image/png', 'data' => base64_encode(str_repeat('x', 6 * 1024 * 1024))]];
+check('nor one past 5 MB', PromptText::images($huge) === [] && str_contains(PromptText::from($huge, '/w', true), '6.0 MB'));
 
 // ---- titles and kinds -------------------------------------------------------------------
 check('a command is titled by itself', ToolDescriptions::title('shell_exec', ['command' => 'make test']) === 'make test');

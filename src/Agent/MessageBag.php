@@ -18,9 +18,12 @@ class MessageBag
         array_unshift($this->messages, ['role' => 'system', 'content' => $content]);
     }
 
-    public function user(string $content): void
+    /**
+     * @param list<array{mimeType: string, data: string}> $images base64, sent with the text to a model that sees
+     */
+    public function user(string $content, array $images = []): void
     {
-        $this->messages[] = ['role' => 'user', 'content' => $content];
+        $this->messages[] = ['role' => 'user', 'content' => $content] + ($images === [] ? [] : ['images' => $images]);
     }
 
     public function assistant(string $content, ?array $toolCalls = null): void

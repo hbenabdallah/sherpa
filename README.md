@@ -72,7 +72,8 @@ Sherpa answers in the language of your question; its interface is in English.
   other JetBrains IDEs, or any client of the Agent Client Protocol — edits
   approved from the editor's diff view, files open in a tab edited as you see
   them, the model and plan mode in the editor's menus, the commands and skills
-  under "/" ([set it up](docs/how-to.md#use-sherpa-in-your-editor-zed-jetbrains)).
+  under "/", the terminal's conversations in the editor's history, screenshots
+  ([set it up](docs/how-to.md#use-sherpa-in-your-editor-zed-jetbrains)).
 
 ## Quick start
 

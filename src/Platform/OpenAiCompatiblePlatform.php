@@ -804,6 +804,14 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
 
             $out = ['role' => $role, 'content' => (string) ($message['content'] ?? '')];
 
+            // Images ride with the text as parts of one content.
+            if (!empty($message['images'])) {
+                $out['content'] = [['type' => 'text', 'text' => $out['content']]];
+                foreach ($message['images'] as $image) {
+                    $out['content'][] = ['type' => 'image_url', 'image_url' => ['url' => "data:{$image['mimeType']};base64,{$image['data']}"]];
+                }
+            }
+
             foreach ($message['tool_calls'] ?? [] as $call) {
                 $arguments = $call['function']['arguments'] ?? [];
 

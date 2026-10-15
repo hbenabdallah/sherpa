@@ -5,6 +5,7 @@
 //   "which model"  "Model: " and the model the request was for
 //   "propose" plan_ready with a two-step plan
 //   a skill   "Skill applied: " and its name
+//   images    "Saw N image(s) with: " and the text beside them
 //   "patch"   file_patch on Invoice.php: return 0 → 42 ("again": 42 → 43)
 //   "plan"    todo_write with three tasks
 //   "slow"    a reply streamed a word every 0.2 s for ten seconds
@@ -66,6 +67,17 @@ if (str_contains((string) ($messages[0]['content'] ?? ''), 'lasting technical fa
 
 if (($last['role'] ?? '') === 'tool') {
     echo $chunk(['role' => 'assistant', 'content' => 'Done: ' . strtok((string) ($last['content'] ?? ''), "\n")]);
+    echo $chunk([], 'stop');
+    echo "data: [DONE]\n\n";
+
+    return;
+}
+
+// Text and images, as parts: says what it was given.
+if (is_array($last['content'] ?? null)) {
+    $parts = $last['content'];
+    $images = array_filter($parts, static fn(array $part) => ($part['type'] ?? '') === 'image_url' && str_starts_with($part['image_url']['url'] ?? '', 'data:image/'));
+    echo $chunk(['role' => 'assistant', 'content' => 'Saw ' . count($images) . ' image(s) with: ' . ($parts[0]['text'] ?? '')]);
     echo $chunk([], 'stop');
     echo "data: [DONE]\n\n";
 

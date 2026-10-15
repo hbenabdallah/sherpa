@@ -25,6 +25,9 @@ final class SessionConfig
     /** @var list<ModelInfo>|null the provider's models, asked once: the list is one request away */
     private ?array $catalogue = null;
 
+    /** @var array<string, bool> by model: whether it sees images, asked once */
+    private array $sight = [];
+
     public function __construct(private readonly SwitchablePlatform $platform) {}
 
     public static function modeId(bool $planning): string
@@ -147,6 +150,33 @@ final class SessionConfig
         }
 
         return array_values($groups);
+    }
+
+    /**
+     * Whether $model reads images. A provider that says nothing of what its
+     * models do gets the benefit of the doubt: it says no itself, in its error.
+     */
+    public function seesImages(?ModelProfile $model): bool
+    {
+        if ($model === null) {
+            return true;
+        }
+
+        if (!isset($this->sight[$model->model])) {
+            $info = null;
+            foreach ($this->catalogue() as $offered) {
+                if ($offered->name === $model->model) {
+                    $info = $offered;
+                }
+            }
+            if ($info === null || $info->capabilitiesUnknown()) {
+                $info = $this->platform->describeModel($model->model) ?? $info;
+            }
+
+            $this->sight[$model->model] = $info === null || $info->capabilitiesUnknown() || in_array('vision', $info->capabilities, true);
+        }
+
+        return $this->sight[$model->model];
     }
 
     /** @return list<array<string, string>> */

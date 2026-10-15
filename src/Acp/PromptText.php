@@ -10,8 +10,16 @@ namespace App\Acp;
  */
 final class PromptText
 {
-    /** @param array<int, mixed> $blocks */
-    public static function from(array $blocks, string $directory): string
+    /** What providers take: PNG, JPEG, GIF and WebP, 5 MB at most (Anthropic's limit, the strictest). */
+    private const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+    private const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+
+    /**
+     * @param array<int, mixed> $blocks
+     * @param bool              $seesImages whether the model reads images: if not, each is
+     *                                      said to be there and left out
+     */
+    public static function from(array $blocks, string $directory, bool $seesImages = false): string
     {
         $text = '';
         $attached = [];
@@ -43,13 +51,65 @@ final class PromptText
                     break;
 
                 case 'image':
+                    $refused = self::refused($block);
+                    if ($refused !== null) {
+                        $attached[] = "(an image was attached, which was not sent: {$refused})";
+                    } elseif (!$seesImages) {
+                        $attached[] = '(an image was attached, which this model cannot see)';
+                    }
+                    break;
+
                 case 'audio':
-                    $attached[] = '(an ' . $block['type'] . ' was attached, which Sherpa cannot read)';
+                    $attached[] = '(an audio clip was attached, which Sherpa cannot hear)';
                     break;
             }
         }
 
         return $attached === [] ? $text : rtrim($text) . "\n\n" . implode("\n\n", $attached);
+    }
+
+    /**
+     * The images to send with the text: those a provider takes.
+     *
+     * @param array<int, mixed> $blocks
+     *
+     * @return list<array{mimeType: string, data: string}>
+     */
+    public static function images(array $blocks): array
+    {
+        $images = [];
+        foreach ($blocks as $block) {
+            if (is_array($block) && ($block['type'] ?? '') === 'image' && self::refused($block) === null) {
+                $images[] = ['mimeType' => $block['mimeType'], 'data' => $block['data']];
+            }
+        }
+
+        return $images;
+    }
+
+    /**
+     * Why an image cannot be sent, or null when it can.
+     *
+     * @param array<string, mixed> $block
+     */
+    private static function refused(array $block): ?string
+    {
+        $type = is_string($block['mimeType'] ?? null) ? $block['mimeType'] : '';
+        if (!in_array($type, self::IMAGE_TYPES, true)) {
+            return ($type === '' ? 'no type given' : $type) . ', where PNG, JPEG, GIF and WebP are taken';
+        }
+
+        $data = is_string($block['data'] ?? null) ? $block['data'] : '';
+        $bytes = base64_decode($data, true);
+        if ($bytes === false || $bytes === '') {
+            return 'its data is not base64';
+        }
+
+        if (strlen($bytes) > self::IMAGE_MAX_BYTES) {
+            return sprintf('%.1f MB, past the 5 MB providers take', strlen($bytes) / 1048576);
+        }
+
+        return null;
     }
 
     /** A file URI as a path in the project, or null for anything else. */
