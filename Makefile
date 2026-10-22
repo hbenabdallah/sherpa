@@ -59,15 +59,15 @@ BIN_DIR ?= $(HOME)/.local/bin
 # because it is an executable downloaded from the web. Kept out of PATH.
 # One pin per platform, cli (make php) and micro (make release) alike; a
 # platform with no pin has no PHP of its own and no executable.
-PHP_STATIC_VERSION ?= 8.4.23
-PHP_SHA256_linux-x86_64    := 1aeed5bc7967977ca5b1da7163acd91bf9ba3ac56037045d4e91ee2ff2712bb7
-PHP_SHA256_linux-aarch64   := 0978d89157292bcc9268a34a73a4d5d2793f8dff1403b5138a94d2af6b7a09b0
-PHP_SHA256_macos-aarch64   := bba286e442796dbd420d778a016e2817b31d5036d11b3ba316d19a60de912cdc
-PHP_SHA256_macos-x86_64    := bd1c20f355e73a9f807b24ba62fd98f3a57bc08d063ebb3aa6393909e01ce89e
-MICRO_SHA256_linux-x86_64  := 104659cc43c5812199b500384079dd7b235aa88fea91ca89b96fc8b5e029985f
-MICRO_SHA256_linux-aarch64 := 28329ce81a8bcf7ef033b799eb399a5848eff558e0c4aa8d29eff7e166972f2b
-MICRO_SHA256_macos-aarch64 := 5347aff955115a34a3b41ed4c2fd80a46f9800de0e5718c6495f35f1c9cb9ce2
-MICRO_SHA256_macos-x86_64  := 923fdc5503dc5583ca21f71b7c71af1b6e14f36cd7b0139806c153e97ca1c4ff
+PHP_STATIC_VERSION ?= 8.5.8
+PHP_SHA256_linux-x86_64    := 517a18e0f0874de35669fe134eb3c52508e128a6d1da5bf890760cb800ada410
+PHP_SHA256_linux-aarch64   := af995ef6b3187b39932a00714dfb97e44bfa40a9243c4c29f61f19d583950753
+PHP_SHA256_macos-aarch64   := cba9bd8b38b51ef2c7cebf02af689e4481bbd07f65edc0b63d3a43b04e0c9db7
+PHP_SHA256_macos-x86_64    := 05751000c6643f82e8377ed19d55bc159f84bbed46ace1fcc6f62be9866c787c
+MICRO_SHA256_linux-x86_64  := 85fa5e04dfcced5c64832ebd6cc3b2cc3b9cd5eb84123a3b4b0fd54652c8fbb9
+MICRO_SHA256_linux-aarch64 := be5f7f21da46ce9579b82d97cfb40787f81999ca155aec12154944af3a13e08e
+MICRO_SHA256_macos-aarch64 := 141cc12c5f2bfbe2862669545ea18be1f5b5b33ae95b7b8ad767afe75e6e9f59
+MICRO_SHA256_macos-x86_64  := 752fd5b19d98d5f056ff884ca7ae314c1cd72069882cec49d699fc28ff5362e0
 RELEASE_PLATFORMS := linux-x86_64 linux-aarch64 macos-aarch64 macos-x86_64
 
 # This machine, in static-php-cli's words: Darwin is macos, arm64 is aarch64.
