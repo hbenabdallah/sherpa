@@ -1,14 +1,14 @@
-FROM php:8.4-cli
+FROM php:8.5-cli
 
 # mbstring, pdo_sqlite, posix, ctype and iconv ship enabled in the official
-# image — passing them to docker-php-ext-install makes the build fail.
-# opcache and pcntl are the only two that genuinely need building.
+# image, and opcache is built into PHP since 8.5 — passing any of them to
+# docker-php-ext-install makes the build fail. pcntl is the only one that
+# genuinely needs building.
 RUN apt-get update && apt-get install -y \
         git \
         unzip \
         zip \
     && docker-php-ext-install \
-        opcache \
         pcntl \
     && rm -rf /var/lib/apt/lists/*
 
