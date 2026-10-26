@@ -153,6 +153,9 @@ class Toolbox
         return $arguments;
     }
 
+    /** Tools that write a file from what the model sends. */
+    private const WRITERS = ['file_write', 'file_patch'];
+
     public function execute(ToolCall $call): ToolResult
     {
         $def = $this->find($call->name);
@@ -168,13 +171,26 @@ class Toolbox
             );
         }
 
+        // A masked secret written back would replace the real one in the file.
+        if (in_array($call->name, self::WRITERS, true)) {
+            foreach ($call->arguments as $value) {
+                if (is_string($value) && SecretMask::holdsMarker($value)) {
+                    return new ToolResult($call->id, 'Not written: this holds "' . SecretMask::MARKER . ' …]", which stands for '
+                        . 'a secret you were not shown. Writing it would replace the secret in the file. '
+                        . 'Edit around it with file_patch, leaving the lines that hold it unchanged.', isError: true);
+                }
+            }
+        }
+
+        // Every result, whichever tool: a key a command printed or a page
+        // held goes to the provider as a marker, not as the key.
         try {
             $result = ($def->handler)(...$this->coerce($def, $call->arguments));
             $content = is_string($result) ? $result : json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
-            return new ToolResult($call->id, $content);
+            return new ToolResult($call->id, SecretMask::mask((string) $content));
         } catch (\Throwable $e) {
-            return new ToolResult($call->id, "Error: {$e->getMessage()}", isError: true);
+            return new ToolResult($call->id, SecretMask::mask("Error: {$e->getMessage()}"), isError: true);
         }
     }
 }

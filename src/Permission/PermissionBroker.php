@@ -27,6 +27,13 @@ class PermissionBroker
             return true; // tool not found, let Toolbox handle the error
         }
 
+        // Reading runs unasked, but not a file that usually holds secrets:
+        // asked every time, and never granted for longer.
+        $secret = $call->name === 'file_read' ? SecretFiles::reason((string) ($call->arguments['path'] ?? '')) : null;
+        if ($secret !== null && $def->permission !== Permission::DENY) {
+            return $this->approver->confirm($call, $def, new Offer([], $secret)) !== ConfirmChoice::Deny;
+        }
+
         return match ($def->permission) {
             Permission::AUTO   => true,
             Permission::DENY   => false,
