@@ -212,7 +212,9 @@ still gets all of it.
 A confirmation offers **[a]** allow once, **[s]** for the session, **[p]** always
 for this project, **[r]** refuse. For a command, **[s]** and **[p]** grant that
 command (`make test *`), not every command, and some are asked about every time:
-`sudo`, `rm -r`, `git push`, a download piped into a shell…
+`sudo`, `rm -r`, `git push`, a download piped into a shell…, and so is reading
+a file that usually holds secrets (`.env`, `id_rsa`, `*.pem`). API keys in what a
+tool returns are masked before they reach the provider
 ([details](docs/concepts.md#tools-and-permissions)). `/permissions` lists the
 grants, standing and for this session, and withdraws them.
 

@@ -223,7 +223,10 @@ Une confirmation propose **[a]** une fois, **[s]** pour la session, **[p]**
 toujours pour ce projet, **[r]** refuser. Pour une commande, **[s]** et **[p]**
 autorisent cette commande (`make test *`), pas toutes les commandes, et certaines
 sont demandées à chaque fois : `sudo`, `rm -r`, `git push`, un téléchargement
-envoyé à un shell… ([détails](docs/concepts.md#tools-and-permissions)).
+envoyé à un shell…, comme la lecture d'un fichier qui contient d'habitude des
+secrets (`.env`, `id_rsa`, `*.pem`). Les clés d'API dans ce que renvoie un outil
+sont masquées avant d'atteindre le fournisseur
+([détails](docs/concepts.md#tools-and-permissions)).
 `/permissions` liste les autorisations, permanentes et de la session, et les retire.
 
 ### Commandes
