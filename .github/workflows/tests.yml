@@ -60,10 +60,20 @@ jobs:
       - name: composer install
         run: ~/.local/share/sherpa/php "$(command -v composer)" install --no-interaction --no-progress
 
+      # Commands run in bubblewrap where it is installed: the sandbox suite
+      # runs it for real here rather than skipping. The runner's AppArmor
+      # keeps unprivileged user namespaces from the programs it does not know.
+      - name: bubblewrap
+        run: |
+          sudo apt-get install -y -qq bubblewrap
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+
       # No compose here: every setting falls back on config/services.yaml,
       # which is precisely the path a host install takes.
       - name: suites
         run: ~/.local/share/sherpa/php tests/run.php
+        env:
+          SHERPA_REQUIRE_SANDBOX: 1
 
   # The Intel Mac's static PHP, checked on an Intel Mac at every push: the
   # release runs its executable there before publishing, and a tag is a bad
@@ -72,7 +82,7 @@ jobs:
   intel-mac:
     name: PHP on an Intel Mac
     runs-on: macos-15-intel
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
 
@@ -89,6 +99,17 @@ jobs:
       - name: runs Sherpa's own checks
         run: |
           ~/.local/share/sherpa/php -r 'exit(PHP_VERSION_ID >= 80400 && extension_loaded("pdo_sqlite") && extension_loaded("pcntl") && extension_loaded("phar") ? 0 : 1);'
+
+      # sandbox-exec exists only here: the sandbox suite runs it for real.
+      - name: composer install
+        run: |
+          command -v composer > /dev/null || brew install -q composer
+          ~/.local/share/sherpa/php "$(command -v composer)" install --no-interaction --no-progress
+
+      - name: sandbox
+        run: ~/.local/share/sherpa/php tests/shell_sandbox_test.php
+        env:
+          SHERPA_REQUIRE_SANDBOX: 1
 
   shell:
     name: Shell scripts

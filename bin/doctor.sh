@@ -184,6 +184,25 @@ else
          'in Docker, only PHP. To move over:  make php'
 fi
 
+# What keeps commands run on this machine to the project: the probe Sherpa runs.
+if [ "${SHERPA_SANDBOX:-}" = 'off' ]; then
+    warn 'commands run without a sandbox (SHERPA_SANDBOX=off)'
+elif [ "$(uname -s)" = 'Darwin' ]; then
+    if sandbox-exec -p '(version 1)(allow default)' true 2>/dev/null; then
+        pass 'commands run in a sandbox (sandbox-exec)'
+    else
+        warn 'sandbox-exec does not work here: commands can write anywhere you can'
+    fi
+elif ! command -v bwrap > /dev/null 2>&1; then
+    warn 'bubblewrap missing: commands can write anywhere you can' \
+         'Install it (apt install bubblewrap, dnf install bubblewrap…) to keep them to the project.'
+elif bwrap --ro-bind / / --dev /dev true 2>/dev/null; then
+    pass 'commands run in a sandbox (bubblewrap)'
+else
+    warn 'bubblewrap cannot start here: commands can write anywhere you can' \
+         'Unprivileged user namespaces are probably turned off (sysctl kernel.unprivileged_userns_clone).'
+fi
+
 # ---- PHP dependencies -------------------------------------------------------
 if [ -d vendor ]; then
     pass 'Composer dependencies installed'
