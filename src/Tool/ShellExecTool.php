@@ -62,7 +62,14 @@ class ShellExecTool
         // command by itself, as a signal; an editor cancels with a message,
         // which only this hears.
         private readonly ?Interrupt $interrupt = null,
+        // Where a command run on this machine may write; see Sandbox.
+        private readonly Sandbox $sandbox = new Sandbox(),
     ) {}
+
+    public function sandbox(): Sandbox
+    {
+        return $this->sandbox;
+    }
 
     /** How many bytes of output this window can afford from one command. */
     private function outputByteCap(): int
@@ -126,7 +133,23 @@ class ShellExecTool
         // successful one: the model reads a report full of failures as done.
         $status = $code === 0 ? '' : "(exit code {$code})\n";
 
-        return $status . $this->trim($output);
+        return $status . $this->trim($output) . $this->sandboxHint($code, $output);
+    }
+
+    /**
+     * A write the sandbox refused reads as a broken file system. Said once,
+     * under the output, so the model edits through the file tools rather than
+     * retrying the same write elsewhere.
+     */
+    private function sandboxHint(?int $code, string $output): string
+    {
+        if ($code === 0 || $this->dockerContainer !== null || $this->sandbox->kind() === null
+            || !preg_match('/Read-only file system|Operation not permitted/i', $output)) {
+            return '';
+        }
+
+        return "\n(Sherpa's sandbox lets commands write only to the project, /tmp and package caches. "
+            . 'Edit files with file_write and file_patch; anything else outside the project is for the user to do.)';
     }
 
     /**
@@ -206,7 +229,8 @@ class ShellExecTool
         // /project edit, the kill would go to another container, or to the host.
         [$container, $user] = [$this->dockerContainer, $this->dockerUser];
         $id = $this->jobs->start($command, $command, $workDir, $container,
-            fn(string $script) => $this->commandIn($container, $user, $script, $workDir));
+            fn(string $script) => $this->commandIn($container, $user, $script, $workDir),
+            $container === null ? $this->sandbox->prefix($this->paths->root()) : []);
         $this->jobs->firstLook($id);
         $state = $this->jobs->read($id);
         $output = trim($state['output']);
@@ -280,7 +304,7 @@ class ShellExecTool
     private function commandIn(?string $container, string $user, string $command, string $workDir): array
     {
         if ($container === null) {
-            return ['bash', '-c', $command];
+            return [...$this->sandbox->prefix($this->paths->root()), 'bash', '-c', $command];
         }
 
         $inside = $this->containerWorkDir($container, $workDir);
@@ -380,6 +404,6 @@ class ShellExecTool
                 . 'cwd: ' . ($inside ?? "(the container's default)") . "\n\$ {$command}";
         }
 
-        return "cwd: {$workDir}\n\$ {$command}";
+        return "cwd: {$workDir}\n{$this->sandbox->describe()}\n\$ {$command}";
     }
 }

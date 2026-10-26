@@ -32,6 +32,7 @@ use App\Mcp\PromptArguments;
 use App\Skills\Skill;
 use App\Skills\SkillRegistry;
 use App\Tool\BackgroundJobs;
+use App\Tool\Sandbox;
 use App\Agent\PlanMode;
 use App\TUI\ChatPane;
 use App\TUI\LineEditor;
@@ -98,6 +99,8 @@ class SherpaCommand extends Command
         // A newer release, said under the logo. Optional so the tests that
         // build this command need not reach GitHub.
         private readonly ?UpdateNotice $updates = null,
+        // The shell tool's: said at start, where it keeps commands, or that nothing does.
+        private readonly ?Sandbox $sandbox = null,
     ) {
         parent::__construct();
     }
@@ -304,6 +307,16 @@ class SherpaCommand extends Command
         if ($project->docker->enabled && ($wrapper = DockerWrapper::in($project->path)) !== null) {
             echo Terminal::YELLOW . "  ⚠ Commands run in {$project->docker->container}, but the {$wrapper} already runs them through docker:"
                 . Terminal::GRAY . " there, make cannot reach docker. /project edit and Docker off runs them on this machine.\n" . Terminal::RESET;
+        }
+
+        // Commands run on this machine, not in a container: where they may
+        // write, or that nothing keeps them in.
+        if ($this->sandbox !== null && !($project->docker->enabled && $project->docker->container !== '') && !is_file('/.dockerenv')) {
+            echo $this->sandbox->kind() === null
+                ? Terminal::YELLOW . '  ⚠ Commands run without a sandbox: ' . $this->sandbox->why()
+                    . Terminal::GRAY . " — they can write anywhere you can.\n" . Terminal::RESET
+                : Terminal::GRAY . '  Commands run in a sandbox: they write only to the project, /tmp and package caches'
+                    . ($this->sandbox->strict() ? ', with no network' : '') . ".\n" . Terminal::RESET;
         }
 
         $resume = $input->getOption('resume');
