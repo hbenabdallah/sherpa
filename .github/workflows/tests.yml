@@ -101,10 +101,12 @@ jobs:
           ~/.local/share/sherpa/php -r 'exit(PHP_VERSION_ID >= 80400 && extension_loaded("pdo_sqlite") && extension_loaded("pcntl") && extension_loaded("phar") ? 0 : 1);'
 
       # sandbox-exec exists only here: the sandbox suite runs it for real.
+      # Composer with the runner's PHP: the static one aborts in its curl's
+      # HTTP/3 (ngtcp2) on this runner before installing anything.
       - name: composer install
         run: |
           command -v composer > /dev/null || brew install -q composer
-          ~/.local/share/sherpa/php "$(command -v composer)" install --no-interaction --no-progress
+          composer install --no-interaction --no-progress
 
       - name: sandbox
         run: ~/.local/share/sherpa/php tests/shell_sandbox_test.php
