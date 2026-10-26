@@ -10,6 +10,8 @@ final class ToolDefinition
         public readonly array $parameters,
         public readonly Permission $permission,
         public readonly object $handler,
+        /** Brings text from outside the project and the user; see Provenance. */
+        public readonly bool $untrusted = false,
     ) {}
 
     public function toFunctionSchema(): array

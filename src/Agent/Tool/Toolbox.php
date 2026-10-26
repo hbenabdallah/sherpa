@@ -13,6 +13,8 @@ class Toolbox
 
     public function __construct(
         #[AutowireIterator('agent.tool')] iterable $tools,
+        // Told what came from outside, and marks it so; absent, nothing is marked.
+        private readonly ?Provenance $provenance = null,
     ) {
         foreach ($tools as $tool) {
             $def = $this->buildDefinition($tool);
@@ -39,6 +41,7 @@ class Toolbox
             parameters: $this->extractParameters($method),
             permission: $asTool->permission,
             handler: $tool,
+            untrusted: $asTool->untrusted,
         );
     }
 
@@ -188,7 +191,13 @@ class Toolbox
             $result = ($def->handler)(...$this->coerce($def, $call->arguments));
             $content = is_string($result) ? $result : json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
-            return new ToolResult($call->id, SecretMask::mask((string) $content));
+            $content = SecretMask::mask((string) $content);
+            // From outside the project and the user: marked as data.
+            if ($def->untrusted && $this->provenance !== null) {
+                $content = $this->provenance->wrap($call->name, $call->arguments, $content);
+            }
+
+            return new ToolResult($call->id, $content);
         } catch (\Throwable $e) {
             return new ToolResult($call->id, SecretMask::mask("Error: {$e->getMessage()}"), isError: true);
         }

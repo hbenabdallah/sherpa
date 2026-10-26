@@ -172,6 +172,7 @@ class McpRegistry
                     // says its tool does, the user is asked before it runs.
                     permission: Permission::CONFIRM,
                     handler: new McpTool($client, $tool['name']),
+                    untrusted: true,
                 ));
                 $this->toolNames[$server->name][] = $name;
                 $added++;
@@ -191,6 +192,7 @@ class McpRegistry
                     // What comes back is third-party content, like a tool's.
                     permission: Permission::CONFIRM,
                     handler: new McpResourceReader($client),
+                    untrusted: true,
                 ));
                 $this->toolNames[$server->name][] = $this->localName($server->name, 'read_resource');
                 $this->resources[$server->name] = $resources;

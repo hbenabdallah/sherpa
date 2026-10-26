@@ -17,6 +17,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
     description: 'Read a web page — a library\'s documentation, an error explained online, a changelog — as text: headings, lists, tables and code kept, menus and scripts dropped. http(s) only. A long page is read in parts: call again with the offset it gives.',
     // A request leaves the machine, and its address alone can say something.
     permission: Permission::CONFIRM,
+    untrusted: true,
 )]
 class WebFetchTool
 {

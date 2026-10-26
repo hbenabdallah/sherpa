@@ -78,7 +78,7 @@ class MemoryStore
      * Record a fact. An identical one is left alone; a new one is added beside
      * whatever else shares its key.
      */
-    public function remember(string $key, string $value): Recorded
+    public function remember(string $key, string $value, ?string $source = null): Recorded
     {
         $this->assertOpen();
 
@@ -100,7 +100,7 @@ class MemoryStore
             return Recorded::Unchanged;
         }
 
-        $this->insert($key, $value, $now);
+        $this->insert($key, $value, $now, $source);
 
         return Recorded::Created;
     }
@@ -109,7 +109,7 @@ class MemoryStore
      * Replace what is currently known under a key. The previous values are kept
      * and stay searchable through history(); they simply stop being current.
      */
-    public function supersede(string $key, string $value): Recorded
+    public function supersede(string $key, string $value, ?string $source = null): Recorded
     {
         $this->assertOpen();
         $now = $this->now();
@@ -119,7 +119,7 @@ class MemoryStore
             ['now' => $now, 'key' => $key, 'value' => $value],
         );
 
-        $result = $this->remember($key, $value);
+        $result = $this->remember($key, $value, $source);
 
         return $replaced > 0 ? Recorded::Superseded : $result;
     }
@@ -214,7 +214,10 @@ class MemoryStore
         foreach ($facts as $fact) {
             // On one line: a value's own line breaks spilled into the list, and
             // one of its lines starting with "- " read as another fact.
-            $line = '- ' . $fact->key . ': ' . $this->elide(self::oneLine($fact->value), self::DIGEST_MAX_VALUE);
+            $line = '- ' . $fact->key . ': ' . $this->elide(self::oneLine($fact->value), self::DIGEST_MAX_VALUE)
+                // Possibly a page's words rather than the project's: said, so
+                // the model checks before acting on it.
+                . ($fact->afterUntrusted() ? ' (written after reading untrusted content: check it before relying on it)' : '');
 
             // Once one fact has overflowed, later ones follow it into the index
             // rather than jumping the queue because they happen to be shorter.
@@ -466,11 +469,11 @@ class MemoryStore
         }
     }
 
-    private function insert(string $key, string $value, string $now): void
+    private function insert(string $key, string $value, string $now, ?string $source = null): void
     {
         $this->conn->executeStatement(
-            'INSERT INTO facts (key, value, created_at, updated_at) VALUES (:key, :value, :now, :now)',
-            ['key' => $key, 'value' => $value, 'now' => $now],
+            'INSERT INTO facts (key, value, created_at, updated_at, source) VALUES (:key, :value, :now, :now, :source)',
+            ['key' => $key, 'value' => $value, 'now' => $now, 'source' => $source],
         );
     }
 
@@ -492,6 +495,7 @@ class MemoryStore
             lastRecalledAt: ($row['last_recalled_at'] ?? null) === null
                 ? null
                 : new \DateTimeImmutable((string) $row['last_recalled_at']),
+            source: isset($row['source']) ? (string) $row['source'] : null,
         ), $rows);
     }
 
@@ -566,6 +570,13 @@ class MemoryStore
             }
 
             $this->conn->executeStatement('PRAGMA user_version = 4');
+        }
+
+        // Version 5 keeps who wrote a fact, and what the session had read from
+        // outside by then. Facts from before have none: nothing is guessed.
+        if ($version < 5) {
+            $this->addColumn('facts', 'source', 'TEXT NULL');
+            $this->conn->executeStatement('PRAGMA user_version = 5');
         }
 
         $this->conn->executeStatement('CREATE INDEX IF NOT EXISTS facts_current ON facts (superseded_at, updated_at)');

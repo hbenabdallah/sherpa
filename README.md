@@ -59,7 +59,9 @@ Sherpa answers in the language of your question; its interface is in English.
   HTML, indexed along their headings, searched by keywords and by meaning together,
   kept up to date automatically.
 - **Project memory**: conventions, where the configuration lives, how to run the
-  tests — kept in SQLite and ranked by what you are working on now.
+  tests — kept in SQLite and ranked by what you are working on now. Each fact
+  says who wrote it, and one written after reading a web page is asked about
+  first.
 - **Long sessions**: old tool output is moved out of the context window and can be
   recalled; conversations are saved after every turn and resumed with `/resume`.
 - **Plan mode**: the model reads and proposes, and nothing is written or run until

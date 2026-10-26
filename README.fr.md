@@ -61,7 +61,8 @@ Sherpa répond dans la langue de votre question ; son interface est en anglais.
   sens à la fois, index tenu à jour tout seul.
 - **Mémoire du projet** : les conventions, l'emplacement de la configuration, la
   commande des tests — gardés dans SQLite et classés selon ce sur quoi vous
-  travaillez.
+  travaillez. Chaque fait dit qui l'a écrit, et un fait écrit après la lecture
+  d'une page web est d'abord demandé.
 - **Longues sessions** : les vieilles sorties d'outils sortent de la fenêtre de
   contexte et peuvent être rappelées ; les conversations sont enregistrées à
   chaque tour et reprises avec `/resume`.

@@ -168,6 +168,11 @@ HELP . Terminal::RESET;
                             ? Terminal::GRAY . "  ({$fact->recalledCount}×)" . Terminal::RESET
                             : '';
                         echo Terminal::YELLOW . "  • {$fact->key}: " . Terminal::RESET . $fact->value . $used . "\n";
+                        // Who wrote it; in red when a page or an MCP answer had been read by then.
+                        if ($fact->source !== null) {
+                            echo ($fact->afterUntrusted() ? Terminal::RED . '    ⚠ ' : Terminal::GRAY . '    ')
+                                . "by {$fact->source}" . Terminal::RESET . "\n";
+                        }
                     }
                 }
 
@@ -222,7 +227,7 @@ HELP . Terminal::RESET;
                     // Remembering something here is deciding to work here: a
                     // held project is saved first, or the fact dies with the session.
                     $this->working->save();
-                    $recorded = $this->memoryStore->remember($kv[0], $kv[1]);
+                    $recorded = $this->memoryStore->remember($kv[0], $kv[1], 'you, with /remember');
                     echo Terminal::GREEN . match ($recorded) {
                         \App\Memory\Recorded::Created    => "✓ Remembered: {$kv[0]}\n",
                         \App\Memory\Recorded::Unchanged  => "✓ Already known: {$kv[0]}\n",
