@@ -16,6 +16,7 @@ use App\Agent\Tool\Toolbox;
 use App\Mcp\McpRegistry;
 use App\Memory\ContextStore;
 use App\Memory\MemoryStore;
+use App\Permission\CommandPolicy;
 use App\Permission\ProjectPermissions;
 use App\Permission\SessionPermissions;
 use App\Platform\SwitchablePlatform;
@@ -104,7 +105,7 @@ final class SlashCommands
             ['/forget', '<key>', 'Drop a fact'],
             ['/docs', '[reindex|eval|<question>]', 'The documentation index'],
             ['/project', '[edit|forget]', 'The current project'],
-            ['/permissions', '[revoke <tool>|clear]', "Grants, for the project and this session"],
+            ['/permissions', '[revoke <tool|command>|clear]', "Grants, for the project and this session"],
             ['/skills', '', 'The available skills'],
             ['/mcp', '[add|enable|disable|remove]', 'MCP servers: list, add, turn on or off'],
             ['/tools', '', 'The available tools'],
@@ -137,7 +138,7 @@ final class SlashCommands
     /mcp add            Declare an MCP server: a command or an address, tried at once
     /mcp disable|enable|remove <name>   Turn a server off, back on, or forget it
     /permissions        List the grants, standing and for this session
-    /permissions revoke <tool>   Withdraw one grant
+    /permissions revoke <tool|command>   Withdraw one grant
     /permissions clear  Withdraw every grant
     /context            Break down what fills the context
     /compact            Compact the conversation now
@@ -498,8 +499,13 @@ HELP . Terminal::RESET;
         }
 
         if ($action === 'revoke') {
+            // A command is named as it is listed, or without the tool's name.
+            if ($target !== '' && !in_array($target, [...$this->projectPermissions->all(), ...$this->sessionPermissions->all()], true)) {
+                $target = CommandPolicy::PREFIX . $target;
+            }
+
             if ($target === '') {
-                echo Terminal::RED . "Usage: /permissions revoke <tool>\n" . Terminal::RESET;
+                echo Terminal::RED . "Usage: /permissions revoke <tool|command>\n" . Terminal::RESET;
             } elseif ($this->projectPermissions->revoke($target) | $this->sessionPermissions->revoke($target)) {
                 echo Terminal::GREEN . "✓ Withdrawn: {$target}. It will be asked about again.\n" . Terminal::RESET;
             } else {
@@ -531,7 +537,7 @@ HELP . Terminal::RESET;
         }
 
         if ($standing !== [] || $session !== []) {
-            echo Terminal::GRAY . "\n  /permissions revoke <tool> · /permissions clear\n" . Terminal::RESET;
+            echo Terminal::GRAY . "\n  /permissions revoke <tool|command> · /permissions clear\n" . Terminal::RESET;
         }
     }
     /** What this session used and cost — the compactor's requests included. */

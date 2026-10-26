@@ -2,6 +2,8 @@
 
 namespace App\Project;
 
+use App\Permission\CommandPolicy;
+
 final class Project
 {
     public function __construct(
@@ -16,8 +18,8 @@ final class Project
         public \DateTimeImmutable $lastUsedAt,
         /**
          * Tools the user chose to allow for this project without being asked
-         * again. Survives restarts, so it is a standing grant — shell_exec in
-         * here means arbitrary commands run unprompted from now on.
+         * again, and commands, as "shell_exec: make test *" (CommandPolicy).
+         * Survives restarts, so it is a standing grant.
          *
          * @var array<int, string>
          */
@@ -35,9 +37,12 @@ final class Project
             stack: $data['stack'] ?? '',
             createdAt: new \DateTimeImmutable($data['created_at'] ?? 'now'),
             lastUsedAt: new \DateTimeImmutable($data['last_used_at'] ?? 'now'),
+            // A grant of shell_exec itself, from before grants named commands,
+            // let any command run unasked: it is not carried over, and the
+            // next command is asked about, with a grant for that command.
             allowedTools: array_values(array_filter(
                 $data['allowed_tools'] ?? [],
-                is_string(...),
+                static fn (mixed $grant): bool => is_string($grant) && $grant !== CommandPolicy::TOOL,
             )),
         );
     }

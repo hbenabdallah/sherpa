@@ -189,12 +189,12 @@ $answers = [
 ];
 [$front, $editor] = frontend($paths, $todos, $answers);
 $front->showToolCall('file_patch', $call->arguments, 'p1');
-check('"for this session" is the session grant', $front->confirm($call, $def) === ConfirmChoice::Session);
+check('"for this session" is the session grant', $front->confirm($call, $def, new App\Permission\Offer()) === ConfirmChoice::Session);
 $asked = array_values(array_filter(out($editor), fn(array $m) => ($m['method'] ?? '') === 'session/request_permission'))[0]['params'] ?? [];
 check('the question names the session and the call, with the diff', $asked['sessionId'] === 's1' && $asked['toolCall']['toolCallId'] === 'p1'
     && $asked['toolCall']['content'][0]['type'] === 'diff' && str_contains($asked['toolCall']['content'][0]['newText'], 'return 1;'), json_encode($asked));
-check('a cancelled question is a refusal', $front->confirm($call, $def) === ConfirmChoice::Deny);
-check('so is an answer naming no option offered', $front->confirm($call, $def) === ConfirmChoice::Deny);
+check('a cancelled question is a refusal', $front->confirm($call, $def, new App\Permission\Offer()) === ConfirmChoice::Deny);
+check('so is an answer naming no option offered', $front->confirm($call, $def, new App\Permission\Offer()) === ConfirmChoice::Deny);
 
 $front->showToolCall('plan_ready', ['plan' => '1. Fix'], 'r1');
 check('a plan carried out on "go"', $front->approvePlan('1. Fix') === true);
@@ -202,11 +202,29 @@ check('and kept on "keep planning"', $front->approvePlan('1. Fix') === false);
 $planned = array_values(array_filter(out($editor), fn(array $m) => ($m['method'] ?? '') === 'session/request_permission' && $m['params']['options'][0]['optionId'] === 'plan-go'));
 check('asked under the plan_ready call', ($planned[0]['params']['toolCall']['toolCallId'] ?? '') === 'r1' && str_contains(json_encode($planned[0]), '1. Fix'), json_encode($planned[0] ?? null));
 
+// A command: the longer answers name what they grant, and what is asked
+// every time is offered once or refused, nothing else.
+$shellDef = new ToolDefinition('shell_exec', 'Run a command', [], Permission::CONFIRM, new ShellExecTool());
+$shellCall = new ToolCall('x1', 'shell_exec', ['command' => 'make test']);
+[$front, $editor] = frontend($paths, $todos, [
+    ['outcome' => ['outcome' => 'selected', 'optionId' => 'allow-project']],
+    ['outcome' => ['outcome' => 'selected', 'optionId' => 'allow-session']],
+]);
+$front->showToolCall('shell_exec', $shellCall->arguments, 'x1');
+check('a command granted for the project', $front->confirm($shellCall, $shellDef, new App\Permission\Offer(['shell_exec: make test *'])) === ConfirmChoice::Project);
+$front->showToolCall('shell_exec', ['command' => 'git push'], 'x2');
+check('"for this session" is no answer where only once is offered',
+    $front->confirm(new ToolCall('x2', 'shell_exec', ['command' => 'git push']), $shellDef, new App\Permission\Offer([], 'it pushes to a remote')) === ConfirmChoice::Deny);
+$asked = array_values(array_map(fn(array $m) => $m['params'], array_filter(out($editor), fn(array $m) => ($m['method'] ?? '') === 'session/request_permission')));
+check('the grant offered names the command', str_contains(json_encode($asked[0]['options'] ?? []), 'Always allow make test * in this project'), json_encode($asked[0]['options'] ?? []));
+check('only once or refuse for what is asked every time', array_column($asked[1]['options'] ?? [], 'optionId') === ['allow-once', 'reject'], json_encode($asked[1]['options'] ?? []));
+check('with the reason', str_contains(json_encode($asked[1]['toolCall']['content'] ?? []), 'Asked every time: it pushes to a remote'));
+
 // An editor that went away answers nothing, which allows nothing.
 [$sherpa, $gone] = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
 fclose($gone);
 $orphan = new EditorFrontend(new Connection($sherpa, $sherpa), new EditPreview(new FileWriteTool($paths), new FilePatchTool($paths)), $paths, new ShellExecTool($paths), $todos);
-check('no editor to answer: refused', $orphan->confirm($call, $def) === ConfirmChoice::Deny);
+check('no editor to answer: refused', $orphan->confirm($call, $def, new App\Permission\Offer()) === ConfirmChoice::Deny);
 check('and no plan approved', $orphan->approvePlan('x') === null);
 
 // ---- the model menu ------------------------------------------------------------------

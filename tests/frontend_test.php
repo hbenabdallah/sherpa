@@ -57,7 +57,7 @@ final class Recorder implements AgentOutput, Approver
     public function showInfo(string $message): void { $this->seen[] = "info:{$message}"; }
     public function showError(string $message): void { $this->seen[] = "error:{$message}"; }
     public function forSubagent(): AgentOutput { return $this; }
-    public function confirm(ToolCall $call, ToolDefinition $def): ConfirmChoice { $this->seen[] = "confirm:{$call->id}"; return ConfirmChoice::Session; }
+    public function confirm(ToolCall $call, ToolDefinition $def, App\Permission\Offer $offer): ConfirmChoice { $this->seen[] = "confirm:{$call->id}"; return ConfirmChoice::Session; }
     public function approvePlan(string $plan): ?bool { $this->seen[] = "plan:{$plan}"; return false; }
 }
 
@@ -105,7 +105,7 @@ $frontend->flushBuffer();
 $frontend->showToolCall('file_read', ['path' => 'a.php'], 'c1');
 $frontend->showToolResult('file_read', 'x', false, 'c1');
 $frontend->showInfo('note');
-$choice = $frontend->confirm(new ToolCall('c2', 'shell_exec', []), new ToolDefinition('shell_exec', '', [], App\Agent\Tool\Permission::CONFIRM, $shell));
+$choice = $frontend->confirm(new ToolCall('c2', 'shell_exec', []), new ToolDefinition('shell_exec', '', [], App\Agent\Tool\Permission::CONFIRM, $shell), new App\Permission\Offer());
 $approved = $frontend->approvePlan('the plan');
 check('once switched, everything reaches the new frontend, call ids included',
     $recorder->seen === ['begin', 'token:Hi', 'flush', 'call:file_read:c1', 'result:file_read:c1', 'info:note', 'confirm:c2', 'plan:the plan'],

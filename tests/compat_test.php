@@ -82,11 +82,13 @@ check('projects.yaml: the project is found from its directory', $project?->slug 
 check('under its name', $project?->name === 'Projet Été', (string) $project?->name);
 check('with its container', $project?->docker->enabled === true && $project->docker->container === 'app' && $project->docker->dbContainer === 'db');
 check('which runs commands as the user, the default since', $project?->docker->user === App\Project\DockerConfig::USER_HOST, (string) $project?->docker->user);
-check('and its standing grants', $project?->allowedTools === ['shell_exec'], json_encode($project?->allowedTools));
+// Its one grant was shell_exec itself, which let any command run unasked:
+// grants name commands now, and that one is not carried over.
+check('and not its grant of shell_exec itself', $project?->allowedTools === [], json_encode($project?->allowedTools));
 
 $projects->touch($project);
 $again = (new ProjectStore(new StackDetector()))->forDirectory($root . '/projet');
-check('saved again, nothing of it is lost', $again?->allowedTools === ['shell_exec'] && $again->docker->container === 'app' && $again->name === 'Projet Été');
+check('saved again, nothing of it is lost', $again?->allowedTools === [] && $again->docker->container === 'app' && $again->name === 'Projet Été');
 
 // ---- the memory database ---------------------------------------------------
 $memory = new MemoryStore();

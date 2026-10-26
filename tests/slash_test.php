@@ -255,6 +255,15 @@ check('a grant made "always" in this session is withdrawn from the session too',
     !$permissions->isAllowed('shell_exec') && !$session->isSessionAllowed('shell_exec'), $out);
 [, $out] = $slash('/permissions revoke file_write');
 check('a grant for this session only can be withdrawn as well', str_contains($out, 'Withdrawn') && !$session->isSessionAllowed('file_write'), $out);
+// A command is withdrawn by naming it, with or without the tool's name.
+$permissions->allow('shell_exec: make test *');
+$session->allowForSession('shell_exec: ls -la');
+[, $out] = $slash('/permissions');
+check('a command grant is listed with what it covers', str_contains($out, 'shell_exec: make test *'), $out);
+[, $out] = $slash('/permissions revoke make test *');
+check('and withdrawn by the command alone', str_contains($out, 'Withdrawn') && !$permissions->isAllowed('shell_exec: make test *'), $out);
+[, $out] = $slash('/permissions revoke shell_exec: ls -la');
+check('or as it is listed', str_contains($out, 'Withdrawn') && $session->all() === [], $out);
 $permissions->allow('file_patch');
 $session->allowForSession('project_grep');
 [, $out] = $slash('/permissions clear');

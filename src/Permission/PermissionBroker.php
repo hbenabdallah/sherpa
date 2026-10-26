@@ -30,8 +30,45 @@ class PermissionBroker
         return match ($def->permission) {
             Permission::AUTO   => true,
             Permission::DENY   => false,
-            Permission::CONFIRM => $this->askConfirmation($call, $def),
+            Permission::CONFIRM => $call->name === CommandPolicy::TOOL
+                ? $this->askAboutCommand($call, $def)
+                : $this->askConfirmation($call, $def),
         };
+    }
+
+    /**
+     * A command runs unasked only when grants cover every command in it, and
+     * nothing in it is asked about every time. A grant is made for the
+     * commands it names, never for the tool.
+     */
+    private function askAboutCommand(ToolCall $call, ToolDefinition $def): bool
+    {
+        $command = ShellCommand::parse((string) ($call->arguments['command'] ?? ''));
+        $grants = [...$this->project->all(), ...$this->session->all()];
+        if (CommandPolicy::allows($command, $grants)) {
+            return true;
+        }
+
+        $onlyOnce = CommandPolicy::onlyOnce($command);
+        $offer = new Offer($onlyOnce === null ? CommandPolicy::grantsFor($command) : [], $onlyOnce);
+
+        $choice = $this->approver->confirm($call, $def, $offer);
+        if ($choice === ConfirmChoice::Deny) {
+            return false;
+        }
+        // Whatever an approver answers for a call that can only be allowed
+        // once, nothing outlives it.
+        if ($onlyOnce === null) {
+            foreach ($offer->grants as $grant) {
+                match ($choice) {
+                    ConfirmChoice::Session => $this->grantForSession($grant),
+                    ConfirmChoice::Project => $this->grantForProject($grant),
+                    ConfirmChoice::Once    => null,
+                };
+            }
+        }
+
+        return true;
     }
 
     private function askConfirmation(ToolCall $call, ToolDefinition $def): bool
@@ -41,7 +78,7 @@ class PermissionBroker
             return true;
         }
 
-        return match ($this->approver->confirm($call, $def)) {
+        return match ($this->approver->confirm($call, $def, new Offer())) {
             ConfirmChoice::Once    => true,
             ConfirmChoice::Session => $this->grantForSession($call->name),
             ConfirmChoice::Project => $this->grantForProject($call->name),
