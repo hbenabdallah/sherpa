@@ -16,7 +16,7 @@
   <a href="https://github.com/hbenabdallah/sherpa/releases/latest"><img src="https://img.shields.io/github/v/release/hbenabdallah/sherpa" alt="Latest release"></a>
   <a href="https://github.com/hbenabdallah/sherpa/releases"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/hbenabdallah/sherpa/badges/downloads.json" alt="Installs"></a>
   <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS-lightgrey" alt="Linux | macOS">
-  <a href="https://github.com/hbenabdallah/sherpa/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-PolyForm%20Shield%201.0.0-blue" alt="License: PolyForm Shield 1.0.0"></a>
+  <a href="https://github.com/hbenabdallah/sherpa/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT"></a>
   <a href="https://github.com/hbenabdallah/sherpa"><img src="https://img.shields.io/github/stars/hbenabdallah/sherpa?style=social" alt="GitHub stars"></a>
 </p>
 
@@ -419,11 +419,8 @@ codebases for AI coding agents.
 
 ## License
 
-Sherpa is source-available under the
-[PolyForm Shield License 1.0.0](https://github.com/hbenabdallah/sherpa/blob/main/LICENSE):
-you may use, modify and redistribute it, including in a company, for any purpose
-that does not compete with Sherpa. Providing a competing product from this code
-is not allowed. This is not an OSI-approved open-source license.
+Sherpa is open source under the
+[MIT License](https://github.com/hbenabdallah/sherpa/blob/main/LICENSE).
 
 The executable also bundles PHP and Composer packages under their own licenses,
 listed in `THIRD-PARTY-NOTICES.md` with each release.

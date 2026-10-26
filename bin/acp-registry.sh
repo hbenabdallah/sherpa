@@ -42,7 +42,7 @@ cat <<JSON
   "description": "A coding agent for any model provider, local ones included, that asks before anything that writes or executes",
   "repository": "$repo",
   "authors": ["Houssem Eddine BENABDALLAH"],
-  "license": "PolyForm-Shield-1.0.0",
+  "license": "MIT",
   "license_url": "$repo/blob/main/LICENSE",
   "distribution": {
     "binary": {

@@ -16,7 +16,7 @@
   <a href="https://github.com/hbenabdallah/sherpa/releases/latest"><img src="https://img.shields.io/github/v/release/hbenabdallah/sherpa" alt="Dernière version"></a>
   <a href="https://github.com/hbenabdallah/sherpa/releases"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/hbenabdallah/sherpa/badges/downloads.json" alt="Installations"></a>
   <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS-lightgrey" alt="Linux | macOS">
-  <a href="https://github.com/hbenabdallah/sherpa/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-PolyForm%20Shield%201.0.0-blue" alt="Licence : PolyForm Shield 1.0.0"></a>
+  <a href="https://github.com/hbenabdallah/sherpa/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="Licence : MIT"></a>
   <a href="https://github.com/hbenabdallah/sherpa"><img src="https://img.shields.io/github/stars/hbenabdallah/sherpa?style=social" alt="Étoiles GitHub"></a>
 </p>
 
@@ -446,12 +446,8 @@ des projets PHP pour les agents de code.
 
 ## Licence
 
-Sherpa est distribué sous la
-[PolyForm Shield License 1.0.0](https://github.com/hbenabdallah/sherpa/blob/main/LICENSE),
-une licence « source disponible » : vous pouvez l'utiliser, le modifier et le
-redistribuer, y compris en entreprise, pour tout usage qui ne concurrence pas
-Sherpa. Il est interdit de fournir, à partir de ce code, un produit concurrent.
-Ce n'est pas une licence open source approuvée par l'OSI.
+Sherpa est un logiciel libre, sous
+[licence MIT](https://github.com/hbenabdallah/sherpa/blob/main/LICENSE).
 
 L'exécutable embarque aussi PHP et des paquets Composer sous leurs propres
 licences, listées dans `THIRD-PARTY-NOTICES.md` à chaque version.
