@@ -10,6 +10,9 @@ commands. These pages cover the rest:
   several providers, a local model, a project that runs in a container, skills,
   MCP servers, measuring documentation search on your own project, and keeping
   an eye on cost.
+- **[Threat model](threat-model.md)**: what Sherpa protects, from whom, each
+  defence, and what it leaves to you. To report a vulnerability, see
+  [SECURITY.md](../SECURITY.md).
 - **[Design choices](design-choices.md)**: what was decided while building
   an AI agent, and the measurements behind each decision. It also lists what was
   tried and rejected.
