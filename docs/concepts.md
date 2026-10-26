@@ -79,6 +79,17 @@ or at `/`. The documentation index and the project's skills take only files
 inside the project too, so a link in a repository cannot hand the model a file
 from elsewhere without asking.
 
+Commands run on your machine go through a **sandbox**: bubblewrap on Linux,
+`sandbox-exec` on macOS. They read what you can read, and write only to the
+project, the temporary directories and the package managers' caches (`~/.cache`,
+`~/.composer`, `~/.npm`…). A command cannot change your shell profile, your SSH
+configuration or Sherpa's own grants, and cannot read the API keys Sherpa keeps.
+`SHERPA_SANDBOX=strict` also cuts the network; `SHERPA_SANDBOX=off` turns the
+sandbox off. Without bubblewrap installed, Sherpa says at start that commands run
+without a sandbox. A command run in the project's container is not wrapped: the
+container is its sandbox. Docker's socket stays reachable from the sandbox, and
+a command that talks to it can do anything Docker can.
+
 `web_fetch` follows redirects one at a time, and refuses one that leads from a
 public address to `localhost`, a private network or a cloud metadata address.
 
