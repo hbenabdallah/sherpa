@@ -68,7 +68,7 @@ final class PlanAnswer implements Approver
     /** @var list<string> */
     public array $plans = [];
     public function __construct(private readonly bool $yes) {}
-    public function confirm(App\Agent\Tool\ToolCall $call, App\Agent\Tool\ToolDefinition $def): ConfirmChoice { return ConfirmChoice::Once; }
+    public function confirm(App\Agent\Tool\ToolCall $call, App\Agent\Tool\ToolDefinition $def, App\Permission\Offer $offer): ConfirmChoice { return ConfirmChoice::Once; }
     public function approvePlan(string $plan): ?bool { $this->plans[] = $plan; return $this->yes; }
 }
 

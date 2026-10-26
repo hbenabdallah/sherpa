@@ -9,6 +9,7 @@ use App\Agent\Tool\ToolCall;
 use App\Agent\Tool\ToolDefinition;
 use App\Permission\Approver;
 use App\Permission\ConfirmChoice;
+use App\Permission\Offer;
 use App\Project\ProjectPathResolver;
 use App\Tool\Edit\EditPreview;
 use App\Tool\Edit\ProposedEdit;
@@ -264,9 +265,13 @@ final class EditorFrontend implements AgentOutput, Approver
 
     // ---- questions --------------------------------------------------------------
 
-    public function confirm(ToolCall $call, ToolDefinition $def): ConfirmChoice
+    public function confirm(ToolCall $call, ToolDefinition $def, Offer $offer): ConfirmChoice
     {
         $edit = $this->calls[$call->id]['edit'] ?? $this->edits->of($call);
+        $content = $this->preview($call->name, $call->arguments, $edit) ?: [self::text($def->description)];
+        if (!$offer->standing()) {
+            $content[] = self::text("Asked every time: {$offer->onlyOnce}");
+        }
 
         try {
             $answer = $this->connection->request('session/request_permission', [
@@ -276,21 +281,50 @@ final class EditorFrontend implements AgentOutput, Approver
                     'title'      => ToolDescriptions::title($call->name, $call->arguments),
                     'kind'       => ToolDescriptions::kind($call->name),
                     'status'     => 'pending',
-                    'content'    => $this->preview($call->name, $call->arguments, $edit) ?: [self::text($def->description)],
+                    'content'    => $content,
                 ],
-                'options' => self::OPTIONS,
+                'options' => self::options($offer),
             ]);
         } catch (AcpError) {
             // No answer is not a yes.
             return ConfirmChoice::Deny;
         }
 
-        return match (self::chosen($answer)) {
+        $chosen = self::chosen($answer);
+        // Only what was offered: an answer naming another option is no answer.
+        if (!in_array($chosen, array_column(self::options($offer), 'optionId'), true)) {
+            return ConfirmChoice::Deny;
+        }
+
+        return match ($chosen) {
             'allow-once'    => ConfirmChoice::Once,
             'allow-session' => ConfirmChoice::Session,
             'allow-project' => ConfirmChoice::Project,
             default         => ConfirmChoice::Deny,
         };
+    }
+
+    /**
+     * The answers offered: once and refuse only for what is asked every time,
+     * and for a command, the commands a longer answer would grant, named.
+     *
+     * @return list<array{optionId: string, name: string, kind: string}>
+     */
+    private static function options(Offer $offer): array
+    {
+        if (!$offer->standing()) {
+            return [self::OPTIONS[0], self::OPTIONS[3]];
+        }
+        if ($offer->grants === []) {
+            return self::OPTIONS;
+        }
+
+        $commands = implode(', ', $offer->commands());
+        $options = self::OPTIONS;
+        $options[1]['name'] = "Allow {$commands} for this session";
+        $options[2]['name'] = "Always allow {$commands} in this project";
+
+        return $options;
     }
 
     /** The plan in the plan_ready card, and the question under it. */

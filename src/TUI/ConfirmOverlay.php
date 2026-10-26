@@ -6,6 +6,7 @@ use App\Agent\Tool\ToolCall;
 use App\Agent\Tool\ToolDefinition;
 use App\Permission\Approver;
 use App\Permission\ConfirmChoice;
+use App\Permission\Offer;
 use App\Tool\FilePatchTool;
 use App\Tool\FileWriteTool;
 use App\Tool\ShellExecTool;
@@ -23,9 +24,9 @@ class ConfirmOverlay implements Approver
         private readonly MarkdownRenderer $markdown = new MarkdownRenderer(),
     ) {}
 
-    public function confirm(ToolCall $call, ToolDefinition $def): ConfirmChoice
+    public function confirm(ToolCall $call, ToolDefinition $def, Offer $offer): ConfirmChoice
     {
-        return $this->show($call, $def);
+        return $this->show($call, $def, $offer);
     }
 
     /**
@@ -80,14 +81,14 @@ class ConfirmOverlay implements Approver
      * the scrollback, the keypress echoed inside it, and no trace of what was
      * chosen. The question line is then replaced by the answer.
      */
-    public function show(ToolCall $call, ToolDefinition $def): ConfirmChoice
+    public function show(ToolCall $call, ToolDefinition $def, Offer $offer = new Offer()): ConfirmChoice
     {
         [$cols] = $this->terminal->size();
         $width = max(20, min(76, $cols - 4));
 
         $diffLines = explode("\n", $this->buildPreview($call));
 
-        echo "\n" . $this->frame($call, $def, $diffLines, $width);
+        echo "\n" . $this->frame($call, $def, $diffLines, $width, $offer);
 
         $this->terminal->rawMode();
         // A key typed while the model was working is not an answer to a
@@ -97,13 +98,14 @@ class ConfirmOverlay implements Approver
 
         try {
             while (true) {
-                echo "\r\e[2K" . self::QUESTION;
+                echo "\r\e[2K" . ($offer->standing() ? self::QUESTION : self::QUESTION_ONCE);
 
                 $key = strtolower($this->terminal->readKey());
                 $picked = match ($key) {
                     'a' => ConfirmChoice::Once,
-                    's' => ConfirmChoice::Session,
-                    'p' => ConfirmChoice::Project,
+                    // Not offered for what is only ever allowed once.
+                    's' => $offer->standing() ? ConfirmChoice::Session : null,
+                    'p' => $offer->standing() ? ConfirmChoice::Project : null,
                     // End of input refuses too: a closed terminal must not
                     // spin here, and must not allow anything either.
                     'r', "\x03", '' => ConfirmChoice::Deny,
@@ -119,7 +121,7 @@ class ConfirmOverlay implements Approver
             $this->terminal->restoreMode();
             // Wiped whatever the key echoed, if the terminal echoed it, along
             // with the question: the answer takes its place, and stays.
-            echo "\r\e[2K" . self::verdict($choice, $call->name) . "\n";
+            echo "\r\e[2K" . self::verdict($choice, $call->name, $offer) . "\n";
         }
 
         return $choice;
@@ -132,15 +134,22 @@ class ConfirmOverlay implements Approver
         . Terminal::RED . '[r]' . Terminal::RESET . ' Refuse  '
         . Terminal::BOLD . '› ' . Terminal::RESET;
 
+    private const QUESTION_ONCE = '  '
+        . Terminal::GREEN . '[a]' . Terminal::RESET . ' Allow once  '
+        . Terminal::RED . '[r]' . Terminal::RESET . ' Refuse  '
+        . Terminal::BOLD . '› ' . Terminal::RESET;
+
     /** The line that replaces the question: what was chosen, and what happens now. */
-    public static function verdict(ConfirmChoice $choice, string $tool): string
+    public static function verdict(ConfirmChoice $choice, string $tool, Offer $offer = new Offer()): string
     {
         $tool = Terminal::plain($tool, singleLine: true);
+        // What the grant names, when it is not the whole tool.
+        $what = $offer->grants === [] ? '' : ': ' . Terminal::plain(implode(', ', $offer->commands()), singleLine: true);
 
         return match ($choice) {
             ConfirmChoice::Once    => Terminal::GREEN . "  ✓ Allowed once — running {$tool}…" . Terminal::RESET,
-            ConfirmChoice::Session => Terminal::GREEN . "  ✓ Allowed for this session — running {$tool}…" . Terminal::RESET,
-            ConfirmChoice::Project => Terminal::GREEN . "  ✓ Always allowed in this project — running {$tool}…" . Terminal::RESET,
+            ConfirmChoice::Session => Terminal::GREEN . "  ✓ Allowed for this session{$what} — running {$tool}…" . Terminal::RESET,
+            ConfirmChoice::Project => Terminal::GREEN . "  ✓ Always allowed in this project{$what} — running {$tool}…" . Terminal::RESET,
             ConfirmChoice::Deny    => Terminal::RED . "  ✗ Refused — {$tool} does not run." . Terminal::RESET,
         };
     }
@@ -154,9 +163,12 @@ class ConfirmOverlay implements Approver
      * command, after a run of spaces, was approved without being seen — and
      * what does not fit is counted out loud rather than dropped.
      *
+     * Under the arguments, what a longer answer would grant — a command
+     * rather than the tool — or why only "once" is offered.
+     *
      * @param array<int, string> $diffLines
      */
-    public function frame(ToolCall $call, ToolDefinition $def, array $diffLines, int $width): string
+    public function frame(ToolCall $call, ToolDefinition $def, array $diffLines, int $width, Offer $offer = new Offer()): string
     {
         $inner = $width - 4;
         $yellow = Terminal::YELLOW;
@@ -175,6 +187,15 @@ class ConfirmOverlay implements Approver
 
         $out .= $row($def->description, Terminal::GRAY);
         $out .= $row($this->summarizeArgs($call->arguments, $inner), Terminal::WHITE);
+        // Wrapped, not cut: this is what a grant would cover from now on.
+        $note = match (true) {
+            !$offer->standing() => ["⚠ Asked every time: {$offer->onlyOnce}", Terminal::RED],
+            $offer->grants !== [] => ['[s]/[p] would allow: ' . implode(', ', $offer->commands()), Terminal::CYAN],
+            default => null,
+        };
+        foreach ($note === null ? [] : self::wrap(Terminal::plain($note[0], singleLine: true), $inner) as $piece) {
+            $out .= $row($piece, $note[1]);
+        }
         $out .= $row(str_repeat('─', $inner), Terminal::GRAY);
 
         $shown = 0;
