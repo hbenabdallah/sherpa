@@ -363,6 +363,7 @@ ce qui a été rejeté, est dans [les choix de conception](https://github.com/hb
 | `SHERPA_MAX_SESSION_TOKENS` | arrête une session au-delà de ce nombre de tokens |
 | `SHERPA_FACT_EXTRACTION=off` | pas de passage mémoire en fin de session |
 | `SHERPA_UPDATE_CHECK=off` | pas de vérification quotidienne d'une nouvelle version |
+| `SHERPA_SANDBOX=strict` · `off` | commandes sans réseau non plus · sans sandbox |
 
 Depuis les sources, les mêmes réglages peuvent aller dans `.env` (voir
 `.env.dist`).
@@ -389,9 +390,12 @@ dernière version : rien sur vous ni sur votre code ne part avec, et
 d'abord, sauf si vous avez autorisé cet outil — ou, pour les commandes, cette
 commande — pour la session ou le projet ; `/permissions` affiche et retire ces
 autorisations. Une suppression récursive, un push ou `sudo` sont demandés à
-chaque fois. Les outils de fichiers sont
-confinés au dossier du projet, liens symboliques compris, et `web_fetch` ne
-suit pas une redirection du web vers votre machine ou votre réseau local.
+chaque fois. Les outils de fichiers sont confinés au dossier du projet, liens
+symboliques compris. Les commandes tournent dans une sandbox (bubblewrap sous
+Linux, `sandbox-exec` sous macOS) qui ne les laisse écrire que dans le projet,
+`/tmp` et les caches des gestionnaires de paquets
+([détails](docs/concepts.md#tools-and-permissions)). `web_fetch` ne suit pas une
+redirection du web vers votre machine ou votre réseau local.
 
 **Quels modèles fonctionnent ?** Tout modèle qui sait appeler des outils, en
 ligne ou par Ollama. Sherpa est une boucle d'appels d'outils, et le dit quand un
