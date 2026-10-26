@@ -210,8 +210,11 @@ still gets all of it.
 | `todo_write` | keep a plan for a task of several steps, shown as it changes | no |
 
 A confirmation offers **[a]** allow once, **[s]** for the session, **[p]** always
-for this project, **[r]** refuse. `/permissions` lists the grants, standing and
-for this session, and withdraws them.
+for this project, **[r]** refuse. For a command, **[s]** and **[p]** grant that
+command (`make test *`), not every command, and some are asked about every time:
+`sudo`, `rm -r`, `git push`, a download piped into a shell…
+([details](docs/concepts.md#tools-and-permissions)). `/permissions` lists the
+grants, standing and for this session, and withdraws them.
 
 ### Commands
 
@@ -229,7 +232,7 @@ for this session, and withdraws them.
 | `/todo` | the plan the model keeps for the current task |
 | `/jobs` · `/jobs stop <id>` | commands left running in the background, and stopping one |
 | `/project`, `/project edit`, `/project forget` | the current project |
-| `/permissions` · `/permissions revoke <tool>` · `/permissions clear` | the grants, standing and for this session, and withdrawing them |
+| `/permissions` · `/permissions revoke <tool\|command>` · `/permissions clear` | the grants, standing and for this session, and withdrawing them |
 | `/mcp` · `/mcp add` · `/mcp disable\|enable\|remove <name>` · `/<server>:<prompt>` | the MCP servers with their resources and prompts · declare one, tried at once · turn one off, back on, or forget it · run one of their prompts |
 | `/skills`, `/tools` | what the model can load, and what it can call |
 | `/reset`, `/exit` | an empty conversation · leave (Ctrl+C at an empty prompt too) |
@@ -358,12 +361,14 @@ and `SHERPA_UPDATE_CHECK=off` stops it.
 
 **Can it change my files or run commands without asking?** No. Writing a file,
 running a command and fetching a web page always ask first, unless you granted
-that tool for the session or the project; `/permissions` shows and withdraws
-those grants. File tools are confined to the project directory, symbolic
-links included. Commands run in a sandbox (bubblewrap on Linux, `sandbox-exec`
-on macOS) that lets them write only to the project, `/tmp` and package caches
-([details](docs/concepts.md#tools-and-permissions)). `web_fetch` does not follow
-a redirect from the web to your machine or your local network.
+that tool — or, for commands, that command — for the session or the project;
+`/permissions` shows and withdraws those grants. A recursive delete, a push or
+`sudo` is asked about every time. File tools are confined to the project
+directory, symbolic links included. Commands run in a sandbox (bubblewrap on
+Linux, `sandbox-exec` on macOS) that lets them write only to the project, `/tmp`
+and package caches ([details](docs/concepts.md#tools-and-permissions)).
+`web_fetch` does not follow a redirect from the web to your machine or your
+local network.
 
 **Which models work?** Any model that supports tool calling, online or through
 Ollama. Sherpa is a loop of tool calls, and says so when a model cannot make them.

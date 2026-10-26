@@ -52,9 +52,24 @@ ask for confirmation first:
 | **p** | this tool, always, in this project |
 | **r** | nothing: the model is told the call was refused |
 
+For `shell_exec`, **s** and **p** grant the commands of the call, never the
+tool. `make test` grants `make test *`: that program and that first argument,
+with any arguments after them. A command whose first argument is an option, or
+whose program runs other commands (`docker`, `bash`, `find`, `curl`, `npx`…),
+is granted exactly as it is. A line with several commands (`&&`, `;`, `|`)
+runs unasked only when every one of them is granted. The box says what a grant
+would cover before you answer.
+
+Some commands are asked about every time, granted or not, and only **a** or
+**r** is offered: `sudo`, `rm -r`, `git push`, `git reset --hard`, `git clean -f`,
+`chmod -R`, `dd`, a download piped into a shell, `docker … prune`, `find -delete`
+or `-exec`. So is a command that writes to a file through `>`, or whose words do
+not say what runs: `$( )`, backticks, a loop, a here-document.
+
 `/permissions` lists the grants that are in force and withdraws them. A tool
-revoked there asks again at its next call, whether it was granted for the
-project or for the session.
+or a command revoked there asks again at its next call, whether it was granted
+for the project or for the session. A grant of `shell_exec` itself, made by an
+earlier Sherpa, is not carried over: the next command asks again.
 
 The file tools are **confined to the project**, which is the directory Sherpa
 was started in. A path outside it is refused, whether it is absolute, starts

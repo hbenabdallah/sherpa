@@ -220,8 +220,11 @@ au-delà de cinq lignes ou de mille caractères, il s'affiche comme
 | `todo_write` | tenir un plan pour une tâche en plusieurs étapes, affiché à chaque mise à jour | non |
 
 Une confirmation propose **[a]** une fois, **[s]** pour la session, **[p]**
-toujours pour ce projet, **[r]** refuser. `/permissions` liste les autorisations,
-permanentes et de la session, et les retire.
+toujours pour ce projet, **[r]** refuser. Pour une commande, **[s]** et **[p]**
+autorisent cette commande (`make test *`), pas toutes les commandes, et certaines
+sont demandées à chaque fois : `sudo`, `rm -r`, `git push`, un téléchargement
+envoyé à un shell… ([détails](docs/concepts.md#tools-and-permissions)).
+`/permissions` liste les autorisations, permanentes et de la session, et les retire.
 
 ### Commandes
 
@@ -239,7 +242,7 @@ permanentes et de la session, et les retire.
 | `/todo` | le plan que le modèle tient pour la tâche en cours |
 | `/jobs` · `/jobs stop <id>` | les commandes laissées en arrière-plan, et en arrêter une |
 | `/project`, `/project edit`, `/project forget` | le projet courant |
-| `/permissions` · `/permissions revoke <outil>` · `/permissions clear` | les autorisations, permanentes et de la session, et les retirer |
+| `/permissions` · `/permissions revoke <outil\|commande>` · `/permissions clear` | les autorisations, permanentes et de la session, et les retirer |
 | `/mcp` · `/mcp add` · `/mcp disable\|enable\|remove <nom>` · `/<serveur>:<prompt>` | les serveurs MCP avec leurs resources et prompts · en déclarer un, essayé aussitôt · en couper un, le rallumer ou l'oublier · lancer un de leurs prompts |
 | `/skills`, `/tools` | ce que le modèle peut charger, et ce qu'il peut appeler |
 | `/reset`, `/exit` | une conversation vide · quitter (Ctrl+C à une invite vide aussi) |
@@ -380,13 +383,15 @@ dernière version : rien sur vous ni sur votre code ne part avec, et
 
 **Peut-il modifier mes fichiers ou lancer des commandes sans demander ?** Non.
 Écrire un fichier, lancer une commande et lire une page web demandent toujours
-d'abord, sauf si vous avez autorisé cet outil pour la session ou le projet ;
-`/permissions` affiche et retire ces autorisations. Les outils de fichiers sont
-confinés au dossier du projet, liens symboliques compris. Les commandes tournent
-dans une sandbox (bubblewrap sous Linux, `sandbox-exec` sous macOS) qui ne les
-laisse écrire que dans le projet, `/tmp` et les caches des gestionnaires de
-paquets ([détails](docs/concepts.md#tools-and-permissions)). `web_fetch` ne suit
-pas une redirection du web vers votre machine ou votre réseau local.
+d'abord, sauf si vous avez autorisé cet outil — ou, pour les commandes, cette
+commande — pour la session ou le projet ; `/permissions` affiche et retire ces
+autorisations. Une suppression récursive, un push ou `sudo` sont demandés à
+chaque fois. Les outils de fichiers sont confinés au dossier du projet, liens
+symboliques compris. Les commandes tournent dans une sandbox (bubblewrap sous
+Linux, `sandbox-exec` sous macOS) qui ne les laisse écrire que dans le projet,
+`/tmp` et les caches des gestionnaires de paquets
+([détails](docs/concepts.md#tools-and-permissions)). `web_fetch` ne suit pas une
+redirection du web vers votre machine ou votre réseau local.
 
 **Quels modèles fonctionnent ?** Tout modèle qui sait appeler des outils, en
 ligne ou par Ollama. Sherpa est une boucle d'appels d'outils, et le dit quand un

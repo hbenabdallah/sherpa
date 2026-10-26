@@ -141,9 +141,9 @@ check('the change survives a reload', $reloaded->get($before->slug)?->name === '
     (string) $reloaded->get($before->slug)?->name);
 
 // Standing permissions belong to the project, not to its address.
-$store->allowTool($after, 'shell_exec');
+$store->allowTool($after, 'file_write');
 $moved = $store->update($after, 'Encore ailleurs', $fresh(), $none);
-check('standing permissions survive an edit', $moved->allowedTools === ['shell_exec'], json_encode($moved->allowedTools));
+check('standing permissions survive an edit', $moved->allowedTools === ['file_write'], json_encode($moved->allowedTools));
 
 $store->delete($moved->slug);
 
@@ -159,13 +159,13 @@ $sessionB2 = new ProjectStore(new StackDetector());   // B starts after alpha ex
 $beta = $sessionB2->create('Beta', $fresh(), $none);
 
 // A now writes anything at all.
-$sessionA->allowTool($alpha, 'shell_exec');
+$sessionA->allowTool($alpha, 'file_write');
 
 $reloaded = new ProjectStore(new StackDetector());
 check('a write in one session does not delete another session\'s project',
     $reloaded->get($beta->slug) !== null, implode(',', array_map(fn($p) => $p->slug, $reloaded->all())));
 check('and its own change is still recorded',
-    in_array('shell_exec', $reloaded->get($alpha->slug)?->allowedTools ?? [], true),
+    in_array('file_write', $reloaded->get($alpha->slug)?->allowedTools ?? [], true),
     json_encode($reloaded->get($alpha->slug)?->allowedTools));
 
 // The same guarantee for deletion: A deleting alpha must not resurrect or
