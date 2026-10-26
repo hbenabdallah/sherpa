@@ -7,6 +7,7 @@ use App\Agent\Tool\AsTool;
 use App\Agent\Tool\Param;
 use App\Agent\Tool\Permission;
 use App\Memory\MemoryStore;
+use App\Permission\SecretFiles;
 use App\Project\ProjectPathResolver;
 use Symfony\Component\Process\Process;
 
@@ -84,6 +85,11 @@ class ProjectGrepTool
         // read primitive for the whole filesystem at AUTO permission.
         $target = $path !== null ? $this->paths->resolve($path) : $base;
 
+        // A file that usually holds secrets is read with file_read, which asks.
+        if (is_file($target) && ($secret = SecretFiles::reason($target)) !== null) {
+            return "Not searched: {$secret}. Read it with file_read, which asks the user first.";
+        }
+
         $resultCap = $this->resultCap();
 
         // -E: the regex dialect models actually write. In grep's default one,
@@ -140,6 +146,24 @@ class ProjectGrepTool
         // Make paths relative to project for readability
         $output = str_replace($base . '/', '', $output);
 
+        // Matches in files that usually hold secrets are left out, and named:
+        // "not found" would send the model looking elsewhere for what is there.
+        $hidden = [];
+        $output = implode("\n", array_filter(explode("\n", $output), static function (string $line) use (&$hidden): bool {
+            if (preg_match('/^(.*?):\d+:/', $line, $m) === 1 && SecretFiles::reason($m[1]) !== null) {
+                $hidden[$m[1]] = true;
+
+                return false;
+            }
+
+            return true;
+        }));
+        $footer = $hidden === [] ? '' : "\n(matches in " . implode(', ', array_keys($hidden))
+            . ' not shown: they usually hold secrets. file_read asks the user before reading one.)';
+        if ($output === '') {
+            return "No matches shown for: {$pattern}" . $footer;
+        }
+
         // Bounded by lines and by characters: a line count alone let one
         // match inside minified JSON bring a whole megabyte into the window.
         $charCap = $resultCap * self::CHARS_PER_RESULT;
@@ -158,6 +182,6 @@ class ProjectGrepTool
             $chars += strlen($line) + 1;
         }
 
-        return implode("\n", $shown);
+        return implode("\n", $shown) . $footer;
     }
 }

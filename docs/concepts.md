@@ -66,6 +66,16 @@ Some commands are asked about every time, granted or not, and only **a** or
 or `-exec`. So is a command that writes to a file through `>`, or whose words do
 not say what runs: `$( )`, backticks, a loop, a here-document.
 
+Reading is asked about too, every time, for a file that usually holds secrets:
+`.env` and its variants (not `.env.example` or `.env.dist`), private keys
+(`id_rsa`, `*.pem`, `*.key`), `.npmrc`, `auth.json`, `secrets.yaml`, and anything
+under `.ssh` or `.aws`. What is read goes to the model's provider. `project_grep`
+leaves such files out and says so, and a command that names one is asked about
+every time as well. Whatever a tool returns, a credential in a recognisable form
+(an API key of Anthropic, OpenAI, GitHub, AWS, Google, Stripe, NVIDIA…, a private
+key block) is replaced by `[secret masked: …]` before it is sent, and a file
+write that would put such a marker back in place of the real value is refused.
+
 `/permissions` lists the grants that are in force and withdraws them. A tool
 or a command revoked there asks again at its next call, whether it was granted
 for the project or for the session. A grant of `shell_exec` itself, made by an
