@@ -297,8 +297,9 @@ Sherpa a call graph of the code over MCP.
 
 More in the [documentation](https://github.com/hbenabdallah/sherpa/blob/main/docs/README.md):
 [concepts](https://github.com/hbenabdallah/sherpa/blob/main/docs/concepts.md),
-[how-to guides](https://github.com/hbenabdallah/sherpa/blob/main/docs/how-to.md) and
-[design choices](https://github.com/hbenabdallah/sherpa/blob/main/docs/design-choices.md).
+[how-to guides](https://github.com/hbenabdallah/sherpa/blob/main/docs/how-to.md),
+[design choices](https://github.com/hbenabdallah/sherpa/blob/main/docs/design-choices.md) and the
+[threat model](https://github.com/hbenabdallah/sherpa/blob/main/docs/threat-model.md).
 
 ## Measured, not assumed
 

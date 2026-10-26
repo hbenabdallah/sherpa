@@ -313,8 +313,9 @@ Sherpa le graphe d'appels du code par MCP.
 
 La suite, en anglais, est dans la [documentation](https://github.com/hbenabdallah/sherpa/blob/main/docs/README.md) :
 [concepts](https://github.com/hbenabdallah/sherpa/blob/main/docs/concepts.md),
-[guides pratiques](https://github.com/hbenabdallah/sherpa/blob/main/docs/how-to.md) et
-[choix de conception](https://github.com/hbenabdallah/sherpa/blob/main/docs/design-choices.md).
+[guides pratiques](https://github.com/hbenabdallah/sherpa/blob/main/docs/how-to.md),
+[choix de conception](https://github.com/hbenabdallah/sherpa/blob/main/docs/design-choices.md) et le
+[modèle de menaces](https://github.com/hbenabdallah/sherpa/blob/main/docs/threat-model.md).
 
 ## Mesuré, pas supposé
 
