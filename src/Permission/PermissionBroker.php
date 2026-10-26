@@ -3,6 +3,7 @@
 namespace App\Permission;
 
 use App\Agent\Tool\Permission;
+use App\Agent\Tool\Provenance;
 use App\Agent\Tool\ToolCall;
 use App\Agent\Tool\ToolDefinition;
 
@@ -16,6 +17,8 @@ class PermissionBroker
         // fails to autowire would put back exactly the bug being fixed here —
         // an "[p] Always" that quietly grants nothing. Make it a boot failure.
         private readonly ProjectPermissions $project,
+        // What the session read from outside: a fact written after it is asked about.
+        private readonly ?Provenance $provenance = null,
     ) {}
 
     /**
@@ -25,6 +28,15 @@ class PermissionBroker
     {
         if ($def === null) {
             return true; // tool not found, let Toolbox handle the error
+        }
+
+        // Memory is read by every later session, in its system prompt. After a
+        // web page or an MCP answer, what the model wants kept may be what
+        // that text told it to keep: asked every time, never granted.
+        if ($call->name === 'memory_remember' && $this->provenance?->tainted() && $def->permission !== Permission::DENY) {
+            $reason = "this session has read {$this->provenance->label()}, and a fact is kept for every later session";
+
+            return $this->approver->confirm($call, $def, new Offer([], $reason)) !== ConfirmChoice::Deny;
         }
 
         return match ($def->permission) {

@@ -5,6 +5,7 @@ namespace App\Memory;
 use App\Agent\ContextBudget;
 use App\Agent\MessageBag;
 use App\Agent\PlanMode;
+use App\Agent\Tool\Provenance;
 use App\Platform\PlatformInterface;
 use App\Runtime\Interrupt;
 
@@ -47,6 +48,8 @@ class FactExtractor
         // Optional so the extractor stays constructible on its own, as
         // memory_test builds it; absent, the floor applies.
         private readonly ?ContextBudget $budget = null,
+        // What the session read from outside, kept with each fact found.
+        private readonly ?Provenance $provenance = null,
     ) {}
 
     /** How many characters of transcript this window can afford. */
@@ -233,7 +236,7 @@ class FactExtractor
 
             // remember(), never supersede(): a model reading a transcript is in
             // no position to decide that something it did not see is now wrong.
-            match ($this->store->remember($key, $value)) {
+            match ($this->store->remember($key, $value, Provenance::sourceOf('the end-of-session pass', $this->provenance))) {
                 Recorded::Created => $created++,
                 default           => $known++,
             };

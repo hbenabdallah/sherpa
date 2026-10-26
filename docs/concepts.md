@@ -181,6 +181,14 @@ record.
 A fact is never overwritten. A correction replaces it, and the old value stays
 on record.
 
+Each fact keeps who wrote it: the model, the end-of-session pass, or you with
+`/remember`. A web page or an MCP server's answer can carry instructions meant
+for the model, so what `web_fetch` and MCP tools return reaches it marked as
+data from that source, not as instructions. Once the session has read some,
+`memory_remember` is asked about every time, naming what was read, and the
+fact keeps that it was written after it. `/memory` shows such a fact in red,
+and the system prompt tells the model to check it before relying on it.
+
 A digest of the facts goes into every system prompt, within a fixed budget of
 characters. The facts are ranked by:
 
