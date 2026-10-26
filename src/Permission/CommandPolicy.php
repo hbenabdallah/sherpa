@@ -48,6 +48,13 @@ final class CommandPolicy
             if ($danger !== null) {
                 return $danger;
             }
+            // `cat .env` reads it as surely as file_read does.
+            foreach (array_slice($words, 1) as $word) {
+                $secret = SecretFiles::reason($word);
+                if ($secret !== null) {
+                    return 'it names ' . $secret;
+                }
+            }
         }
 
         return $command->opaque;

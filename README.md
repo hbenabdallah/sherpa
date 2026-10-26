@@ -214,7 +214,9 @@ still gets all of it.
 A confirmation offers **[a]** allow once, **[s]** for the session, **[p]** always
 for this project, **[r]** refuse. For a command, **[s]** and **[p]** grant that
 command (`make test *`), not every command, and some are asked about every time:
-`sudo`, `rm -r`, `git push`, a download piped into a shell…
+`sudo`, `rm -r`, `git push`, a download piped into a shell…, and so is reading
+a file that usually holds secrets (`.env`, `id_rsa`, `*.pem`). API keys in what a
+tool returns are masked before they reach the provider
 ([details](docs/concepts.md#tools-and-permissions)). `/permissions` lists the
 grants, standing and for this session, and withdraws them.
 
@@ -341,6 +343,7 @@ was rejected, is in the [design choices](https://github.com/hbenabdallah/sherpa/
 | `SHERPA_MAX_SESSION_TOKENS` | stop a session past this many tokens |
 | `SHERPA_FACT_EXTRACTION=off` | no memory pass at the end of a session |
 | `SHERPA_UPDATE_CHECK=off` | no daily check for a newer release |
+| `SHERPA_SANDBOX=strict` · `off` | commands without network too · without a sandbox |
 
 From the source, the same settings can live in `.env` (see `.env.dist`).
 
@@ -364,9 +367,12 @@ and `SHERPA_UPDATE_CHECK=off` stops it.
 running a command and fetching a web page always ask first, unless you granted
 that tool — or, for commands, that command — for the session or the project;
 `/permissions` shows and withdraws those grants. A recursive delete, a push or
-`sudo` is asked about every time. File tools are confined to the project directory, symbolic
-links included, and `web_fetch` does not follow a redirect from the web to
-your machine or your local network.
+`sudo` is asked about every time. File tools are confined to the project
+directory, symbolic links included. Commands run in a sandbox (bubblewrap on
+Linux, `sandbox-exec` on macOS) that lets them write only to the project, `/tmp`
+and package caches ([details](docs/concepts.md#tools-and-permissions)).
+`web_fetch` does not follow a redirect from the web to your machine or your
+local network.
 
 **Which models work?** Any model that supports tool calling, online or through
 Ollama. Sherpa is a loop of tool calls, and says so when a model cannot make them.

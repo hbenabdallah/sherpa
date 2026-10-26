@@ -33,8 +33,9 @@ final class BackgroundJobs
      * @param string                        $script      what bash -c runs
      * @param string|null                   $container   the project's container, when it runs there
      * @param callable(string): list<string> $inContainer builds the docker exec around a script
+     * @param list<string>                  $sandbox     the words that run a host command in the sandbox
      */
-    public function start(string $shown, string $script, string $cwd, ?string $container, callable $inContainer): int
+    public function start(string $shown, string $script, string $cwd, ?string $container, callable $inContainer, array $sandbox = []): int
     {
         $id = $this->next++;
 
@@ -45,7 +46,7 @@ final class BackgroundJobs
             $command = $inContainer($wrapped);
             $group = false;
         } else {
-            [$command, $group] = self::ownGroup($script);
+            [$command, $group] = self::ownGroup($script, $sandbox);
         }
 
         $process = new Process($command, cwd: $cwd, timeout: null);
@@ -145,17 +146,24 @@ final class BackgroundJobs
         return $list;
     }
 
-    /** @return array{0: list<string>, 1: bool} the command, and whether it has a group of its own */
-    private static function ownGroup(string $script): array
+    /**
+     * The group is made outside the sandbox, so that stopping the group stops
+     * the sandbox and everything in it.
+     *
+     * @param list<string> $sandbox
+     *
+     * @return array{0: list<string>, 1: bool} the command, and whether it has a group of its own
+     */
+    private static function ownGroup(string $script, array $sandbox = []): array
     {
         if (self::onPath('setsid')) {
-            return [['setsid', 'bash', '-c', $script], true];
+            return [['setsid', ...$sandbox, 'bash', '-c', $script], true];
         }
         if (self::onPath('perl')) {
-            return [['perl', '-e', 'use POSIX qw(setsid); setsid(); exec @ARGV or die', 'bash', '-c', $script], true];
+            return [['perl', '-e', 'use POSIX qw(setsid); setsid(); exec @ARGV or die', ...$sandbox, 'bash', '-c', $script], true];
         }
 
-        return [['bash', '-c', $script], false];
+        return [[...$sandbox, 'bash', '-c', $script], false];
     }
 
     private static function onPath(string $command): bool
