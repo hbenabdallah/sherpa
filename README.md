@@ -345,6 +345,7 @@ was rejected, is in the [design choices](https://github.com/hbenabdallah/sherpa/
 | `SHERPA_FACT_EXTRACTION=off` | no memory pass at the end of a session |
 | `SHERPA_UPDATE_CHECK=off` | no daily check for a newer release |
 | `SHERPA_SANDBOX=strict` · `off` | commands without network too · without a sandbox |
+| `SHERPA_AUTO_APPROVE=1` | answer every question "once", for a run nobody watches (benchmark, CI) |
 
 From the source, the same settings can live in `.env` (see `.env.dist`).
 

@@ -117,6 +117,9 @@ final class BenchRun
                 // Scored on the task, not on the bookkeeping after it: the
                 // extraction was one more request per run, ~7 % of a pass.
                 'SHERPA_FACT_EXTRACTION'    => 'off',
+                // Nobody is there to answer: every question is answered
+                // "once", as the standing grants below used to.
+                'SHERPA_AUTO_APPROVE'       => '1',
             ],
             input: $prompt . "\n/exit\n",
             timeout: $timeout,

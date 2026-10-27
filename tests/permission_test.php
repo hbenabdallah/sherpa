@@ -214,6 +214,16 @@ $reloadedStore->allowTool($reloadedStore->get($project->slug), 'shell_exec');
 $older = (new ProjectStore(new StackDetector()))->get($project->slug);
 check('a grant of shell_exec itself is not carried over', !in_array('shell_exec', $older->allowedTools, true), json_encode($older->allowedTools));
 
+// ---- unattended ---------------------------------------------------------------
+// SHERPA_AUTO_APPROVE answers every question "once": nothing is asked, nothing kept.
+$unattended = new PermissionBroker(new SessionPermissions(), $overlay = new ScriptedOverlay(ConfirmChoice::Deny), $freshPerms, autoApprove: true);
+$before = $freshPerms->all();
+check('unattended, a command runs unasked', $unattended->check(new ToolCall('u', 'shell_exec', ['command' => 'rm -rf build']), definition('shell_exec', Permission::CONFIRM)));
+check('and a write', $unattended->check(call('file_write'), definition('file_write', Permission::CONFIRM)) && $overlay->asked === 0);
+check('but what is refused stays refused', !$unattended->check(call('x'), definition('x', Permission::DENY)));
+check('and nothing is granted for later', $freshPerms->all() === $before);
+check('off unless set', (new PermissionBroker(new SessionPermissions(), $overlay, $freshPerms))->autoApproved() === (getenv('SHERPA_AUTO_APPROVE') === '1'));
+
 // ---- cleanup ---------------------------------------------------------------
 if ($realHome !== null) {
     $_SERVER['HOME'] = $realHome;

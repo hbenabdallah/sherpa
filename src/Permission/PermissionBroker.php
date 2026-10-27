@@ -19,7 +19,20 @@ class PermissionBroker
         private readonly ProjectPermissions $project,
         // What the session read from outside: a fact written after it is asked about.
         private readonly ?Provenance $provenance = null,
+        // SHERPA_AUTO_APPROVE when not given; see autoApproved().
+        private readonly ?bool $autoApprove = null,
     ) {}
+
+    /**
+     * Whether every question is answered "once" without being asked: for a
+     * run nobody watches — the benchmark, a CI job — where the old standing
+     * grant of shell_exec used to do it. Grants nothing that outlives the
+     * call. Never on unless set, and said in red at start.
+     */
+    public function autoApproved(): bool
+    {
+        return $this->autoApprove ?? getenv('SHERPA_AUTO_APPROVE') === '1';
+    }
 
     /**
      * Returns true if the tool call should proceed.
@@ -28,6 +41,10 @@ class PermissionBroker
     {
         if ($def === null) {
             return true; // tool not found, let Toolbox handle the error
+        }
+
+        if ($def->permission !== Permission::DENY && $this->autoApproved()) {
+            return true;
         }
 
         // Memory is read by every later session, in its system prompt. After a

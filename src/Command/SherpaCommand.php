@@ -309,6 +309,11 @@ class SherpaCommand extends Command
                 . Terminal::GRAY . " there, make cannot reach docker. /project edit and Docker off runs them on this machine.\n" . Terminal::RESET;
         }
 
+        if (getenv('SHERPA_AUTO_APPROVE') === '1') {
+            echo Terminal::RED . '  ⚠ SHERPA_AUTO_APPROVE=1: every command, write and read runs without asking.'
+                . Terminal::RESET . "\n";
+        }
+
         // Commands run on this machine, not in a container: where they may
         // write, or that nothing keeps them in.
         if ($this->sandbox !== null && !($project->docker->enabled && $project->docker->container !== '') && !is_file('/.dockerenv')) {
