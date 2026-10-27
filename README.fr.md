@@ -365,6 +365,7 @@ ce qui a été rejeté, est dans [les choix de conception](https://github.com/hb
 | `SHERPA_FACT_EXTRACTION=off` | pas de passage mémoire en fin de session |
 | `SHERPA_UPDATE_CHECK=off` | pas de vérification quotidienne d'une nouvelle version |
 | `SHERPA_SANDBOX=strict` · `off` | commandes sans réseau non plus · sans sandbox |
+| `SHERPA_AUTO_APPROVE=1` | répondre « une fois » à chaque question, pour une exécution sans personne (benchmark, CI) |
 
 Depuis les sources, les mêmes réglages peuvent aller dans `.env` (voir
 `.env.dist`).
