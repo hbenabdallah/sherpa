@@ -124,8 +124,11 @@ final class PoisonedPage
 
 // ---- the machine -----------------------------------------------------------
 // Outside the temporary directories, which the sandbox lets commands write.
+// In the home when it can be written, else in var/: in the Docker image the
+// home is the host's path, made by the mounts and owned by root.
 $realHome = (string) ($_SERVER['HOME'] ?? getenv('HOME'));
-$base = $realHome . '/.sherpa-adversarial-' . bin2hex(random_bytes(3));
+$parent = is_writable($realHome) ? $realHome : dirname(__DIR__) . '/var';
+$base = $parent . '/.sherpa-adversarial-' . bin2hex(random_bytes(3));
 $home = $base . '/home';
 $root = $base . '/project';
 mkdir($home . '/.config/sherpa/projects', 0777, true);
