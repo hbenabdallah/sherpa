@@ -1,5 +1,5 @@
 parameters:
-    level: 4
+    level: 5
     # Not tests/: each suite is a standalone script with its own global helpers (check(), platform()...),
     # and analysed together they collide.
     paths:
