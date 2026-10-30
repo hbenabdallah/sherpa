@@ -124,7 +124,7 @@ final class SlashMenu
 
         $first = max(0, min($this->selected - intdiv(self::ROWS, 2), $count - self::ROWS));
         $shown = array_slice($this->matches, $first, self::ROWS, true);
-        $nameWidth = max(array_map(fn(array $e): int => mb_strwidth($e['name'] . ($e['hint'] !== '' ? ' ' . $e['hint'] : '')), $shown));
+        $nameWidth = max(0, ...array_map(fn(array $e): int => mb_strwidth($e['name'] . ($e['hint'] !== '' ? ' ' . $e['hint'] : '')), $shown));
 
         $rows = [];
         foreach ($shown as $i => $entry) {

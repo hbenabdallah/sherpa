@@ -233,7 +233,7 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
      *
      * @param array<int|string, array<mixed>> $toolCalls
      * @param (callable(string): void)|null    $onToken
-     * @param (callable(bool, ?string=): void)|null $onWait
+     * @param (callable(bool, string=): void)|null $onWait
      */
     private function consumeLine(string $line, string &$content, array &$toolCalls, ?callable $onToken, ?callable $onWait = null): void
     {
@@ -479,7 +479,7 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
             }
 
             foreach ($rows as $row) {
-                $vectors[] = array_map(floatval(...), (array) $row);
+                $vectors[] = array_values(array_map(floatval(...), (array) $row));
             }
         }
 

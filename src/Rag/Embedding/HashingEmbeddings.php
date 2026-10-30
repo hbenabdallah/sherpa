@@ -42,7 +42,7 @@ final class HashingEmbeddings implements EmbeddingProvider
                 $v[crc32($stem) % $this->dimensions] += 1.0;
             }
 
-            return Vectors::normalize($v);
+            return Vectors::normalize(array_values($v));
         }, $texts);
     }
 }

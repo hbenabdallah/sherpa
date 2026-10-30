@@ -175,7 +175,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
      *
      * @param array<string, mixed>          $payload
      * @param (callable(string): void)|null $onToken
-     * @param (callable(bool, ?string=): void)|null $onWait
+     * @param (callable(bool, string=): void)|null $onWait
      *
      * @return array<string, mixed>
      */
@@ -245,7 +245,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
      * screen; a second reply would print after the first half.
      *
      * @return bool false when the user cut the wait short
-     * @param (callable(bool, ?string=): void)|null $onWait
+     * @param (callable(bool, string=): void)|null $onWait
      */
     private function waitBeforeRetry(StreamFailed $e, bool $shown, int $try, ?callable $onWait): bool
     {
@@ -327,7 +327,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
      * request would only repeat, at the same price.
      *
      * @param array<string, mixed> $payload
-     * @param (callable(bool, ?string=): void)|null $onWait
+     * @param (callable(bool, string=): void)|null $onWait
      */
     private function send(array $payload, string $path = '/chat/completions', string $accept = 'text/event-stream', ?callable $onWait = null): ResponseInterface
     {
@@ -413,7 +413,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
      * how long, and Ctrl+C is heard — a minute is too long to be deaf.
      *
      * @return bool false when the user cut it short
-     * @param (callable(bool, ?string=): void)|null $onWait
+     * @param (callable(bool, string=): void)|null $onWait
      */
     private function pause(int $seconds, string $why, ?callable $onWait): bool
     {
@@ -441,7 +441,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
      * and Ctrl+C unheard.
      *
      * @return bool false when the user cut it short
-     * @param (callable(bool, ?string=): void)|null $onWait
+     * @param (callable(bool, string=): void)|null $onWait
      */
     private function awaitHeaders(ResponseInterface $response, ?callable $onWait): bool
     {
@@ -571,7 +571,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
      * @param (callable(string): void)|null $onToken
      *
      * @return array<string, mixed>
-     * @param (callable(bool, ?string=): void)|null $onWait
+     * @param (callable(bool, string=): void)|null $onWait
      */
     private function consume(
         ResponseInterface $response,
@@ -606,7 +606,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
      * @param callable(string): void $onLine
      *
      * @return bool false when the user cut it short
-     * @param (callable(bool, ?string=): void)|null $onWait
+     * @param (callable(bool, string=): void)|null $onWait
      */
     private function pump(ResponseInterface $response, ?callable $onWait, callable $onLine): bool
     {
@@ -656,7 +656,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
      *
      * @param array<int|string, array<string, mixed>> $toolCalls
      * @param (callable(string): void)|null           $onToken
-     * @param (callable(bool, ?string=): void)|null $onWait
+     * @param (callable(bool, string=): void)|null $onWait
      */
     private function consumeLine(
         string $line,
@@ -915,7 +915,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
      *
      * @return array<string, mixed>
      * @param (callable(string): void)|null $onToken
-     * @param (callable(bool, ?string=): void)|null $onWait
+     * @param (callable(bool, string=): void)|null $onWait
      */
     private function streamAnthropic(array $messages, array $tools, ?callable $onToken, ?callable $onWait): array
     {
@@ -1066,7 +1066,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
             // Answers carry their index; nothing promises they come in order.
             usort($rows, static fn(array $a, array $b): int => ($a['index'] ?? 0) <=> ($b['index'] ?? 0));
             foreach ($rows as $row) {
-                $vectors[] = array_map(floatval(...), (array) ($row['embedding'] ?? []));
+                $vectors[] = array_values(array_map(floatval(...), (array) ($row['embedding'] ?? [])));
             }
         }
 

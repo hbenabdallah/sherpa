@@ -117,7 +117,7 @@ final readonly class SlashCommands
             ['/exit', '', 'Leave Sherpa'],
         ];
 
-        return array_map(fn(array $e): array => ['name' => $e[0], 'hint' => $e[1], 'description' => $e[2]], $entries);
+        return array_values(array_map(fn(array $e): array => ['name' => $e[0], 'hint' => $e[1], 'description' => $e[2]], $entries));
     }
 
     public function handle(string $cmd, MessageBag $bag, Project $project): bool

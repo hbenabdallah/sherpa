@@ -171,6 +171,7 @@ final class McpCommand extends Command
      * "Authorization: Bearer x" or "TOKEN=x", as a map.
      *
      * @param array<int, string> $items
+     * @param non-empty-string   $separator
      *
      * @return array<string, string>
      *

@@ -182,7 +182,8 @@ class MemoryStore
     {
         $this->assertOpen();
 
-        return $this->conn->executeStatement('DELETE FROM facts WHERE key = :key', ['key' => $key]);
+        // DBAL gives a count beyond PHP_INT_MAX as a string; a facts table never holds one.
+        return (int) $this->conn->executeStatement('DELETE FROM facts WHERE key = :key', ['key' => $key]);
     }
 
     /**

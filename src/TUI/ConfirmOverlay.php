@@ -288,7 +288,7 @@ class ConfirmOverlay implements Approver
             ) . (filter_var($args['background'] ?? false, FILTER_VALIDATE_BOOLEAN)
                 ? "\n(left running in the background: /jobs lists it, and it stops when Sherpa exits)"
                 : ''),
-            default => json_encode($args, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
+            default => json_encode($args, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
         };
     }
 

@@ -42,7 +42,7 @@ class SessionPermissions
         return $count;
     }
 
-    /** @return array<int, string> */
+    /** @return list<string> */
     public function all(): array
     {
         return array_keys($this->sessionAllowed);

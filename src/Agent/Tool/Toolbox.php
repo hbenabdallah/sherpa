@@ -195,8 +195,13 @@ class Toolbox
 
         // Every result, whichever tool: a key a command printed or a page
         // held goes to the provider as a marker, not as the key.
+        $handler = $def->handler;
+        if (!is_callable($handler)) {
+            throw new LogicException("Tool {$def->name}'s handler cannot be called: it needs an __invoke method");
+        }
+
         try {
-            $result = ($def->handler)(...$this->coerce($def, $call->arguments));
+            $result = $handler(...$this->coerce($def, $call->arguments));
             $content = is_string($result) ? $result : json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
             $content = SecretMask::mask((string) $content);

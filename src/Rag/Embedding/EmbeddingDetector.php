@@ -74,7 +74,7 @@ final readonly class EmbeddingDetector
      * The best embedding model in a catalogue: a known one, else anything
      * whose name says it embeds. Ollama tags carry ":latest" and the like.
      *
-     * @param list<string> $offered
+     * @param array<int, string> $offered
      */
     public static function pick(array $offered): ?string
     {

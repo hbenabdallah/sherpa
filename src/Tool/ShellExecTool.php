@@ -313,7 +313,7 @@ class ShellExecTool
     /**
      * @param string $user see DockerConfig::$user
      *
-     * @return string[]
+     * @return list<string>
      */
     private function commandIn(?string $container, string $user, string $command, string $workDir): array
     {
