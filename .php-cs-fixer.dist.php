@@ -6,8 +6,6 @@ $finder = (new PhpCsFixer\Finder())
     ->in([__DIR__ . '/src', __DIR__ . '/tests'])
     ->ignoreVCSIgnored(true);
 
-// date_time_immutable changes behaviour, not layout: it is turned on by its own change,
-// with the suites run on the result.
 return (new PhpCsFixer\Config())
     ->setRiskyAllowed(true)
     ->setCacheFile(__DIR__ . '/var/.php-cs-fixer.cache')
@@ -21,6 +19,7 @@ return (new PhpCsFixer\Config())
             'exclude' => ['open', 'final', 'Entity', 'ORM\\Entity', 'ORM\\Mapping\\Entity', 'Mapping\\Entity', 'Document', 'ODM\\Document'],
             'consider_absent_docblock_as_internal_class' => true,
         ],
+        'date_time_immutable' => true,
         'modernize_types_casting' => true,
         'strict_comparison' => true,
         'strict_param' => true,
