@@ -24,6 +24,8 @@ class PermissionBroker
         private readonly ?Provenance $provenance = null,
         // SHERPA_AUTO_APPROVE when not given; see autoApproved().
         private readonly ?bool $autoApprove = null,
+        // Auto mode, when the session can be put in it.
+        private readonly ?AutoMode $auto = null,
     ) {}
 
     /**
@@ -64,6 +66,11 @@ class PermissionBroker
         $secret = $call->name === 'file_read' ? SecretFiles::reason((string) ($call->arguments['path'] ?? '')) : null;
         if ($secret !== null && $def->permission !== Permission::DENY) {
             return $this->approver->confirm($call, $def, new Offer([], $secret)) !== ConfirmChoice::Deny;
+        }
+
+        // After what is asked whatever the mode, before what auto mode stops asking.
+        if ($def->permission === Permission::CONFIRM && $this->auto?->allows($call) === true) {
+            return true;
         }
 
         return match ($def->permission) {

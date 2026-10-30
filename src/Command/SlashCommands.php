@@ -8,6 +8,7 @@ use App\Agent\ContextBudget;
 use App\Agent\HistoryCompactor;
 use App\Agent\InferenceSpeed;
 use App\Agent\MessageBag;
+use App\Agent\Mode;
 use App\Agent\PlanMode;
 use App\Agent\SystemPromptBuilder;
 use App\Agent\TodoList;
@@ -17,6 +18,7 @@ use App\Mcp\McpRegistry;
 use App\Memory\ContextStore;
 use App\Memory\MemoryStore;
 use App\Memory\Recorded;
+use App\Permission\AutoMode;
 use App\Permission\CommandPolicy;
 use App\Permission\ProjectPermissions;
 use App\Permission\SessionPermissions;
@@ -80,6 +82,8 @@ final readonly class SlashCommands
         // Optional so the tests that build this class by hand need not build
         // it too; absent, one is made from what is already here.
         private ?McpCommands $mcpCommands = null,
+        // Absent from those tests too: /auto then says it is not available.
+        private ?AutoMode $autoMode = null,
     ) {}
 
     /**
@@ -100,6 +104,7 @@ final readonly class SlashCommands
             ['/compact', '', 'Compact the conversation now'],
             ['/copy', '', 'Copy the last reply to the clipboard'],
             ['/plan', '[on|off]', 'Plan first: nothing is changed until you approve'],
+            ['/auto', '[on|off]', 'Edits and sandboxed commands run without asking'],
             ['/todo', '', "The model's plan for the current task"],
             ['/jobs', '[stop <id>]', 'Commands left running in the background'],
             ['/reset', '', 'Start an empty conversation'],
@@ -155,6 +160,7 @@ final readonly class SlashCommands
     /tools              List the available tools
     /copy               Copy the last reply to the clipboard, as the model wrote it
     /plan [on|off]      Plan mode: the model reads and proposes, and changes nothing until you approve its plan
+    /auto [on|off]      Auto mode: edits in the project, and commands the sandbox holds in, run without asking
     /todo               The plan the model keeps for a task of several steps
     /jobs [stop <id>]   Commands left running in the background, and stopping one
     /exit               Leave Sherpa
@@ -309,6 +315,11 @@ HELP . Terminal::RESET;
                     $this->planMode->off();
                     echo Terminal::GREEN . '✓ Plan mode off.' . Terminal::RESET . Terminal::GRAY . " The model can change things again, asking as usual.\n" . Terminal::RESET;
                 }
+
+                return true;
+
+            case '/auto':
+                $this->switchAuto($args);
 
                 return true;
 
@@ -1000,5 +1011,33 @@ HELP . Terminal::RESET;
     private function row(string $label, string $format, mixed ...$values): void
     {
         echo '  ' . mb_str_pad($label, 22) . ' ' . vsprintf($format, $values) . "\n";
+    }
+
+    private function switchAuto(string $args): void
+    {
+        if (!$this->autoMode instanceof AutoMode) {
+            $this->chat->showError('Auto mode is not available here.');
+
+            return;
+        }
+
+        $turnOn = match (strtolower($args)) {
+            'on'    => true,
+            'off'   => false,
+            default => !$this->autoMode->isOn(),
+        };
+
+        if ($turnOn) {
+            $this->planMode->switchTo(Mode::Auto);
+            echo Terminal::CYAN . '✓ Auto mode on.' . Terminal::RESET . Terminal::GRAY . ' ' . $this->autoMode->describe() . "\n"
+                . "  /auto again to leave it.\n" . Terminal::RESET;
+
+            return;
+        }
+
+        if ($this->autoMode->isOn()) {
+            $this->planMode->switchTo(Mode::Default);
+        }
+        echo Terminal::GREEN . '✓ Auto mode off.' . Terminal::RESET . Terminal::GRAY . " Everything that writes or runs asks again.\n" . Terminal::RESET;
     }
 }

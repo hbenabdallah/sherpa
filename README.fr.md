@@ -72,6 +72,10 @@ Sherpa répond dans la langue de votre question ; son interface est en anglais.
   chaque tour et reprises avec `/resume`.
 - **Mode plan** : le modèle lit et propose, et rien n'est écrit ni lancé avant que
   vous approuviez son plan.
+- **Mode auto** : les modifications dans le projet, et les commandes que la
+  sandbox contient, se font sans demander ; `sudo`, `rm -r`, `git push`, les
+  fichiers qui contiennent des secrets, les pages web et les outils MCP restent
+  demandés.
 - **Sous-agents** pour les questions qui demandent beaucoup de lecture, qui ne
   rapportent que leurs conclusions. Plusieurs demandés d'un coup tournent en même
   temps.
@@ -81,7 +85,7 @@ Sherpa répond dans la langue de votre question ; son interface est en anglais.
   PhpStorm et les autres IDE JetBrains, ou tout client de l'Agent Client
   Protocol — modifications approuvées depuis la vue de diff de l'éditeur,
   fichiers ouverts dans un onglet modifiés tels que vous les voyez, modèle et
-  mode plan dans les menus de l'éditeur, commandes et skills sous « / »,
+  mode (défaut, plan, auto) dans les menus de l'éditeur, commandes et skills sous « / »,
   conversations du terminal dans l'historique de l'éditeur, captures d'écran
   ([mise en place](docs/how-to.md#use-sherpa-in-your-editor-zed-jetbrains)).
 
@@ -247,6 +251,7 @@ sont masquées avant d'atteindre le fournisseur
 | `/context`, `/compact` | ce qui remplit la fenêtre de contexte, les limites du fournisseur, et la compacter tout de suite |
 | `/copy` | la dernière réponse dans le presse-papiers, telle que le modèle l'a écrite (Markdown) |
 | `/plan` · `/plan off` | le mode plan : le modèle lit et propose, et rien n'est écrit ni lancé avant que vous approuviez son plan |
+| `/auto` · `/auto off` | le mode auto : les modifications dans le projet, et les commandes que la sandbox ou le conteneur du projet contient, se font sans demander ; le reste est demandé comme d'habitude |
 | `/todo` | le plan que le modèle tient pour la tâche en cours |
 | `/jobs` · `/jobs stop <id>` | les commandes laissées en arrière-plan, et en arrêter une |
 | `/project`, `/project edit`, `/project forget` | le projet courant |
@@ -369,7 +374,7 @@ ce qui a été rejeté, est dans [les choix de conception](https://github.com/hb
 | `SHERPA_FACT_EXTRACTION=off` | pas de passage mémoire en fin de session |
 | `SHERPA_UPDATE_CHECK=off` | pas de vérification quotidienne d'une nouvelle version |
 | `SHERPA_SANDBOX=strict` · `off` | commandes sans réseau non plus · sans sandbox |
-| `SHERPA_AUTO_APPROVE=1` | répondre « une fois » à chaque question, pour une exécution sans personne (benchmark, CI) |
+| `SHERPA_AUTO_APPROVE=1` | répondre « une fois » à chaque question, même celles que le mode auto pose encore, pour une exécution sans personne (benchmark, CI) |
 
 Depuis les sources, les mêmes réglages peuvent aller dans `.env` (voir
 `.env.dist`).

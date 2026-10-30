@@ -131,6 +131,26 @@ The tools stay in every request while planning. A blocked call is answered with
 why, instead of the tool being removed: removing it would change the start of
 the request, and cost the provider's prompt cache.
 
+## Auto mode
+
+`/auto` turns auto mode on, and the status bar says so; in an editor, it is the
+third mode beside the prompt box. Writing or patching a file runs without
+asking, since the file tools never leave the project. So does a command, when
+something holds it in: the sandbox on this machine, or the project's container.
+With neither (`SHERPA_SANDBOX=off`, no bubblewrap), commands still ask, and
+`/auto` says so when it is turned on.
+
+Everything asked because a call can do harm beyond that boundary is still
+asked: a command asked about every time (`sudo`, `rm -r`, `git push`, a download
+piped into a shell, one that names a secret file or cannot be read whole),
+reading a file that usually holds secrets, a web page, an MCP server's tool, and
+a fact remembered after reading untrusted text. Nothing ran in auto mode is
+granted for after it: turn it off, and the same call is asked about again.
+
+Plan mode and auto mode are one at a time: turning one on leaves the other.
+`SHERPA_AUTO_APPROVE=1` is something else, for runs nobody watches: it answers
+every question, including those auto mode still asks.
+
 ## Sub-agents
 
 A question that needs a lot of reading, such as "where is this handled, and what

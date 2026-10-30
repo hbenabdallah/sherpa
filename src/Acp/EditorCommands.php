@@ -58,7 +58,7 @@ final readonly class EditorCommands
 
         foreach (SlashCommands::catalogue() as $entry) {
             $name = substr($entry['name'], 1);
-            if ($name === 'plan' || in_array($name, self::RUN, true)) {
+            if (in_array($name, ['plan', 'auto'], true) || in_array($name, self::RUN, true)) {
                 $commands[] = self::command($name, $entry['description'], $entry['hint']);
             } elseif (in_array($name, self::BARE, true)) {
                 $commands[] = self::command($name, $entry['description'], '');
@@ -83,8 +83,8 @@ final readonly class EditorCommands
      * message for the model, when it is a skill or an MCP prompt. Anything
      * else — "/etc/hosts is wrong" — is a message as typed.
      *
-     * @return array{reply: string}|array{output: string}|array{prompt: string}|array{plan: bool|null}
-     *               reply: prose; output: what a command printed; plan: on, off, or null to switch
+     * @return array{reply: string}|array{output: string}|array{prompt: string}|array{plan: bool|null}|array{auto: bool|null}
+     *               reply: prose; output: what a command printed; plan, auto: on, off, or null to switch
      */
     public function resolve(string $text, MessageBag $bag, Project $project): array
     {
@@ -98,11 +98,11 @@ final readonly class EditorCommands
         }
 
         if ($name === 'plan') {
-            return ['plan' => match (strtolower($rest)) {
-                'on'    => true,
-                'off'   => false,
-                default => null,
-            }];
+            return ['plan' => self::onOff($rest)];
+        }
+
+        if ($name === 'auto') {
+            return ['auto' => self::onOff($rest)];
         }
 
         if (in_array($name, self::RUN, true) || (in_array($name, self::BARE, true) && $rest === '')) {
@@ -174,5 +174,15 @@ final readonly class EditorCommands
     private static function command(string $name, string $description, string $hint): array
     {
         return ['name' => $name, 'description' => $description] + ($hint === '' ? [] : ['input' => ['hint' => $hint]]);
+    }
+
+    /** "on", "off", or null to switch. */
+    private static function onOff(string $argument): ?bool
+    {
+        return match (strtolower($argument)) {
+            'on'    => true,
+            'off'   => false,
+            default => null,
+        };
     }
 }

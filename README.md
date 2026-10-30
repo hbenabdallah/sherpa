@@ -69,6 +69,9 @@ Sherpa answers in the language of your question; its interface is in English.
   recalled; conversations are saved after every turn and resumed with `/resume`.
 - **Plan mode**: the model reads and proposes, and nothing is written or run until
   you approve its plan.
+- **Auto mode**: edits in the project, and commands the sandbox holds in, run
+  without asking; `sudo`, `rm -r`, `git push`, files that hold secrets, web pages
+  and MCP tools are still asked about.
 - **Sub-agents** for questions that need a lot of reading, which report back only
   their findings. Several asked for at once run at the same time.
 - **Skills** (Markdown files) and **MCP servers** (tools, resources and prompts),
@@ -76,7 +79,7 @@ Sherpa answers in the language of your question; its interface is in English.
 - **In your editor**: `sherpa acp` runs the same agent in Zed, PhpStorm and the
   other JetBrains IDEs, or any client of the Agent Client Protocol — edits
   approved from the editor's diff view, files open in a tab edited as you see
-  them, the model and plan mode in the editor's menus, the commands and skills
+  them, the model and the mode (default, plan, auto) in the editor's menus, the commands and skills
   under "/", the terminal's conversations in the editor's history, screenshots
   ([set it up](docs/how-to.md#use-sherpa-in-your-editor-zed-jetbrains)).
 
@@ -236,6 +239,7 @@ grants, standing and for this session, and withdraws them.
 | `/context`, `/compact` | what fills the context window, the provider's limits, and compacting it now |
 | `/copy` | the last reply to the clipboard, as the model wrote it (Markdown) |
 | `/plan` · `/plan off` | plan mode: the model reads and proposes, and nothing is written or run until you approve its plan |
+| `/auto` · `/auto off` | auto mode: edits in the project, and commands the sandbox or the project's container holds in, run without asking; the rest is asked as usual |
 | `/todo` | the plan the model keeps for the current task |
 | `/jobs` · `/jobs stop <id>` | commands left running in the background, and stopping one |
 | `/project`, `/project edit`, `/project forget` | the current project |
@@ -348,7 +352,7 @@ was rejected, is in the [design choices](https://github.com/hbenabdallah/sherpa/
 | `SHERPA_FACT_EXTRACTION=off` | no memory pass at the end of a session |
 | `SHERPA_UPDATE_CHECK=off` | no daily check for a newer release |
 | `SHERPA_SANDBOX=strict` · `off` | commands without network too · without a sandbox |
-| `SHERPA_AUTO_APPROVE=1` | answer every question "once", for a run nobody watches (benchmark, CI) |
+| `SHERPA_AUTO_APPROVE=1` | answer every question "once", even those auto mode still asks, for a run nobody watches (benchmark, CI) |
 
 From the source, the same settings can live in `.env` (see `.env.dist`).
 
