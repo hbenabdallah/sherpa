@@ -11,6 +11,7 @@ use App\Agent\Tool\Permission;
 use App\Agent\Tool\ToolCall;
 use App\Agent\Tool\ToolDefinition;
 use App\Command\SherpaCommand;
+use App\Command\SlashCommands;
 use App\Permission\ProjectPermissions;
 use App\Platform\OpenAiCompatiblePlatform;
 use App\Platform\SwitchablePlatform;
@@ -127,7 +128,8 @@ if ($command instanceof LazyCommand) {
 $commandStore = new ReflectionProperty($command::class, 'contextStore')->getValue($command);
 $toolStore = new ReflectionProperty(ContextRecallTool::class, 'store')
     ->getValue($container->get(ContextRecallTool::class));
-$compactor = new ReflectionProperty($command::class, 'compactor')->getValue($command);
+$commands = new ReflectionProperty($command::class, 'commands')->getValue($command);
+$compactor = new ReflectionProperty(SlashCommands::class, 'compactor')->getValue($commands);
 $compactorStore = new ReflectionProperty(HistoryCompactor::class, 'context')->getValue($compactor);
 
 check('the command and context_recall share one excerpt store', $commandStore === $toolStore);
@@ -252,9 +254,10 @@ check(
     $commandPerms === $brokerPerms ? '' : 'separate instances — setProject() would never reach the broker',
 );
 
-$commandSession = peek($command, 'sessionPermissions');
+// /permissions clear withdraws the session's grants: from the broker's own.
+$commandSession = peek(peek($command, 'commands'), 'sessionPermissions');
 check(
-    'command and broker share one SessionPermissions instance',
+    'the slash commands and the broker share one SessionPermissions instance',
     $commandSession === peek($broker, 'session'),
 );
 

@@ -6,8 +6,6 @@ namespace App\Command;
 
 use App\Agent\AgentLoop;
 use App\Agent\ContextBudget;
-use App\Agent\HistoryCompactor;
-use App\Agent\InferenceSpeed;
 use App\Agent\MessageBag;
 use App\Agent\PlanMode;
 use App\Agent\SystemPromptBuilder;
@@ -22,7 +20,6 @@ use App\Mcp\PromptArguments;
 use App\Memory\ContextStore;
 use App\Memory\FactExtractor;
 use App\Permission\ProjectPermissions;
-use App\Permission\SessionPermissions;
 use App\Platform\ModelResidency;
 use App\Platform\SwitchablePlatform;
 use App\Project\DockerConfig;
@@ -76,11 +73,9 @@ class SherpaCommand extends Command
         private readonly StatusBar $statusBar,
         private readonly Terminal $terminal,
         private readonly ContextBudget $budget,
-        private readonly HistoryCompactor $compactor,
         private readonly Toolbox $toolbox,
         private readonly LineEditor $lineEditor,
         private readonly ProjectPermissions $projectPermissions,
-        private readonly SessionPermissions $sessionPermissions,
         private readonly Interrupt $interrupt,
         private readonly McpRegistry $mcp,
         private readonly BackgroundJobs $jobs,
@@ -90,7 +85,6 @@ class SherpaCommand extends Command
         private readonly ModelSession $model,
         // Everything typed with a slash in front of it.
         private readonly SlashCommands $commands,
-        private readonly InferenceSpeed $speed,
         private readonly ContextStore $contextStore,
         private readonly UsageMeter $usage,
         private readonly SessionStore $sessions,
