@@ -42,7 +42,7 @@ interface PlatformInterface
      * @param array<int, array<string, mixed>> $messages
      * @param array<int, array<string, mixed>> $tools
      * @param (callable(string): void)|null    $onToken
-     * @param (callable(bool, ?string=): void)|null $onWait
+     * @param (callable(bool, string=): void)|null $onWait
      *
      * @return array<string, mixed>
      */

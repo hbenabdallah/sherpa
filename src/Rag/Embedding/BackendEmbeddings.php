@@ -10,6 +10,7 @@ use App\Platform\EmbeddingBackend;
 use App\Platform\OllamaPlatform;
 use App\Platform\OpenAiCompatiblePlatform;
 use App\Platform\SwitchablePlatform;
+use LogicException;
 use RuntimeException;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -54,20 +55,23 @@ class BackendEmbeddings implements EmbeddingProvider
 
     private function elsewhere(): EmbeddingBackend
     {
-        $where = (array) $this->models->embeddingsElsewhere();
-        $key = json_encode($where);
+        $where = $this->models->embeddingsElsewhere();
+        if ($where === null) {
+            throw new LogicException('embeddings are not configured elsewhere: the chat backend serves them');
+        }
+        $key = json_encode($where, JSON_THROW_ON_ERROR);
 
         if ($this->elsewhere instanceof EmbeddingBackend && $key === $this->elsewhereKey) {
             return $this->elsewhere;
         }
 
         $client = $this->client ?? HttpClient::create();
-        $provider = (string) $where['provider'];
+        $provider = $where['provider'];
 
         if (strtolower($provider) === Backend::Ollama->value) {
-            $platform = new OllamaPlatform($client, $this->platform->ollamaEndpoint(), (string) $where['model']);
+            $platform = new OllamaPlatform($client, $this->platform->ollamaEndpoint(), $where['model']);
         } elseif (is_string($where['url'] ?? null)) {
-            $platform = new OpenAiCompatiblePlatform($client, $where['url'], (string) $where['model'], $where['key']);
+            $platform = new OpenAiCompatiblePlatform($client, $where['url'], $where['model'], $where['key']);
         } else {
             throw new RuntimeException("embeddings.provider in config.yaml is \"{$provider}\", which is no recorded provider: /provider lists them, or say ollama.");
         }

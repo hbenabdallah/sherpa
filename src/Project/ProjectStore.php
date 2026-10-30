@@ -423,8 +423,7 @@ class ProjectStore
     {
         $spelled = strtr(mb_strtolower($name), self::TRANSLITERATION);
         $slug = new UnicodeString($spelled)->ascii()->lower()->toString();
-        $slug = preg_replace('/[^a-z0-9]+/', '-', $slug);
-        $slug = trim($slug, '-');
+        $slug = trim(preg_replace('/[^a-z0-9]+/', '-', $slug) ?? '', '-');
 
         // A name with no ASCII spelling at all leaves nothing behind, and an
         // empty slug is a blank key in projects.yaml and a directory called

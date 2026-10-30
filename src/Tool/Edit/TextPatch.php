@@ -76,11 +76,12 @@ final class TextPatch
      */
     private static function unique(string $content, string $search, string $replace, string $how): ?PatchOutcome
     {
-        $count = substr_count($content, $search);
-
-        if ($count === 0) {
+        $offset = strpos($content, $search);
+        if ($offset === false) {
             return null;
         }
+
+        $count = substr_count($content, $search);
 
         if ($count > 1) {
             return PatchOutcome::failed(
@@ -88,8 +89,6 @@ final class TextPatch
                 . ') — include more of the surrounding code so it matches exactly one place',
             );
         }
-
-        $offset = strpos($content, $search);
 
         return new PatchOutcome(
             content: substr_replace($content, $replace, $offset, strlen($search)),

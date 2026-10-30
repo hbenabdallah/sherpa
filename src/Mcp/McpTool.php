@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Mcp;
 
+use InvalidArgumentException;
+
 /**
  * A remote tool, shaped like a local one.
  *
@@ -20,7 +22,16 @@ final readonly class McpTool
 
     public function __invoke(mixed ...$arguments): string
     {
-        $result = $this->client->callTool($this->remoteName, $arguments);
+        $named = [];
+        foreach ($arguments as $name => $value) {
+            // MCP sends arguments as a JSON object: a position has no name to send.
+            if (is_int($name)) {
+                throw new InvalidArgumentException("MCP tool {$this->remoteName} takes its arguments by name, got one at position {$name}");
+            }
+            $named[$name] = $value;
+        }
+
+        $result = $this->client->callTool($this->remoteName, $named);
 
         // Toolbox turns a thrown exception into a tool result flagged as an
         // error, which is how the model is told the call failed rather than

@@ -170,7 +170,7 @@ class MarkdownRenderer
             foreach ($row as $i => $cell) {
                 $cells[$i] = self::wrap($cell, $widths[$i]);
             }
-            $height = max(array_map(count(...), $cells));
+            $height = max(1, ...array_map(count(...), $cells));
             $wrapped = $wrapped || $height > 1;
 
             $out = [];
@@ -218,9 +218,9 @@ class MarkdownRenderer
      * rather than taken from one column. Never below MIN_COLUMN: past that
      * the table overflows rather than shred every word.
      *
-     * @param list<int> $widths
+     * @param non-empty-array<int, int> $widths by column
      *
-     * @return list<int>
+     * @return non-empty-array<int, int>
      */
     private function fit(array $widths): array
     {
@@ -381,15 +381,15 @@ class MarkdownRenderer
 
     private function renderInline(string $text): string
     {
+        // Each style is decoration: one whose pattern fails leaves the text as it was.
         // Bold
-        $text = preg_replace('/\*\*(.+?)\*\*/', Terminal::BOLD . '$1' . Terminal::RESET, $text);
+        $text = preg_replace('/\*\*(.+?)\*\*/', Terminal::BOLD . '$1' . Terminal::RESET, $text) ?? $text;
         // Italic
-        $text = preg_replace('/\*(.+?)\*/', Terminal::ITALIC . '$1' . Terminal::RESET, $text);
+        $text = preg_replace('/\*(.+?)\*/', Terminal::ITALIC . '$1' . Terminal::RESET, $text) ?? $text;
         // Inline code
-        $text = preg_replace('/`([^`]+)`/', Terminal::BG_DARK . Terminal::CYAN . ' $1 ' . Terminal::RESET, $text);
-        // Links [text](url) → just text
-        $text = preg_replace('/\[([^\]]+)\]\([^)]+\)/', Terminal::UNDERLINE . '$1' . Terminal::RESET, $text);
+        $text = preg_replace('/`([^`]+)`/', Terminal::BG_DARK . Terminal::CYAN . ' $1 ' . Terminal::RESET, $text) ?? $text;
 
-        return $text;
+        // Links [text](url) → just text
+        return preg_replace('/\[([^\]]+)\]\([^)]+\)/', Terminal::UNDERLINE . '$1' . Terminal::RESET, $text) ?? $text;
     }
 }

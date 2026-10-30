@@ -233,7 +233,7 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
      *
      * @param array<int|string, array<mixed>> $toolCalls
      * @param (callable(string): void)|null    $onToken
-     * @param (callable(bool, ?string=): void)|null $onWait
+     * @param (callable(bool, string=): void)|null $onWait
      */
     private function consumeLine(string $line, string &$content, array &$toolCalls, ?callable $onToken, ?callable $onWait = null): void
     {
@@ -250,12 +250,12 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
         // Only the final chunk carries the counts, and the durations beside
         // them. Nanoseconds, both of them.
         if (isset($data['prompt_eval_count']) || isset($data['eval_count'])) {
-            $this->lastUsage = [
+            $usage = [
                 'prompt'     => (int) ($data['prompt_eval_count'] ?? 0),
                 'completion' => (int) ($data['eval_count'] ?? 0),
             ];
-
-            $this->lastTimings = $this->timingsFrom($data, $this->lastUsage);
+            $this->lastUsage = $usage;
+            $this->lastTimings = $this->timingsFrom($data, $usage);
         }
 
         $msg = $data['message'] ?? [];
@@ -479,7 +479,7 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
             }
 
             foreach ($rows as $row) {
-                $vectors[] = array_map(floatval(...), (array) $row);
+                $vectors[] = array_values(array_map(floatval(...), (array) $row));
             }
         }
 

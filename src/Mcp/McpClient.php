@@ -8,6 +8,7 @@ use App\Runtime\Interrupt;
 use App\Runtime\InterruptibleHttpClient;
 use App\Version;
 use Closure;
+use LogicException;
 use Mcp\Client as Sdk;
 use Mcp\Client\Transport\TransportInterface;
 use Mcp\Exception\ExceptionInterface as SdkException;
@@ -355,6 +356,13 @@ final class McpClient
         return $this->client?->getProtocolVersion()?->value;
     }
 
+    private function connected(): Sdk
+    {
+        $this->connect();
+
+        return $this->client ?? throw new LogicException("MCP server {$this->config->name}: connected, yet no client");
+    }
+
     public function close(): void
     {
         $this->client?->disconnect();
@@ -381,12 +389,12 @@ final class McpClient
     private function request(Closure $request): mixed
     {
         try {
-            return $request($this->client);
+            return $request($this->connected());
         } catch (ServerGone) {
             $this->close();
             $this->connect();
 
-            return $request($this->client);
+            return $request($this->connected());
         }
     }
 

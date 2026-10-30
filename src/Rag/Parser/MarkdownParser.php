@@ -47,7 +47,7 @@ final class MarkdownParser implements DocumentParser
         }
 
         $sections = SectionBuilder::build(
-            $lines,
+            array_values($lines),
             static function (int $i, array $lines): ?array {
                 $line = $lines[$i];
 

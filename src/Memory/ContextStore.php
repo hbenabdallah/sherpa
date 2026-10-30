@@ -9,6 +9,7 @@ use DateTimeInterface;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\ParameterType;
+use LogicException;
 use Symfony\Component\String\UnicodeString;
 use Throwable;
 
@@ -40,6 +41,16 @@ final class ContextStore
     private ?Connection $conn = null;
 
     private bool $fullText = false;
+
+    private function connection(): Connection
+    {
+        $this->open();
+        if (!$this->conn instanceof Connection) {
+            throw new LogicException('ContextStore: the in-memory database could not be opened');
+        }
+
+        return $this->conn;
+    }
 
     public function open(): void
     {
@@ -76,7 +87,7 @@ final class ContextStore
     {
         $this->open();
 
-        $this->conn->executeStatement(
+        $this->connection()->executeStatement(
             'INSERT INTO excerpts (tool, content, lines, chars, created_at) VALUES (:t, :c, :l, :n, :now)',
             [
                 't'   => $tool,
@@ -87,14 +98,14 @@ final class ContextStore
             ],
         );
 
-        return (int) $this->conn->lastInsertId();
+        return (int) $this->connection()->lastInsertId();
     }
 
     public function count(): int
     {
         $this->open();
 
-        return (int) $this->conn->fetchOne('SELECT count(*) FROM excerpts');
+        return (int) $this->connection()->fetchOne('SELECT count(*) FROM excerpts');
     }
 
     /**
@@ -107,7 +118,7 @@ final class ContextStore
     {
         $this->open();
 
-        $row = $this->conn->fetchAssociative(
+        $row = $this->connection()->fetchAssociative(
             'SELECT tool, content, lines FROM excerpts WHERE id = :id',
             ['id' => $id],
             ['id' => ParameterType::INTEGER],
@@ -189,7 +200,7 @@ final class ContextStore
             $expression = implode(' OR ', array_map(fn(string $w): string => '"' . $w . '"', $words));
 
             try {
-                return $this->conn->fetchAllAssociative(
+                return $this->connection()->fetchAllAssociative(
                     'SELECT e.id, e.tool, e.content FROM excerpts_fts
                      JOIN excerpts e ON e.id = excerpts_fts.rowid
                      WHERE excerpts_fts MATCH :q
@@ -213,7 +224,7 @@ final class ContextStore
             $params['w' . $i] = '%' . $word . '%';
         }
 
-        return $this->conn->fetchAllAssociative(
+        return $this->connection()->fetchAllAssociative(
             "SELECT id, tool, content FROM excerpts WHERE {$where} ORDER BY id DESC LIMIT :limit",
             $params,
             ['limit' => ParameterType::INTEGER],
@@ -303,17 +314,17 @@ final class ContextStore
     private function buildFullTextIndex(): bool
     {
         try {
-            $this->conn->executeStatement(
+            $this->connection()->executeStatement(
                 "CREATE VIRTUAL TABLE IF NOT EXISTS excerpts_fts
                  USING fts5(content, content='excerpts', content_rowid='id', tokenize='unicode61 remove_diacritics 2')",
             );
 
-            $this->conn->executeStatement(<<<SQL
+            $this->connection()->executeStatement(<<<SQL
                 CREATE TRIGGER IF NOT EXISTS excerpts_fts_insert AFTER INSERT ON excerpts BEGIN
                     INSERT INTO excerpts_fts (rowid, content) VALUES (new.id, new.content);
                 END
             SQL);
-            $this->conn->executeStatement(<<<SQL
+            $this->connection()->executeStatement(<<<SQL
                 CREATE TRIGGER IF NOT EXISTS excerpts_fts_delete AFTER DELETE ON excerpts BEGIN
                     INSERT INTO excerpts_fts (excerpts_fts, rowid, content) VALUES ('delete', old.id, old.content);
                 END
@@ -377,7 +388,7 @@ final class ContextStore
                 continue;
             }
 
-            $this->conn->executeStatement(
+            $this->connection()->executeStatement(
                 'INSERT INTO excerpts (id, tool, content, lines, chars, created_at) VALUES (:id, :t, :c, :l, :n, :at)',
                 [
                     'id' => $id,

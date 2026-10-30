@@ -91,7 +91,7 @@ final readonly class RateLimits
      */
     public function roomFor(int $requests): bool
     {
-        return array_all($this->windows, fn(array $w, $name): bool => $w['remaining'] >= $w['limit'] * self::NEARLY_SPENT && (!str_starts_with($name, 'requests') || $w['remaining'] >= 2 * $requests));
+        return array_all($this->windows, fn(array $w, int|string $name): bool => $w['remaining'] >= $w['limit'] * self::NEARLY_SPENT && (!str_starts_with((string) $name, 'requests') || $w['remaining'] >= 2 * $requests));
     }
 
     private static function number(string $value): ?int

@@ -254,6 +254,13 @@ check(
     $out,
 );
 
+file_put_contents($root . '/projet/.sherpa/rag-questions.json', json_encode([
+    ['kind' => 'procedure', 'q' => 'Which day do we deploy?', 'expect' => [['path' => 'GUIDE.md', 'section' => 'Deployment']]],
+    'not a question',
+]));
+[, $out] = $slash('/docs eval');
+check('/docs eval refuses a file where any question is unreadable, not only the first', str_contains($out, 'does not hold a readable list'), $out);
+
 [, $out] = $slash('/tools');
 check('/tools lists what the model can call', str_contains($out, 'compter'), $out);
 
