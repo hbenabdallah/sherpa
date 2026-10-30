@@ -16,6 +16,7 @@ class Toolbox
     /** @var array<string, ToolDefinition> */
     private array $definitions = [];
 
+    /** @param iterable<object> $tools */
     public function __construct(
         #[AutowireIterator('agent.tool')]
         iterable $tools,
@@ -51,6 +52,7 @@ class Toolbox
         );
     }
 
+    /** @return array<string, array{type: string, description: string, required: bool}> */
     private function extractParameters(ReflectionMethod $method): array
     {
         $params = [];

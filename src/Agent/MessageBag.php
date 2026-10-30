@@ -6,6 +6,7 @@ namespace App\Agent;
 
 class MessageBag
 {
+    /** @var list<array<string, mixed>> */
     private array $messages = [];
 
     public function system(string $content): void
@@ -29,6 +30,7 @@ class MessageBag
         $this->messages[] = ['role' => 'user', 'content' => $content] + ($images === [] ? [] : ['images' => $images]);
     }
 
+    /** @param list<array<string, mixed>>|null $toolCalls */
     public function assistant(string $content, ?array $toolCalls = null): void
     {
         $msg = ['role' => 'assistant', 'content' => $content];
@@ -89,11 +91,13 @@ class MessageBag
         return $closed;
     }
 
+    /** @param array<string, mixed> $message */
     public function add(array $message): void
     {
         $this->messages[] = $message;
     }
 
+    /** @return list<array<string, mixed>> */
     public function all(): array
     {
         return $this->messages;
@@ -102,6 +106,8 @@ class MessageBag
     /**
      * Wholesale replacement, used by HistoryCompactor once it has rewritten the
      * history to fit the context window.
+     *
+     * @param array<int, array<string, mixed>> $messages
      */
     public function replace(array $messages): void
     {

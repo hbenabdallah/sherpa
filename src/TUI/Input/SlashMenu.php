@@ -96,13 +96,19 @@ final class SlashMenu
     /**
      * What the line becomes when the entry is taken: the name, and a space
      * after it when arguments are expected, so the next key typed is one.
+     *
+     * @param array{name: string, hint: string, description: string} $entry
      */
     public static function completion(array $entry): string
     {
         return $entry['name'] . ($entry['hint'] !== '' ? ' ' : '');
     }
 
-    /** Whether taking it with Enter should run it, rather than wait for arguments. */
+    /**
+     * Whether taking it with Enter should run it, rather than wait for arguments.
+     *
+     * @param array{name: string, hint: string, description: string} $entry
+     */
     public static function runsAlone(array $entry): bool
     {
         return $entry['hint'] === '' || str_starts_with($entry['hint'], '[');

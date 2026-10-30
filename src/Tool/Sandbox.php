@@ -91,7 +91,11 @@ class Sandbox
             . ($this->strict() ? ', no network' : '');
     }
 
-    /** The paths a command may write to, besides the project. @return list<string> */
+    /**
+     * The paths a command may write to, besides the project.
+     *
+     * @return list<string>
+     */
     public function writable(): array
     {
         $paths = [];
@@ -153,7 +157,11 @@ class Sandbox
             . ($this->strict() ? "(deny network*)\n(allow network* (local unix))\n" : '');
     }
 
-    /** Files no command reads: the API keys Sherpa keeps. @return list<string> */
+    /**
+     * Files no command reads: the API keys Sherpa keeps.
+     *
+     * @return list<string>
+     */
     private function secrets(): array
     {
         $home = $this->homeDir();

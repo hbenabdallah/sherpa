@@ -230,6 +230,10 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
     /**
      * Parse one NDJSON line of the stream, folding it into the accumulated
      * content and tool calls.
+     *
+     * @param array<int|string, array<mixed>> $toolCalls
+     * @param (callable(string): void)|null    $onToken
+     * @param (callable(bool, ?string=): void)|null $onWait
      */
     private function consumeLine(string $line, string &$content, array &$toolCalls, ?callable $onToken, ?callable $onWait = null): void
     {
@@ -279,6 +283,9 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
      * Merge streamed tool-call fragments. Ollama emits each call complete;
      * OpenAI-style backends stream arguments as text to concatenate per index.
      * Overwriting rather than accumulating drops every call but the last.
+     *
+     * @param array<int|string, array<mixed>> $acc
+     * @param array<int|string, mixed>               $deltas the server's JSON, as decoded
      */
     private function accumulateToolCalls(array &$acc, array $deltas): void
     {

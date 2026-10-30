@@ -65,7 +65,11 @@ final readonly class RateLimits
         return $windows === [] ? null : new self($windows);
     }
 
-    /** The window with the least room left, as a share of it. */
+    /**
+     * The window with the least room left, as a share of it.
+     *
+     * @return array{name: string, percentLeft: int}
+     */
     public function tightest(): array
     {
         $name = null;

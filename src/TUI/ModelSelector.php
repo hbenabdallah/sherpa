@@ -275,6 +275,7 @@ class ModelSelector
         return new ModelProfile($info->name, $window, 'chosen here', $this->backend);
     }
 
+    /** @param array<int, ModelInfo> $models */
     private function render(array $models, int $selected, ?ModelProfile $current, bool $firstRun): void
     {
         [$cols, $rows] = $this->terminal->size();
@@ -332,6 +333,7 @@ class ModelSelector
             . Terminal::RESET;
     }
 
+    /** @param array<int, ModelInfo> $models */
     private function intro(array $models, ?ModelProfile $current, bool $firstRun): string
     {
         if ($models === []) {

@@ -28,6 +28,7 @@ final readonly class DockerConfig
         public string $user = self::USER_HOST,
     ) {}
 
+    /** @param array<string, mixed> $data as projects.yaml holds it */
     public static function fromArray(array $data): self
     {
         $user = trim((string) ($data['user'] ?? ''));
@@ -41,6 +42,7 @@ final readonly class DockerConfig
         );
     }
 
+    /** @return array{enabled: bool, container: string, db_container: string, user: string} */
     public function toArray(): array
     {
         return [

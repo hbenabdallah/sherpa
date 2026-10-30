@@ -43,6 +43,7 @@ class Interrupt
     /** @var (Closure(): void)|null */
     private ?Closure $meanwhile = null;
 
+    /** @param callable(): void $quit */
     public function install(callable $quit): void
     {
         $this->quit = $quit(...);

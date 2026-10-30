@@ -10,6 +10,7 @@ use App\Tool\ListDirTool;
 
 class ChatPane implements AgentOutput
 {
+    /** @var list<array{role: string, content: string}> */
     private array $history = [];
 
     private string $spinner = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏';

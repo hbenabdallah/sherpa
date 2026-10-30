@@ -15,17 +15,19 @@ use Throwable;
  * hands to `docker exec -w` was the host path. Nothing on the host is at that
  * path inside the container, so every command failed before it started. The
  * mount table is the translation.
+ *
+ * @phpstan-type Inspection array{workdir: ?string, mounts: array<int, array{source: string, destination: string}>, running?: bool, status?: string}
  */
 class ContainerInspector
 {
-    /** Inspecting is a fork and a JSON parse; once per container is plenty. */
+    /** @var array<string, Inspection|null> inspecting is a fork and a JSON parse; once per container is plenty */
     private array $cache = [];
 
     /** @var array<string, ?string> */
     private array $homes = [];
 
     /**
-     * @return array{workdir: ?string, mounts: array<int, array{source: string, destination: string}>, running?: bool, status?: string}|null
+     * @return Inspection|null
      *         null when the container cannot be inspected at all
      */
     public function inspect(string $container): ?array
@@ -45,6 +47,7 @@ class ContainerInspector
         return $this->cache[$container] = $inspected;
     }
 
+    /** @return Inspection|null */
     private function run(string $container): ?array
     {
         $process = new Process(['docker', 'inspect', '--format', '{{json .}}', $container], timeout: 10);

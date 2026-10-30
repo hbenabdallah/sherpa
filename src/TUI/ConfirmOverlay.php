@@ -292,6 +292,7 @@ class ConfirmOverlay implements Approver
         };
     }
 
+    /** @param array<string, mixed> $args */
     private function summarizeArgs(array $args, int $maxLen): string
     {
         $parts = [];

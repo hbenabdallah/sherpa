@@ -21,6 +21,8 @@ use Throwable;
  * once per section. It all fits a share of the window: more passages is not a
  * better answer, it is attention spread thinner. Each says where it came from,
  * so the answer can cite it and the user can check it.
+ *
+ * @phpstan-import-type Run from RetrievalEval
  */
 class DocSearch
 {
@@ -175,7 +177,7 @@ class DocSearch
      *
      * @param list<array{kind: string, q: string, expect: list<array{path: string, section: string}>}> $questions
      *
-     * @return array<string, array> strategy name => RetrievalEval::run()
+     * @return array<string, Run> strategy name => RetrievalEval::run()
      */
     public function evaluate(array $questions): array
     {

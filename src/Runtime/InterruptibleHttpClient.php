@@ -30,7 +30,11 @@ final class InterruptibleHttpClient implements HttpClientInterface
         $this->decorate($client);
     }
 
-    /** @throws TransportException when the user cut the wait short */
+    /**
+     * @param array<string, mixed> $options
+     *
+     * @throws TransportException when the user cut the wait short
+     */
     public function request(string $method, string $url, array $options = []): ResponseInterface
     {
         $response = $this->client->request($method, $url, $options);

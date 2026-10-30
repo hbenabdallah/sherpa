@@ -15,7 +15,11 @@ namespace App\Rag\Embedding;
  */
 final class Vectors
 {
-    /** @param list<float> $v @return list<float> */
+    /**
+     * @param list<float> $v
+     *
+     * @return list<float>
+     */
     public static function normalize(array $v): array
     {
         $norm = sqrt(array_sum(array_map(static fn(float $x): float => $x * $x, $v)));
@@ -23,7 +27,10 @@ final class Vectors
         return $norm > 0 ? array_map(static fn(float $x): float => $x / $norm, $v) : $v;
     }
 
-    /** @param list<float> $a @param list<float> $b */
+    /**
+     * @param list<float> $a
+     * @param list<float> $b
+     */
     public static function dot(array $a, array $b): float
     {
         $sum = 0.0;

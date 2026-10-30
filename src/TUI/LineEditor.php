@@ -44,7 +44,7 @@ class LineEditor
     /** Entries the history held when read: what follows was typed here. */
     private int $historyRead = 0;
 
-    /** Past lines, oldest first, when there is no libreadline to keep them. */
+    /** @var list<string> past lines, oldest first, when there is no libreadline to keep them */
     private array $history = [];
 
     /**
