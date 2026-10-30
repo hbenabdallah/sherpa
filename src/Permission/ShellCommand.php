@@ -33,15 +33,23 @@ final class ShellCommand
 
     public static function parse(string $line): self
     {
+        // Shared by reference with the closures below, which tools read at the type a variable has
+        // here: a literal false or null would make the closure that ends a word look like dead code.
         $segments = [];
         $piped = [];
+        /** @var string|null $opaque */
         $opaque = null;
 
+        /** @var list<string> $words */
         $words = [];
+        /** @var string $word */
         $word = '';
+        /** @var bool $inWord */
         $inWord = false;
+        /** @var bool $nextPiped */
         $nextPiped = false;
         // The operator of a redirection waiting for its target, the next word.
+        /** @var string|null $redirect */
         $redirect = null;
 
         $endWord = function () use (&$word, &$inWord, &$words, &$redirect, &$opaque): void {
