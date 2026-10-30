@@ -39,9 +39,12 @@ Sherpa answers in the language of your question; its interface is in English.
   a session, without restarting.
 - **One file, nothing to install.** A single executable for Linux and macOS: no
   PHP, no Node, no Python, no Docker.
-- **It asks before it acts.** Reading is free; writing a file, running a command
-  or fetching a web page needs your approval — once, for the session, or always
-  for this project.
+- **It asks before it acts, and is fenced in.** Reading is free; writing a file,
+  running a command or fetching a web page needs your approval — once, for the
+  session, or always for this project. Commands run in a sandbox that writes only
+  to the project, `/tmp` and package caches; reading a file that usually holds
+  secrets is asked about every time, and API keys in what a tool returns are
+  masked before they reach the provider.
 - **It knows your project.** A memory of lasting facts per project, and a search
   of your documentation by keywords and by meaning, with sources cited.
 - **Measured, not assumed.** Each design choice was kept because a benchmark said
