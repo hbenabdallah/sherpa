@@ -39,9 +39,13 @@ Sherpa répond dans la langue de votre question ; son interface est en anglais.
   fournisseur en pleine session, sans redémarrer.
 - **Un seul fichier, rien à installer.** Un exécutable unique pour Linux et
   macOS : ni PHP, ni Node, ni Python, ni Docker.
-- **Il demande avant d'agir.** Lire est libre ; écrire un fichier, lancer une
-  commande ou lire une page web demande votre accord — une fois, pour la session,
-  ou toujours pour ce projet.
+- **Il demande avant d'agir, et reste dans son enclos.** Lire est libre ; écrire
+  un fichier, lancer une commande ou lire une page web demande votre accord — une
+  fois, pour la session, ou toujours pour ce projet. Les commandes tournent dans une
+  sandbox qui n'écrit que dans le projet, `/tmp` et les caches de paquets ;
+  lire un fichier qui contient d'ordinaire des secrets est demandé à chaque fois,
+  et les clés d'API dans ce qu'un outil renvoie sont masquées avant d'atteindre le
+  fournisseur.
 - **Il connaît votre projet.** Une mémoire des faits durables par projet, et une
   recherche dans votre documentation par mots-clés et par le sens, sources citées.
 - **Mesuré, pas supposé.** Chaque choix de conception a été gardé parce qu'un
