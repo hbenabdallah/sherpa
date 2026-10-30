@@ -8,6 +8,7 @@ use Mcp\Schema\Enum\ProtocolVersion;
 use Mcp\Schema\Implementation;
 use Mcp\Schema\JsonRpc\Error;
 use Mcp\Schema\JsonRpc\Response;
+use Mcp\Schema\ServerCapabilities;
 
 /**
  * The SDK's record of what is awaited, as a transport sees it. The transport
@@ -72,7 +73,7 @@ final readonly class ListeningState implements ClientStateInterface
         return $this->state->isInitialized();
     }
 
-    public function setProtocolVersion(ProtocolVersion $protocolVersion): void
+    public function setProtocolVersion(?ProtocolVersion $protocolVersion): void
     {
         $this->state->setProtocolVersion($protocolVersion);
     }
@@ -82,7 +83,7 @@ final readonly class ListeningState implements ClientStateInterface
         return $this->state->getProtocolVersion();
     }
 
-    public function setServerInfo(Implementation $serverInfo): void
+    public function setServerInfo(?Implementation $serverInfo): void
     {
         $this->state->setServerInfo($serverInfo);
     }
@@ -90,6 +91,16 @@ final readonly class ListeningState implements ClientStateInterface
     public function getServerInfo(): ?Implementation
     {
         return $this->state->getServerInfo();
+    }
+
+    public function setServerCapabilities(?ServerCapabilities $capabilities): void
+    {
+        $this->state->setServerCapabilities($capabilities);
+    }
+
+    public function getServerCapabilities(): ?ServerCapabilities
+    {
+        return $this->state->getServerCapabilities();
     }
 
     public function setInstructions(?string $instructions): void
