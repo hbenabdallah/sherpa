@@ -20,7 +20,7 @@ use LogicException;
  * confined and which container shell_exec uses, from the start, and once it is
  * real its memory, its grants and its conversations.
  */
-class WorkingProject
+final class WorkingProject
 {
     private ?Project $project = null;
 

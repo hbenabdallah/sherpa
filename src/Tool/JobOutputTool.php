@@ -14,7 +14,7 @@ use App\Agent\Tool\Permission;
     // It reads the output of a command the user already allowed.
     permission: Permission::AUTO,
 )]
-class JobOutputTool
+final class JobOutputTool
 {
     public function __construct(private readonly ShellExecTool $shell) {}
 

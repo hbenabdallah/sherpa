@@ -51,7 +51,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Throwable;
 
 #[AsCommand(name: 'sherpa', description: 'Sherpa — a development agent in your terminal')]
-class SherpaCommand extends Command
+final class SherpaCommand extends Command
 {
     private bool $warnedAboutSessions = false;
 

@@ -20,7 +20,7 @@ use Throwable;
  * SHERPA_SANDBOX=strict also cuts the network. A command run in the project's
  * container is not wrapped: the container is its sandbox.
  */
-class Sandbox
+final class Sandbox
 {
     public const BUBBLEWRAP = 'bubblewrap';
 

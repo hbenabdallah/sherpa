@@ -17,6 +17,8 @@ use Throwable;
  * mount table is the translation.
  *
  * @phpstan-type Inspection array{workdir: ?string, mounts: array<int, array{source: string, destination: string}>, running?: bool, status?: string}
+ *
+ * @open the suites extend it with containers that need no Docker
  */
 class ContainerInspector
 {

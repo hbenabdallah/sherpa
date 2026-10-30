@@ -23,7 +23,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * chat provider with no embedding model (Anthropic, Groq) then still searches
  * the documentation by meaning, with OpenAI's or a local Ollama's.
  */
-class BackendEmbeddings implements EmbeddingProvider
+final class BackendEmbeddings implements EmbeddingProvider
 {
     /** The platform for embeddings elsewhere, kept while where it points stays the same. */
     private ?EmbeddingBackend $elsewhere = null;

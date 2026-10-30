@@ -14,7 +14,7 @@ use App\Agent\Tool\Permission;
     // It stops only what Sherpa itself started.
     permission: Permission::AUTO,
 )]
-class JobStopTool
+final class JobStopTool
 {
     public function __construct(private readonly BackgroundJobs $jobs) {}
 

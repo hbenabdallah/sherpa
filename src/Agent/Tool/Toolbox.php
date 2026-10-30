@@ -11,6 +11,7 @@ use ReflectionNamedType;
 use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 use Throwable;
 
+/** @open the suites extend it with a toolbox that fails */
 class Toolbox
 {
     /** @var array<string, ToolDefinition> */

@@ -16,7 +16,7 @@ use App\Memory\Recorded;
     description: 'Persist a durable fact about the project for future sessions. Use for architectural decisions, conventions, key file locations, etc. Set replaces=true only to correct something already known under the same key.',
     permission: Permission::AUTO,
 )]
-class MemoryRememberTool
+final class MemoryRememberTool
 {
     public function __construct(
         private readonly MemoryStore $store,

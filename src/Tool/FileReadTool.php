@@ -18,7 +18,7 @@ use RuntimeException;
     description: 'Read the contents of a file in the project. Returns file content with line numbers.',
     permission: Permission::AUTO,
 )]
-class FileReadTool
+final class FileReadTool
 {
     /**
      * Share of the prompt window one read may fill, with the floor a 32k

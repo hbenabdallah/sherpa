@@ -19,7 +19,7 @@ use Throwable;
  * and a UNIQUE key with an upsert made that silent data loss. Nothing here
  * overwrites — a correction supersedes, and the old value stays on record.
  */
-class MemoryStore
+final class MemoryStore
 {
     /**
      * How the digest ranks. Situation leads: it is the only signal that knows

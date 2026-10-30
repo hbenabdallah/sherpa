@@ -18,7 +18,7 @@ use Symfony\Component\Process\Process;
     description: 'Search for a pattern in project files using grep. Returns matching lines with filenames and line numbers.',
     permission: Permission::AUTO,
 )]
-class ProjectGrepTool
+final class ProjectGrepTool
 {
     /**
      * Floors, chosen against a 32k window and kept as the small-window

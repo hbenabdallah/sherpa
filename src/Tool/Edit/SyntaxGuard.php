@@ -25,7 +25,7 @@ use Throwable;
  * file that did not parse before is not guarded, so repairing one in several
  * steps stays possible.
  */
-class SyntaxGuard
+final class SyntaxGuard
 {
     /**
      * @param bool|null $inProcess parse here rather than run `php -l`; by

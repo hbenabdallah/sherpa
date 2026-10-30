@@ -12,7 +12,7 @@ use stdClass;
  * Same file shape as other MCP clients use, so a working configuration can be
  * copied over rather than translated.
  */
-class McpConfig
+final class McpConfig
 {
     private ?string $overridePath = null;
 

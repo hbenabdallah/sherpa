@@ -19,6 +19,8 @@ use stdClass;
  * cannot vouch for. One that will not start, or answers nonsense, costs its own
  * tools and nothing else: the session continues, and says which server failed
  * and why rather than appearing to have fewer tools than it was told about.
+ *
+ * @open the suites extend it with servers' instructions of their own
  */
 class McpRegistry
 {

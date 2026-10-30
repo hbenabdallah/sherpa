@@ -9,7 +9,7 @@ use App\Tool\FilePatchTool;
 use App\Tool\FileWriteTool;
 
 /** The edit a tool call would make, for the calls that edit a file. */
-class EditPreview
+final class EditPreview
 {
     public function __construct(
         private readonly FileWriteTool $fileWrite,

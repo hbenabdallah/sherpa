@@ -9,6 +9,7 @@ use App\Agent\Tool\Provenance;
 use App\Agent\Tool\ToolCall;
 use App\Agent\Tool\ToolDefinition;
 
+/** @open the suites extend it with brokers that answer for the user */
 class PermissionBroker
 {
     public function __construct(

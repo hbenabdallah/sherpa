@@ -21,7 +21,7 @@ use Symfony\Component\Process\Process;
     description: 'Execute a shell command in the project directory. Use for running tests, checking routes, debugging, and the project\'s own tools (linters, fixers, generators, package managers). Never to edit a file yourself — no sed -i, perl -pi, cat/echo/tee into a file: that is file_patch and file_write. With background=true it is left running — a dev server, a watcher, a long suite — and you get a job id: read it with job_output, stop it with job_stop.',
     permission: Permission::CONFIRM,
 )]
-class ShellExecTool
+final class ShellExecTool
 {
     /**
      * Floors, not limits: a hundred lines is often fewer than the failures of a

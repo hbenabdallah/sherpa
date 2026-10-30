@@ -27,7 +27,7 @@ use RuntimeException;
     // It reads, as the tools it is given do, and costs what its requests cost.
     permission: Permission::AUTO,
 )]
-class DelegateTool
+final class DelegateTool
 {
     /** What a sub-agent is: the tools that read, and nothing that changes or leaves the machine. */
     private const string SYSTEM = <<<'PROMPT'

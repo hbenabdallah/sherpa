@@ -14,6 +14,7 @@ use App\Tool\FileWriteTool;
 use App\Tool\ShellExecTool;
 use Throwable;
 
+/** @open the suites extend it with scripted answers */
 class ConfirmOverlay implements Approver
 {
     /** Rows of preview the box holds; past them, it says how many it hid. */

@@ -15,7 +15,7 @@ use App\Permission\Approver;
     description: 'In plan mode, present your plan to the user once you have investigated enough: what you will change, where, in what order, and how you will check it. The user approves it — and you then carry it out — or asks for changes.',
     permission: Permission::AUTO,
 )]
-class PlanReadyTool
+final class PlanReadyTool
 {
     public function __construct(
         private readonly PlanMode $planMode,

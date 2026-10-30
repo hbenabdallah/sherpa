@@ -14,7 +14,7 @@ use App\Memory\MemoryStore;
     description: 'Retrieve facts previously memorized about this project. The search matches whole words in any order and returns the closest matches first.',
     permission: Permission::AUTO,
 )]
-class MemoryRecallTool
+final class MemoryRecallTool
 {
     public function __construct(private readonly MemoryStore $store) {}
 

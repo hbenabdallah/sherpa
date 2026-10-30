@@ -20,7 +20,7 @@ use RuntimeException;
     description: 'Create or overwrite a file with the given content.',
     permission: Permission::CONFIRM,
 )]
-class FileWriteTool
+final class FileWriteTool
 {
     public function __construct(
         private readonly ProjectPathResolver $paths = new ProjectPathResolver(),

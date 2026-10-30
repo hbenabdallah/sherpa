@@ -13,4 +13,4 @@ use RuntimeException;
  * shape nobody promised. None of that is allowed to take Sherpa down with it,
  * so every failure arrives here and is dealt with at the boundary.
  */
-class McpException extends RuntimeException {}
+final class McpException extends RuntimeException {}

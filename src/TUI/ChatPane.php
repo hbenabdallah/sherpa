@@ -8,6 +8,7 @@ use App\Agent\AgentOutput;
 use App\Agent\Lanes;
 use App\Tool\ListDirTool;
 
+/** @open SubagentPane extends it */
 class ChatPane implements AgentOutput
 {
     /** @var list<array{role: string, content: string}> */

@@ -10,7 +10,7 @@ namespace App\Permission;
  * Project-scoped grants do not live here: they must outlive the process, so
  * they are persisted. See ProjectPermissions.
  */
-class SessionPermissions
+final class SessionPermissions
 {
     /** @var array<string, true> */
     private array $sessionAllowed = [];

@@ -15,7 +15,7 @@ use Throwable;
  * and every question has an answer ready, so Enter all the way through is a
  * valid setup. Nothing is written: the answers make a draft.
  */
-class ProjectQuestions
+final class ProjectQuestions
 {
     /** Service names that usually hold the application and its database. */
     private const array APP_HINTS = ['app', 'php', 'web', 'api', 'backend'];

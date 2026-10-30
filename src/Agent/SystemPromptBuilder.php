@@ -14,7 +14,7 @@ use App\Project\TestCommand;
 use App\Project\TestCommandDetector;
 use App\Skills\SkillRegistry;
 
-class SystemPromptBuilder
+final class SystemPromptBuilder
 {
     /**
      * Share of the prompt allowance spent quoting remembered facts. A flat

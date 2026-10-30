@@ -24,7 +24,7 @@ use Throwable;
     description: 'Find files by name pattern: "*Test.php" anywhere, "src/**/*.yaml" under src, "{README,CHANGELOG}.md". The most recently changed come first. Use it to locate files by name; use project_grep to search inside them.',
     permission: Permission::AUTO,
 )]
-class FileFindTool
+final class FileFindTool
 {
     /** Walked past when the project is not a git repository, as list_dir does. */
     private const array SKIPPED = ['vendor', 'node_modules', '.git', 'var', '.idea', '.vscode', '.claude', '__pycache__', '.venv', 'target'];

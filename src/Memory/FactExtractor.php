@@ -18,7 +18,7 @@ use Throwable;
  * expected to call memory_remember as it works. It runs after /exit, while
  * someone waits for their shell back, so it has to be cheap.
  */
-class FactExtractor
+final class FactExtractor
 {
     /**
      * Below this there is no session to summarise, only a greeting: system,

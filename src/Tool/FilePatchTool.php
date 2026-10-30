@@ -22,7 +22,7 @@ use RuntimeException;
     description: 'Apply a targeted replacement in a file: replace a string that occurs once with a new string. Safer than full file_write for small edits.',
     permission: Permission::CONFIRM,
 )]
-class FilePatchTool
+final class FilePatchTool
 {
     public function __construct(
         private readonly ProjectPathResolver $paths = new ProjectPathResolver(),
