@@ -245,7 +245,7 @@ request asked for (three times), and a class renamed but not its file.
 
 ## Distribution: one file
 
-Sherpa is written in PHP 8.4 with Symfony. A PHP tool usually asks its users to
+Sherpa is written in PHP 8.5 with Symfony. A PHP tool usually asks its users to
 install PHP. The release is instead a phar appended to a static PHP runtime
 (`micro`), pinned by checksum:
 

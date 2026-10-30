@@ -179,7 +179,7 @@ if [ "${SHERPA_RUNTIME:-}" = 'docker' ]; then
 elif php=$(./bin/find-php.sh); then
     pass "Sherpa runs on this machine, with PHP $("$php" -r 'echo PHP_VERSION;') ($php)"
 else
-    warn 'Sherpa runs in Docker: no PHP 8.4 with pdo_sqlite and pcntl on this machine' \
+    warn 'Sherpa runs in Docker: no PHP 8.5 with pdo_sqlite and pcntl on this machine' \
          'On the machine, shell_exec runs your own tools (npm, pytest, docker compose exec…);' \
          'in Docker, only PHP. To move over:  make php'
 fi

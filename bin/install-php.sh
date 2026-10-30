@@ -26,7 +26,7 @@ dir=$3
 
 if [ -z "$expected" ]; then
     echo "✗ no PHP pinned for $(uname -s)-$(uname -m) (only Linux x86_64 and aarch64, macOS aarch64)." >&2
-    echo "  Any PHP 8.4 with pdo_sqlite and pcntl will do: in the PATH, or named by SHERPA_PHP=…" >&2
+    echo "  Any PHP 8.5 with pdo_sqlite and pcntl will do: in the PATH, or named by SHERPA_PHP=…" >&2
     exit 1
 fi
 
@@ -56,9 +56,9 @@ echo "✓ SHA-256 sum checked"
 
 tar -xzf "$tmp/php.tgz" -C "$tmp" php
 
-# What Sherpa cannot run without: 8.4, SQLite for its memory, pcntl for Ctrl+C.
-if ! "$tmp/php" -r 'exit(PHP_VERSION_ID >= 80400 && extension_loaded("pdo_sqlite") && extension_loaded("pcntl") ? 0 : 1);'; then
-    echo "✗ this PHP does not suit Sherpa (8.4, pdo_sqlite and pcntl required): nothing was installed." >&2
+# What Sherpa cannot run without: 8.5, SQLite for its memory, pcntl for Ctrl+C.
+if ! "$tmp/php" -r 'exit(PHP_VERSION_ID >= 80500 && extension_loaded("pdo_sqlite") && extension_loaded("pcntl") ? 0 : 1);'; then
+    echo "✗ this PHP does not suit Sherpa (8.5, pdo_sqlite and pcntl required): nothing was installed." >&2
     exit 1
 fi
 
