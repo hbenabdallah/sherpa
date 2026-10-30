@@ -671,14 +671,13 @@ HELP . Terminal::RESET;
             return;
         }
 
-        $questions = json_decode((string) file_get_contents($file), true);
-        if (!is_array($questions) || $questions === [] || !isset($questions[0]['q'], $questions[0]['expect'])) {
+        $questions = self::questions(json_decode((string) file_get_contents($file), true));
+        if ($questions === null) {
             $this->chat->showError("{$file} does not hold a readable list of questions (see /docs eval with no file).");
 
             return;
         }
 
-        $questions = array_map(static fn(array $q): array => ['kind' => (string) ($q['kind'] ?? 'question')] + $q, $questions);
         $results = $this->docs->evaluate($questions);
 
         echo Terminal::BOLD . "\nDocumentation search, measured on " . count($questions) . " questions:\n\n" . Terminal::RESET;
@@ -690,6 +689,38 @@ HELP . Terminal::RESET;
                     . Terminal::GRAY . '      → ' . Terminal::plain($miss['top'], singleLine: true) . "\n" . Terminal::RESET;
             }
         }
+    }
+
+    /**
+     * The questions of a rag-questions.json, every one of them readable, or null.
+     *
+     * @return non-empty-list<array{kind: string, q: string, expect: list<array{path: string, section: string}>}>|null
+     */
+    private static function questions(mixed $decoded): ?array
+    {
+        if (!is_array($decoded) || $decoded === []) {
+            return null;
+        }
+
+        $questions = [];
+        foreach ($decoded as $question) {
+            if (!is_array($question) || !is_string($question['q'] ?? null) || !is_array($question['expect'] ?? null)) {
+                return null;
+            }
+
+            $expect = [];
+            foreach ($question['expect'] as $expected) {
+                if (!is_array($expected) || !is_string($expected['path'] ?? null)) {
+                    return null;
+                }
+                $expect[] = ['path' => $expected['path'], 'section' => is_string($expected['section'] ?? null) ? $expected['section'] : ''];
+            }
+
+            $kind = $question['kind'] ?? 'question';
+            $questions[] = ['kind' => is_scalar($kind) ? (string) $kind : 'question', 'q' => $question['q'], 'expect' => $expect];
+        }
+
+        return $questions;
     }
 
     /** /jobs, and /jobs stop <id>. */
