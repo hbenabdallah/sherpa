@@ -6,9 +6,9 @@ namespace App\Rag\Embedding;
 
 use App\Config\Backend;
 use App\Config\ModelResolver;
+use App\Platform\EmbeddingBackend;
 use App\Platform\OllamaPlatform;
 use App\Platform\OpenAiCompatiblePlatform;
-use App\Platform\PlatformInterface;
 use App\Platform\SwitchablePlatform;
 use RuntimeException;
 use Symfony\Component\HttpClient\HttpClient;
@@ -25,7 +25,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 class BackendEmbeddings implements EmbeddingProvider
 {
     /** The platform for embeddings elsewhere, kept while where it points stays the same. */
-    private ?PlatformInterface $elsewhere = null;
+    private ?EmbeddingBackend $elsewhere = null;
 
     private string $elsewhereKey = '';
 
@@ -52,12 +52,12 @@ class BackendEmbeddings implements EmbeddingProvider
         return array_map(Vectors::normalize(...), $platform->embed($texts, $model));
     }
 
-    private function elsewhere(): PlatformInterface
+    private function elsewhere(): EmbeddingBackend
     {
         $where = (array) $this->models->embeddingsElsewhere();
         $key = json_encode($where);
 
-        if ($this->elsewhere instanceof PlatformInterface && $key === $this->elsewhereKey) {
+        if ($this->elsewhere instanceof EmbeddingBackend && $key === $this->elsewhereKey) {
             return $this->elsewhere;
         }
 

@@ -18,7 +18,7 @@ trait LastCall
     /** @var array<string, mixed> outside any Fiber: the main conversation */
     private array $mainCall = [];
 
-    /** @var WeakMap<Fiber<mixed, mixed, mixed, mixed>, array<string, mixed>>|null */
+    /** @var WeakMap<Fiber, array<string, mixed>>|null */
     private ?WeakMap $fiberCalls = null;
 
     private function lastOf(string $key): mixed
