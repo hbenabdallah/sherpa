@@ -221,6 +221,12 @@ $questions = new ProjectQuestions(new LineEditor(), new ProjectStore(new StackDe
 check('its containers running, the app\'s is where commands run', $docker->enabled && $docker->container === 'shop-app-1' && $docker->dbContainer === 'shop-db-1', json_encode($docker));
 check('and the user is told, with how to change it', str_contains($note, 'container shop-app-1') && str_contains($note, '/project edit'), $note);
 
+mkdir("{$root}/solo");
+file_put_contents("{$root}/bin/docker", "#!/bin/sh\nprintf 'solo-app-1\\n'\n");
+[$docker, $note] = $questions->guessDocker("{$root}/solo");
+check('an app container with no database beside it: no database container', $docker->enabled && $docker->container === 'solo-app-1' && $docker->dbContainer === '', json_encode($docker));
+file_put_contents("{$root}/bin/docker", "#!/bin/sh\nprintf 'shop-app-1\\nshop-db-1\\nother-web-1\\n'\n");
+
 [$docker, $note] = $questions->guessDocker("{$root}/plain");
 check('a compose file with nothing running: this machine', !$docker->enabled && str_contains($note, 'none of its containers is running'), $note);
 

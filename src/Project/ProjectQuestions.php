@@ -87,7 +87,7 @@ class ProjectQuestions
 
         if ($container !== null) {
             return [
-                new DockerConfig(enabled: true, container: $container, dbContainer: $this->pick($running, self::DB_HINTS, required: false), user: DockerConfig::USER_HOST),
+                new DockerConfig(enabled: true, container: $container, dbContainer: $this->pick($running, self::DB_HINTS, required: false) ?? '', user: DockerConfig::USER_HOST),
                 "New project: its commands run in the container {$container}, which is running. {$change}",
             ];
         }
