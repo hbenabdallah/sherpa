@@ -2,6 +2,11 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\AcpTest;
+
+use Closure;
+use stdClass;
+
 // `sherpa acp` end to end, as an editor drives it: the real command in a
 // subprocess, a scripted provider behind it, and this script in the editor's
 // seat — initialize, open a session, prompt, answer the permission questions,
@@ -57,8 +62,8 @@ final class Editor
     /** @var list<array<string, mixed>> permission questions asked, with the answer given */
     public array $asked = [];
 
-    /** @var \Closure(array<string, mixed>): ?string picks an option id for a question, null to cancel */
-    public \Closure $answer;
+    /** @var Closure(array<string, mixed>): ?string picks an option id for a question, null to cancel */
+    public Closure $answer;
 
     /** @var array<string, string> files open in tabs, with changes not saved: path => text */
     public array $buffers = [];
@@ -104,11 +109,11 @@ final class Editor
      * questions meanwhile. $during runs on every notification.
      *
      * @param array<string, mixed>                       $params
-     * @param (\Closure(array<string, mixed>): void)|null $during
+     * @param (Closure(array<string, mixed>): void)|null $during
      *
      * @return array<string, mixed> the response, result or error
      */
-    public function call(string $method, array $params, float $timeout = 20.0, ?\Closure $during = null): array
+    public function call(string $method, array $params, float $timeout = 20.0, ?Closure $during = null): array
     {
         $id = ++$this->id;
         fwrite($this->pipes[0], json_encode(['jsonrpc' => '2.0', 'id' => $id, 'method' => $method, 'params' => $params === [] ? new stdClass() : $params]) . "\n");
@@ -142,7 +147,7 @@ final class Editor
                     fwrite($this->pipes[0], json_encode(['jsonrpc' => '2.0', 'id' => $message['id'], 'result' => null]) . "\n");
                 } elseif (isset($message['method'])) {
                     $this->updates[] = $message;
-                    if ($during instanceof \Closure) {
+                    if ($during instanceof Closure) {
                         $during($message);
                     }
                 }

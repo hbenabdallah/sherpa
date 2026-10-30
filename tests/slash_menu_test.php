@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\SlashMenuTest;
+
 // The prompt's two helpers: the menu under "/", and the scrollback Page Up
 // opens. Both are text in, text out, so neither needs a terminal here.
 

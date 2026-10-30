@@ -2,9 +2,16 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\PlatformTest;
+
 use App\Agent\Result;
 use App\Agent\Tool\TextToolCallParser;
+use ReflectionClass;
+use ReflectionMethod;
+use ReflectionProperty;
+use RuntimeException;
 use Symfony\Component\Console\Command\LazyCommand;
+use Throwable;
 
 // The model backend behind an interface — and the proof that the interface is
 // real, by running the whole agent loop through a second implementation that
@@ -261,7 +268,7 @@ function unpairedCalls(array $messages): array
     return $problems;
 }
 
-/** @return array{0: Result|\Throwable, 1: MessageBag, 2: ContextBudget, 3: InferenceSpeed} */
+/** @return array{0: Result|Throwable, 1: MessageBag, 2: ContextBudget, 3: InferenceSpeed} */
 function loopWith(PlatformInterface $platform, array $tools = [], string $toolbox = Toolbox::class): array
 {
     $budget = new ContextBudget(contextWindow: 32768);
@@ -303,7 +310,7 @@ function loopWith(PlatformInterface $platform, array $tools = [], string $toolbo
 check('the Ollama backend satisfies the interface', is_subclass_of(OllamaPlatform::class, PlatformInterface::class));
 
 $reflection = new ReflectionClass(PlatformInterface::class);
-$methods = array_map(fn(\ReflectionMethod $m): string => $m->getName(), $reflection->getMethods());
+$methods = array_map(fn(ReflectionMethod $m): string => $m->getName(), $reflection->getMethods());
 sort($methods);
 // Still a guard, not a rubber stamp: every name below has a caller in src/.
 // catalogue/describeModel/useModel/contextWindow arrived with model selection —

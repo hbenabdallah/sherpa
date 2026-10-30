@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\ParserTest;
+
 // Verification of TextToolCallParser: recovering tool calls a model emitted as
 // prose, without firing on models that merely talk about JSON.
 

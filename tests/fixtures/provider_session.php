@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\Fixtures\ProviderSession;
+
+use DateTimeImmutable;
+
 // Runs one /provider command against scripted providers, answering its
 // questions from stdin, and prints what happened as JSON — so adding and
 // switching providers can be tested without a terminal.
@@ -39,7 +43,7 @@ use App\Usage\UsageMeter;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 
-[, $configPath, $args] = $argv;
+[, $configPath, $args] = $_SERVER['argv'];
 $dir = dirname($configPath);
 
 $requests = [];

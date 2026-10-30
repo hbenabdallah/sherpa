@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\ContextTest;
+
 use App\Runtime\Interrupt;
 
 // Verification of ContextBudget accounting/calibration and HistoryCompactor.

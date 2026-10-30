@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\SessionTest;
+
 use App\Agent\PlanMode;
 use App\Session\SavedSession;
 

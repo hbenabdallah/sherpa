@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\E2eLive;
+
 use App\Agent\Tool\ToolDefinition;
 use App\Permission\ProjectPermissions;
 use App\Platform\ModelInfo;

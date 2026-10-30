@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\UpdateTest;
+
+use ReflectionProperty;
 use Symfony\Component\Console\Command\LazyCommand;
 
 // A new release, told and installed. Before, a release reached nobody who did

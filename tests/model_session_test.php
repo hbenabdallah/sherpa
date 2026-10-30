@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\ModelSessionTest;
+
+use DateTimeImmutable;
+
 // ModelSession: which backend, which model, and what a change to either costs.
 // It came out of the command in one piece, and what it does is exactly what
 // nothing could reach before: the boot decisions, /model and /backend.

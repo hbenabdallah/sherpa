@@ -2,9 +2,13 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\PlanModeTest;
+
 use App\Agent\Tool\ToolCall;
 use App\Agent\Tool\ToolDefinition;
 use App\Permission\Offer;
+use DateTimeImmutable;
+use ReflectionClass;
 
 // Plan mode: the model reads and proposes, nothing changes until the plan is
 // approved — and once it is, the work goes on in the same turn.

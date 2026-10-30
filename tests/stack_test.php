@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\StackTest;
+
 use App\Project\DockerWrapper;
 use App\Project\TestCommand;
 
@@ -19,6 +21,7 @@ use App\Project\Project;
 use App\Project\StackDetector;
 use App\Project\TestCommandDetector;
 use App\Skills\SkillRegistry;
+use DateTimeImmutable;
 
 $pass = 0;
 $fail = 0;
@@ -161,8 +164,8 @@ function projectAt(string $path): Project
         memoryDb: '/dev/null',
         docker: new DockerConfig(enabled: false),
         stack: 'stale, written when it was created',
-        createdAt: new \DateTimeImmutable(),
-        lastUsedAt: new \DateTimeImmutable(),
+        createdAt: new DateTimeImmutable(),
+        lastUsedAt: new DateTimeImmutable(),
     );
 }
 
@@ -213,8 +216,8 @@ $inContainer = new Project(
     memoryDb: '/dev/null',
     docker: new DockerConfig(enabled: true, container: 'enveloppe-app-1'),
     stack: '',
-    createdAt: new \DateTimeImmutable(),
-    lastUsedAt: new \DateTimeImmutable(),
+    createdAt: new DateTimeImmutable(),
+    lastUsedAt: new DateTimeImmutable(),
 );
 $told = $builder->build($inContainer);
 check(

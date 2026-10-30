@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\Fixtures\McpHttpServer;
+
 /**
  * The same stand-in MCP server, reached over HTTP instead of a pipe.
  *

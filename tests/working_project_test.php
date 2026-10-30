@@ -2,9 +2,12 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\WorkingProjectTest;
+
 use App\Project\Project;
 use App\Project\ProjectQuestions;
 use App\TUI\LineEditor;
+use ReflectionProperty;
 
 // The project is the directory Sherpa is launched from. A known one opens at
 // once; a new one is asked about and held — nothing written — until the first

@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\TodoTest;
+
 use App\Agent\Tool\Permission;
 use App\Agent\Tool\Toolbox;
 use App\Agent\Tool\ToolDefinition;

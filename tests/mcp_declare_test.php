@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\McpDeclareTest;
+
 use App\Agent\Tool\ToolDefinition;
 
 // Declaring MCP servers without opening mcp.json: /mcp add and its siblings in
@@ -93,7 +95,7 @@ check('nothing empty or default is written', !isset($data['mcpServers']['demo'][
 check('turning one off keeps how it was set up', $config->setEnabled('demo', false) && $config->server('demo')?->enabled === false && $config->server('demo')?->command === PHP_BINARY);
 check('and back on', $config->setEnabled('demo', true) && $config->server('demo')?->enabled === true);
 check('a name nobody declared is not invented', !$config->setEnabled('personne', false) && !$config->remove('personne'));
-check('removing one leaves the others', $config->remove('autre') && $config->server('autre') === null && $config->server('demo') !== null);
+check('removing one leaves the others', $config->remove('autre') && !$config->server('autre') instanceof ServerConfig && $config->server('demo') instanceof ServerConfig);
 
 $threw = false;
 
@@ -171,11 +173,11 @@ $crash = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($fixture) . ' crash';
 $r = $session($live, 'add', "mort\n{$crash}\n\nn\n");
 check(
     'a server that does not answer is said so, and not saved without a yes',
-    str_contains($r['shown'], 'missing configuration') && configAt($live)->server('mort') === null && !in_array('mcp__mort__echo', $r['tools'], true),
+    str_contains($r['shown'], 'missing configuration') && !configAt($live)->server('mort') instanceof ServerConfig && !in_array('mcp__mort__echo', $r['tools'], true),
     $r['shown'],
 );
 $r = $session($live, 'add', "mort\n{$crash}\n\ny\n");
-check('saved anyway when asked to', configAt($live)->server('mort') !== null && str_contains($r['shown'], 'not connected'), $r['shown']);
+check('saved anyway when asked to', configAt($live)->server('mort') instanceof ServerConfig && str_contains($r['shown'], 'not connected'), $r['shown']);
 
 $r = $session($live, 'add', "web\nhttps://example.test/mcp\nBearer xyz\nn\n");
 check('an address asks for its Authorization header, hidden', str_contains($r['shown'], 'Authorization header') && !str_contains($r['shown'], 'xyz'), $r['shown']);
@@ -189,7 +191,7 @@ $r = $session($live, 'enable demo');
 check('/mcp enable brings it back at once', in_array('mcp__demo__echo', $r['tools'], true) && str_contains($r['prompt'], 'Call horloge'), json_encode($r['tools']));
 
 $r = $session($live, 'remove mort');
-check('/mcp remove forgets it', configAt($live)->server('mort') === null && str_contains($r['shown'], 'mort removed'), $r['shown']);
+check('/mcp remove forgets it', !configAt($live)->server('mort') instanceof ServerConfig && str_contains($r['shown'], 'mort removed'), $r['shown']);
 $r = $session($live, 'remove personne');
 check('a name nobody declared is said to be unknown', str_contains($r['shown'], 'No MCP server named personne'), $r['shown']);
 $r = $session($live, 'disable');
@@ -207,7 +209,7 @@ $tester->execute(['action' => 'add', 'name' => 'web', '--url' => 'https://exampl
 check('--no-check saves without trying', $tester->getStatusCode() === 0 && configAt($shell)->server('web')?->headers === ['Authorization' => 'Bearer xyz']);
 
 $tester->execute(['action' => 'add', 'name' => 'x', '--url' => 'https://example.test/mcp', 'server-command' => ['php']]);
-check('a command and --url together are refused', $tester->getStatusCode() === 1 && configAt($shell)->server('x') === null);
+check('a command and --url together are refused', $tester->getStatusCode() === 1 && !configAt($shell)->server('x') instanceof ServerConfig);
 $tester->execute(['action' => 'add', 'name' => 'y', 'server-command' => ['php'], '--var' => ['SANS_EGAL'], '--no-check' => true]);
 check('a variable without = is refused', $tester->getStatusCode() === 1 && str_contains($tester->getDisplay(), 'KEY=value'), $tester->getDisplay());
 
@@ -219,7 +221,7 @@ check('naming its variables and headers, never their values', str_contains($out,
 $tester->execute(['action' => 'disable', 'name' => 'web']);
 check('sherpa mcp disable', configAt($shell)->server('web')?->enabled === false);
 $tester->execute(['action' => 'remove', 'name' => 'web']);
-check('sherpa mcp remove', configAt($shell)->server('web') === null && $tester->getStatusCode() === 0);
+check('sherpa mcp remove', !configAt($shell)->server('web') instanceof ServerConfig && $tester->getStatusCode() === 0);
 $tester->execute(['action' => 'remove', 'name' => 'web']);
 check('and again, an error: nothing by that name', $tester->getStatusCode() === 1);
 $tester->execute(['action' => 'frobnicate']);

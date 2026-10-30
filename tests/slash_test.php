@@ -2,8 +2,11 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\SlashTest;
+
 use App\Session\SavedSession;
 use App\Skills\Skill;
+use DateTimeImmutable;
 
 // The slash commands: what a session is steered with. They were three hundred
 // lines inside the command that also boots the session and runs its loop, and

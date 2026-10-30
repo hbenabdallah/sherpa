@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\WiringTest;
+
 use App\Agent\AgentLoop;
 use App\Agent\ContextBudget;
 use App\Agent\HistoryCompactor;
@@ -22,6 +24,8 @@ use App\Tool\FileReadTool;
 use App\Tool\ProjectGrepTool;
 use App\Tool\ShellExecTool;
 use App\TUI\Terminal;
+use ReflectionMethod;
+use ReflectionProperty;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\LazyCommand;
 

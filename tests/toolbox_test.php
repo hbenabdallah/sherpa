@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\ToolboxTest;
+
 // The bridge between what a model writes and what a PHP handler will accept.
 
 require __DIR__ . '/../vendor/autoload.php';

@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\McpTest;
+
 use App\Mcp\ServerLog;
+use Throwable;
 
 // The MCP client, driven against a server that misbehaves on purpose.
 //
@@ -101,6 +104,7 @@ check('a single huge line is cut too, without breaking a character', strlen($wid
 // ---- servers that fail ------------------------------------------------------
 $missing = McpClient::for(new ServerConfig(name: 'absent', command: 'nexistepasdutout'));
 $threw = false;
+$message = '';
 
 try {
     $missing->listTools();
@@ -108,10 +112,11 @@ try {
     $threw = true;
     $message = $e->getMessage();
 }
-check('a missing command is reported before anything else', $threw && str_contains($message ?? '', 'command not found'), $message ?? '');
+check('a missing command is reported before anything else', $threw && str_contains($message, 'command not found'), $message);
 
 $crashing = McpClient::for(server('crash'));
 $threw = false;
+$message = '';
 
 try {
     $crashing->listTools();
@@ -119,8 +124,8 @@ try {
     $threw = true;
     $message = $e->getMessage();
 }
-check('a server that dies at the handshake is reported', $threw, $message ?? '');
-check("and its stderr is quoted, since that is where the reason is", str_contains($message ?? '', 'missing configuration'), $message ?? '');
+check('a server that dies at the handshake is reported', $threw, $message);
+check("and its stderr is quoted, since that is where the reason is", str_contains($message, 'missing configuration'), $message);
 $crashing->close();
 
 // A tool call that errors is an answer, not a crash: the model has to read it.
@@ -131,6 +136,7 @@ $broken->close();
 
 $protocolError = McpClient::for(server('protoerror'));
 $threw = false;
+$message = '';
 
 try {
     $protocolError->callTool('echo', ['text' => 'x']);
@@ -138,10 +144,10 @@ try {
     $threw = true;
     $message = $e->getMessage();
 }
-check('a JSON-RPC error is raised rather than returned as content', $threw && str_contains($message ?? '', 'invalid parameter'), $message ?? '');
+check('a JSON-RPC error is raised rather than returned as content', $threw && str_contains($message, 'invalid parameter'), $message);
 // That message becomes the tool result, and the tool result goes to the
 // model's provider: the server's log, which can hold a token, stays out.
-check('and the server\'s log is not quoted to the model', !str_contains($message ?? '', 'SECRET-1234'), $message ?? '');
+check('and the server\'s log is not quoted to the model', !str_contains($message, 'SECRET-1234'), $message);
 $protocolError->close();
 
 // A server that accepts the handshake and then answers nothing must not hold
@@ -150,6 +156,7 @@ $protocolError->close();
 $hanging = McpClient::for(server('silent'), handshakeTimeout: 1.0, callTimeout: 1.0);
 $started = microtime(true);
 $threw = false;
+$message = '';
 
 try {
     $hanging->listTools();
@@ -158,7 +165,7 @@ try {
     $message = $e->getMessage();
 }
 $waited = microtime(true) - $started;
-check('a server that never answers times out', $threw && $waited < 5.0, sprintf('%.1fs: %s', $waited, $message ?? 'no throw'));
+check('a server that never answers times out', $threw && $waited < 5.0, sprintf('%.1fs: %s', $waited, $threw ? $message : 'no throw'));
 $hanging->close();
 
 // A server that exits between two calls — crashed, killed, restarted itself.
@@ -344,6 +351,7 @@ check('and adds no MCP section to the prompt', $registry->promptSection() === ''
 // Two ways in, and the file says which by what it holds. Declaring neither or
 // both is a question nobody can answer for the user.
 $threw = false;
+$message = '';
 
 try {
     ServerConfig::fromArray('deux', ['command' => 'php', 'url' => 'https://exemple/mcp']);
@@ -351,9 +359,10 @@ try {
     $threw = true;
     $message = $e->getMessage();
 }
-check('command and url together are refused', $threw && str_contains($message ?? '', 'pick one'), $message ?? '');
+check('command and url together are refused', $threw && str_contains($message, 'pick one'), $message);
 
 $threw = false;
+$message = '';
 
 try {
     ServerConfig::fromArray('nulle-part', ['args' => ['x']]);
@@ -361,9 +370,10 @@ try {
     $threw = true;
     $message = $e->getMessage();
 }
-check('and declaring neither is refused too', $threw && str_contains($message ?? '', 'missing'), $message ?? '');
+check('and declaring neither is refused too', $threw && str_contains($message, 'missing'), $message);
 
 $threw = false;
+$message = '';
 
 try {
     ServerConfig::fromArray('pas-une-url', ['url' => 'exemple.test/mcp']);
@@ -373,8 +383,8 @@ try {
 }
 check(
     'a url that is not http(s) is caught at the file, not at the first call',
-    $threw && str_contains($message ?? '', 'http(s)'),
-    $message ?? '',
+    $threw && str_contains($message, 'http(s)'),
+    $message,
 );
 
 // ---- resources and prompts -------------------------------------------------
@@ -408,6 +418,7 @@ check(
     $rich->readResource('file:///logo.png'),
 );
 $threw = false;
+$message = '';
 
 try {
     $rich->readResource('db://nothing');
@@ -415,7 +426,7 @@ try {
     $threw = true;
     $message = $e->getMessage();
 }
-check('an unknown resource is an error naming it', $threw && str_contains($message ?? '', 'db://nothing'), $message ?? '');
+check('an unknown resource is an error naming it', $threw && str_contains($message, 'db://nothing'), $message);
 
 $prompts = $rich->listPrompts();
 check(
@@ -519,6 +530,7 @@ check(
 );
 check('one with no arguments runs as it is', str_contains((string) $registry->expandPrompt('/docs:standup'), 'PROMPT standup'));
 $threw = false;
+$message = '';
 
 try {
     $registry->expandPrompt('/docs:review');
@@ -526,7 +538,7 @@ try {
     $threw = true;
     $message = $e->getMessage();
 }
-check('a missing required argument is refused with the usage', $threw && str_contains($message ?? '', 'missing change') && str_contains($message ?? '', '<change> [focus]'), $message ?? '');
+check('a missing required argument is refused with the usage', $threw && str_contains($message, 'missing change') && str_contains($message, '<change> [focus]'), $message);
 check('a command that names no prompt is left alone', $registry->expandPrompt('/docs:nothing') === null && $registry->expandPrompt('/help') === null);
 $registry->shutdown();
 unlink($path);
@@ -622,6 +634,7 @@ $paged->close();
 // to reach one that asks who is calling.
 $unauth = McpClient::for(new ServerConfig(name: 'distant', url: $base . '/unauth'), handshakeTimeout: 5.0, callTimeout: 5.0);
 $threw = false;
+$message = '';
 
 try {
     $unauth->listTools();
@@ -629,7 +642,7 @@ try {
     $threw = true;
     $message = $e->getMessage();
 }
-check('a server that refuses the call is reported', $threw, $message ?? '');
+check('a server that refuses the call is reported', $threw, $message);
 $unauth->close();
 
 // Ctrl+C reaches a server that takes its time, and the wait is shown meanwhile.
@@ -647,6 +660,7 @@ $authed->close();
 
 $broken = McpClient::for(new ServerConfig(name: 'distant', url: $base . '/http500'), handshakeTimeout: 5.0, callTimeout: 5.0);
 $threw = false;
+$message = '';
 
 try {
     $broken->listTools();
@@ -654,7 +668,7 @@ try {
     $threw = true;
     $message = $e->getMessage();
 }
-check('an HTTP error is an McpException like any other failure', $threw && str_contains($message ?? '', 'distant'), $message ?? '');
+check('an HTTP error is an McpException like any other failure', $threw && str_contains($message, 'distant'), $message);
 $broken->close();
 
 // Through the registry, since that is what reads the file the user writes.

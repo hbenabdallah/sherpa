@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\ProjectTest;
+
 use App\Project\Project;
 use Symfony\Component\Yaml\Yaml;
 

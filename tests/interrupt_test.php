@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\InterruptTest;
+
 // Ctrl+C cancels the turn, not the session — and leaves the conversation in a
 // state the next request can actually be built from.
 

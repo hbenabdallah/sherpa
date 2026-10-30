@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\Fixtures\FakeProvider;
+
 // An OpenAI-compatible provider for `php -S`, scripted and stateless, so the
 // single executable can be run end to end without a real model or any quota.
 //

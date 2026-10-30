@@ -1,0 +1,12 @@
+# The suites, apart from src/: they are scripts that stay readable when they fail. A check reads a value
+# through ?-> or ?? even where it cannot be null, so a broken one prints what it got instead of dying, and
+# check() counts through globals PHPStan does not follow. Level 4 and up report both as dead code.
+parameters:
+    level: 3
+    paths:
+        - tests
+    excludePaths:
+        # Sample projects the benchmark hands to the model, not Sherpa's code.
+        - tests/bench/projects
+    tmpDir: var/phpstan-tests
+    reportUnmatchedIgnoredErrors: true

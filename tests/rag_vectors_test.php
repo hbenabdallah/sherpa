@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\RagVectorsTest;
+
+use RuntimeException;
+
 // The vector path, without a network: a hashing stand-in plays the embedding
 // model. What is tested is the plumbing — what gets embedded and when, what
 // happens when the model changes or the provider fails. Whether vectors find

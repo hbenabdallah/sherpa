@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\CompatTest;
+
 use App\Memory\Recorded;
 use App\Project\DockerConfig;
 
