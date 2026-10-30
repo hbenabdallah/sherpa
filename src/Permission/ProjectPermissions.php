@@ -58,6 +58,6 @@ class ProjectPermissions
     /** @return array<int, string> */
     public function all(): array
     {
-        return $this->project?->allowedTools ?? [];
+        return $this->project->allowedTools ?? [];
     }
 }

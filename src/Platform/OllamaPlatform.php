@@ -368,10 +368,6 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
             return null;
         }
 
-        if (!is_array($data)) {
-            return null;
-        }
-
         foreach ($data['models'] ?? [] as $entry) {
             if (!is_array($entry) || !$this->namesCurrentModel($entry)) {
                 continue;

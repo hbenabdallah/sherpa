@@ -44,11 +44,16 @@ final class HtmlParser implements DocumentParser
             }
         }
 
-        $title = trim($dom->getElementsByTagName('title')->item(0)?->textContent ?? '');
+        $title = trim($dom->getElementsByTagName('title')->item(0)->textContent ?? '');
 
+        // Shared by reference with $flush, which tools read at the type a variable has here.
+        /** @var list<Section> $sections */
         $sections = [];
+        /** @var array<int, string> $stack */
         $stack = [];
+        /** @var list<string> $blocks */
         $blocks = [];
+        /** @var int $start */
         $start = 1;
 
         $flush = function (int $end) use (&$sections, &$stack, &$blocks, &$start): void {

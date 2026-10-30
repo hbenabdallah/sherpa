@@ -67,7 +67,7 @@ class BackendEmbeddings implements EmbeddingProvider
         if (strtolower($provider) === Backend::Ollama->value) {
             $platform = new OllamaPlatform($client, $this->platform->ollamaEndpoint(), (string) $where['model']);
         } elseif (is_string($where['url'] ?? null)) {
-            $platform = new OpenAiCompatiblePlatform($client, $where['url'], (string) $where['model'], (string) ($where['key'] ?? ''));
+            $platform = new OpenAiCompatiblePlatform($client, $where['url'], (string) $where['model'], $where['key']);
         } else {
             throw new RuntimeException("embeddings.provider in config.yaml is \"{$provider}\", which is no recorded provider: /provider lists them, or say ollama.");
         }

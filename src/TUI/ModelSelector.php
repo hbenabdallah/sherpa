@@ -48,7 +48,7 @@ class ModelSelector
      */
     public function run(?ModelProfile $current = null, bool $firstRun = false, ?Backend $backend = null): ?ModelProfile
     {
-        $this->backend = $backend ?? $current?->backend ?? Backend::DEFAULT;
+        $this->backend = $backend ?? $current->backend ?? Backend::DEFAULT;
 
         // A model of the other backend is not "the current one" on this list,
         // even when the names happen to match.

@@ -676,7 +676,7 @@ final class AcpServer
             return;
         }
 
-        isset($route['output']) ? $this->editor->showOutput($route['output']) : $this->editor->say($route['reply'] ?? '');
+        isset($route['output']) ? $this->editor->showOutput($route['output']) : $this->editor->say($route['reply']);
         // /compact changed the conversation; the others leave it as it was.
         $this->save($session);
     }

@@ -60,7 +60,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
     /** How long one at a time holds after the provider said slow down. */
     private const int STRAINED_SECONDS = 120;
 
-    /** @var array{prompt: int, completion: int}|null */
+    /** @var array{prompt: int, completion: int, cached?: int}|null */
     private ?array $lastUsage {
         get => $this->lastOf('usage');
         set(?array $value) {
@@ -745,7 +745,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
      * fragment belongs to. The id and name come once, in the opening fragment.
      *
      * @param array<int|string, array<string, mixed>> $acc
-     * @param array<int, array<string, mixed>>        $deltas
+     * @param array<int|string, mixed>               $deltas the provider's JSON, as decoded
      */
     private function accumulateToolCalls(array &$acc, array $deltas): void
     {

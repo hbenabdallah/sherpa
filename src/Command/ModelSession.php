@@ -422,7 +422,7 @@ final class ModelSession
             $chosen = $this->modelSelector->run($this->profile, backend: $this->platform->backend());
 
             if (!$chosen instanceof ModelProfile) {
-                $this->chat->showInfo('Model unchanged: ' . ($this->profile?->model ?? $this->platform->modelName()));
+                $this->chat->showInfo('Model unchanged: ' . ($this->profile->model ?? $this->platform->modelName()));
 
                 return;
             }
@@ -474,7 +474,7 @@ final class ModelSession
         // and the conversation still belonging to the old one.
         if ($changed && !$this->confirmReset($bag, $profile)) {
             echo Terminal::GRAY . '  Model unchanged: '
-                . ($previous?->model ?? $this->platform->modelName())
+                . ($previous->model ?? $this->platform->modelName())
                 . ". The conversation is untouched.\n" . Terminal::RESET;
 
             return false;

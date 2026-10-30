@@ -323,7 +323,7 @@ class MarkdownRenderer
         if (preg_match('/^```(\w*)/', $line, $m)) {
             if (!$this->inCodeBlock) {
                 $this->inCodeBlock = true;
-                $this->codeLang = $m[1] ?? '';
+                $this->codeLang = $m[1];
                 $lang = $this->codeLang ? " {$this->codeLang}" : '';
 
                 return Terminal::BG_DARK . Terminal::GRAY . "┌── code{$lang} " . Terminal::RESET;

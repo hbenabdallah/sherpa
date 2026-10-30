@@ -77,8 +77,8 @@ final class Project
 
     public function shortPath(): string
     {
-        $home = $_SERVER['HOME'] ?? getenv('HOME') ?? '';
+        $home = $_SERVER['HOME'] ?? getenv('HOME');
 
-        return $home ? str_replace($home, '~', $this->path) : $this->path;
+        return is_string($home) && $home !== '' ? str_replace($home, '~', $this->path) : $this->path;
     }
 }

@@ -39,7 +39,9 @@ class ChatPane implements AgentOutput
     private bool $holding = true;
 
     public function __construct(
-        private readonly Terminal $terminal,
+        // Protected, not private: PHPStan 2.3 reports a private property that is only passed to a
+        // subclass's constructor (SubagentPane, in forSubagent()) as never read.
+        protected readonly Terminal $terminal,
         private readonly MarkdownRenderer $markdown,
     ) {}
 
@@ -285,7 +287,7 @@ class ChatPane implements AgentOutput
             return;
         }
 
-        $first = explode("\n", $clean)[0] ?? '';
+        $first = explode("\n", $clean)[0];
         $truncated = mb_strlen($clean) > mb_strlen($first) ? ' …' : '';
 
         // A command that ran and failed is not a tool error, but a check mark

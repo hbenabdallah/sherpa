@@ -134,7 +134,7 @@ final class McpClient
                 throw $this->failure('listing the tools failed', $e);
             }
 
-            foreach ($page?->tools ?? [] as $tool) {
+            foreach ($page->tools as $tool) {
                 $tools[] = [
                     'name'        => $tool->name,
                     'description' => (string) ($tool->description ?? ''),
@@ -142,7 +142,7 @@ final class McpClient
                 ];
             }
 
-            $cursor = $page?->nextCursor;
+            $cursor = $page->nextCursor;
         } while ($cursor !== null && count($tools) < self::MAX_TOOLS);
 
         return $tools;
@@ -167,8 +167,8 @@ final class McpClient
         }
 
         return [
-            'text'    => $this->flatten($result?->content ?? []),
-            'isError' => (bool) $result?->isError,
+            'text'    => $this->flatten($result->content),
+            'isError' => $result->isError,
         ];
     }
 
@@ -192,7 +192,7 @@ final class McpClient
                 return $resources;
             }
 
-            foreach ($page?->resources ?? [] as $resource) {
+            foreach ($page->resources as $resource) {
                 $resources[] = [
                     'uri'         => $resource->uri,
                     'name'        => (string) ($resource->title ?? $resource->name),
@@ -201,7 +201,7 @@ final class McpClient
                 ];
             }
 
-            $cursor = $page?->nextCursor;
+            $cursor = $page->nextCursor;
         } while ($cursor !== null && count($resources) < self::MAX_RESOURCES);
 
         return $resources;
@@ -230,7 +230,7 @@ final class McpClient
                 return $templates;
             }
 
-            foreach ($page?->resourceTemplates ?? [] as $template) {
+            foreach ($page->resourceTemplates as $template) {
                 $templates[] = [
                     'uriTemplate' => $template->uriTemplate,
                     'name'        => (string) ($template->title ?? $template->name),
@@ -239,7 +239,7 @@ final class McpClient
                 ];
             }
 
-            $cursor = $page?->nextCursor;
+            $cursor = $page->nextCursor;
         } while ($cursor !== null && count($templates) < self::MAX_RESOURCES);
 
         return $templates;
@@ -260,7 +260,7 @@ final class McpClient
         }
 
         $parts = [];
-        foreach ($result?->contents ?? [] as $content) {
+        foreach ($result->contents as $content) {
             $parts[] = match (true) {
                 $content instanceof TextResourceContents => $content->text,
                 $content instanceof BlobResourceContents => '[' . ($content->mimeType ?? 'binary') . ', '
@@ -291,7 +291,7 @@ final class McpClient
                 return $prompts;
             }
 
-            foreach ($page?->prompts ?? [] as $prompt) {
+            foreach ($page->prompts as $prompt) {
                 $prompts[] = [
                     'name'        => $prompt->name,
                     'description' => (string) ($prompt->description ?? $prompt->title ?? ''),
@@ -303,7 +303,7 @@ final class McpClient
                 ];
             }
 
-            $cursor = $page?->nextCursor;
+            $cursor = $page->nextCursor;
         } while ($cursor !== null && count($prompts) < self::MAX_PROMPTS);
 
         return $prompts;
@@ -327,7 +327,7 @@ final class McpClient
         }
 
         $messages = [];
-        foreach ($result?->messages ?? [] as $message) {
+        foreach ($result->messages as $message) {
             $messages[] = [
                 'role' => $message->role->value,
                 'text' => $message->content instanceof EmbeddedResource && $message->content->resource instanceof TextResourceContents
