@@ -15,7 +15,7 @@ use Throwable;
  * and every question has an answer ready, so Enter all the way through is a
  * valid setup. Nothing is written: the answers make a draft.
  */
-final class ProjectQuestions
+final readonly class ProjectQuestions
 {
     /** Service names that usually hold the application and its database. */
     private const array APP_HINTS = ['app', 'php', 'web', 'api', 'backend'];
@@ -23,8 +23,8 @@ final class ProjectQuestions
     private const array DB_HINTS = ['db', 'database', 'mysql', 'mariadb', 'postgres', 'pgsql'];
 
     public function __construct(
-        private readonly LineEditor $editor,
-        private readonly ProjectStore $store,
+        private LineEditor $editor,
+        private ProjectStore $store,
     ) {}
 
     public function ask(string $path): Project

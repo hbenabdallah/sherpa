@@ -14,9 +14,9 @@ use App\Agent\Tool\Permission;
     description: 'Write the plan for a task of several steps, and keep it up to date: send the WHOLE list every time, one task per line — "[ ] to do", "[>] in progress", "[x] done". Mark a task in progress before starting it and done as soon as it is. Not for a one-step request.',
     permission: Permission::AUTO,
 )]
-final class TodoWriteTool
+final readonly class TodoWriteTool
 {
-    public function __construct(private readonly TodoList $todos) {}
+    public function __construct(private TodoList $todos) {}
 
     public function __invoke(
         #[Param('The whole list, one task per line, each starting with [ ], [>] or [x]')]

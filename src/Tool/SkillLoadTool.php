@@ -15,9 +15,9 @@ use App\Skills\SkillRegistry;
     description: 'Load the full content of a skill document into context. Use when you need detailed guidance on a specific technical domain.',
     permission: Permission::AUTO,
 )]
-final class SkillLoadTool
+final readonly class SkillLoadTool
 {
-    public function __construct(private readonly SkillRegistry $registry) {}
+    public function __construct(private SkillRegistry $registry) {}
 
     public function __invoke(
         #[Param('Name of the skill to load (as shown in the skills index)')]

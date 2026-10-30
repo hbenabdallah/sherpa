@@ -20,13 +20,13 @@ use RuntimeException;
     description: 'Create or overwrite a file with the given content.',
     permission: Permission::CONFIRM,
 )]
-final class FileWriteTool
+final readonly class FileWriteTool
 {
     public function __construct(
-        private readonly ProjectPathResolver $paths = new ProjectPathResolver(),
-        private readonly SyntaxGuard $syntax = new SyntaxGuard(),
+        private ProjectPathResolver $paths = new ProjectPathResolver(),
+        private SyntaxGuard $syntax = new SyntaxGuard(),
         // The disk, or the editor's buffers under `sherpa acp`.
-        private readonly Files $files = new Files(),
+        private Files $files = new Files(),
     ) {}
 
     public function __invoke(

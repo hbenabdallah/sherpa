@@ -9,11 +9,11 @@ use App\Tool\FilePatchTool;
 use App\Tool\FileWriteTool;
 
 /** The edit a tool call would make, for the calls that edit a file. */
-final class EditPreview
+final readonly class EditPreview
 {
     public function __construct(
-        private readonly FileWriteTool $fileWrite,
-        private readonly FilePatchTool $filePatch,
+        private FileWriteTool $fileWrite,
+        private FilePatchTool $filePatch,
     ) {}
 
     /** null for a call that edits nothing, or whose edit cannot be worked out: it will fail. */

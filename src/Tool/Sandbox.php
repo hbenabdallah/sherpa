@@ -22,9 +22,9 @@ use Throwable;
  */
 final class Sandbox
 {
-    public const BUBBLEWRAP = 'bubblewrap';
+    public const string BUBBLEWRAP = 'bubblewrap';
 
-    public const SANDBOX_EXEC = 'sandbox-exec';
+    public const string SANDBOX_EXEC = 'sandbox-exec';
 
     /**
      * Under the home, where installs and test runs write what they download

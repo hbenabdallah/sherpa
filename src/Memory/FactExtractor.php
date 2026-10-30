@@ -18,7 +18,7 @@ use Throwable;
  * expected to call memory_remember as it works. It runs after /exit, while
  * someone waits for their shell back, so it has to be cheap.
  */
-final class FactExtractor
+final readonly class FactExtractor
 {
     /**
      * Below this there is no session to summarise, only a greeting: system,
@@ -48,14 +48,14 @@ final class FactExtractor
     private const int MAX_FACTS = 12;
 
     public function __construct(
-        private readonly PlatformInterface $platform,
-        private readonly MemoryStore $store,
-        private readonly Interrupt $interrupt,
+        private PlatformInterface $platform,
+        private MemoryStore $store,
+        private Interrupt $interrupt,
         // Optional so the extractor stays constructible on its own, as
         // memory_test builds it; absent, the floor applies.
-        private readonly ?ContextBudget $budget = null,
+        private ?ContextBudget $budget = null,
         // What the session read from outside, kept with each fact found.
-        private readonly ?Provenance $provenance = null,
+        private ?Provenance $provenance = null,
     ) {}
 
     /** How many characters of transcript this window can afford. */

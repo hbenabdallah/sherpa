@@ -15,7 +15,7 @@ use App\Memory\ContextStore;
     description: 'Search the tool output that was removed from this conversation to save context. Use it instead of re-running a tool when you need something you read earlier in this session. Search by keywords, or pass the id quoted in an elided message.',
     permission: Permission::AUTO,
 )]
-final class ContextRecallTool
+final readonly class ContextRecallTool
 {
     /** Share of the prompt window one recall may occupy. */
     private const float SHARE = 0.08;
@@ -25,8 +25,8 @@ final class ContextRecallTool
     private const int MAX_CHARS = 40000;
 
     public function __construct(
-        private readonly ContextStore $store,
-        private readonly ?ContextBudget $budget = null,
+        private ContextStore $store,
+        private ?ContextBudget $budget = null,
     ) {}
 
     public function __invoke(

@@ -14,9 +14,9 @@ use App\Agent\Tool\Permission;
     // It stops only what Sherpa itself started.
     permission: Permission::AUTO,
 )]
-final class JobStopTool
+final readonly class JobStopTool
 {
-    public function __construct(private readonly BackgroundJobs $jobs) {}
+    public function __construct(private BackgroundJobs $jobs) {}
 
     public function __invoke(#[Param('The job id shell_exec gave')] int $id): string
     {

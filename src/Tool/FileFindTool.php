@@ -24,7 +24,7 @@ use Throwable;
     description: 'Find files by name pattern: "*Test.php" anywhere, "src/**/*.yaml" under src, "{README,CHANGELOG}.md". The most recently changed come first. Use it to locate files by name; use project_grep to search inside them.',
     permission: Permission::AUTO,
 )]
-final class FileFindTool
+final readonly class FileFindTool
 {
     /** Walked past when the project is not a git repository, as list_dir does. */
     private const array SKIPPED = ['vendor', 'node_modules', '.git', 'var', '.idea', '.vscode', '.claude', '__pycache__', '.venv', 'target'];
@@ -39,8 +39,8 @@ final class FileFindTool
     private const int CHARS_PER_PATH = 50;
 
     public function __construct(
-        private readonly ProjectPathResolver $paths = new ProjectPathResolver(),
-        private readonly ?ContextBudget $budget = null,
+        private ProjectPathResolver $paths = new ProjectPathResolver(),
+        private ?ContextBudget $budget = null,
     ) {}
 
     public function __invoke(

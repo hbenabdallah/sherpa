@@ -138,7 +138,7 @@ final class SherpaCommand extends Command
 
         // Ctrl+C cancels the turn while one is running; at an idle prompt, or on
         // a second press, it quits through here.
-        $this->interrupt->install(function (): void {
+        $this->interrupt->install(function (): never {
             $this->terminal->restoreSane();
             echo "\n";
             exit(0);
