@@ -1,4 +1,5 @@
 <?php
+
 // An OpenAI-compatible provider for `php -S`, scripted by the last user
 // message, so `sherpa acp` can be driven end to end by tests/acp_test.php:
 //

@@ -1,19 +1,17 @@
 <?php
+
 // Terminal escape handling: what gets stripped from untrusted text, and the
 // display behaviours that depend on it.
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
-use App\Agent\Tool\ToolCall;
-use App\Agent\Tool\ToolDefinition;
-use App\Agent\Tool\Permission;
+use App\Tool\FilePatchTool;
+use App\Tool\FileWriteTool;
+use App\Tool\ShellExecTool;
 use App\TUI\ChatPane;
 use App\TUI\ConfirmOverlay;
 use App\TUI\MarkdownRenderer;
 use App\TUI\Terminal;
-use App\Tool\FilePatchTool;
-use App\Tool\FileWriteTool;
-use App\Tool\ShellExecTool;
 
 $pass = 0;
 $fail = 0;
@@ -70,8 +68,10 @@ check('once, not before every line after', !str_contains(captured(fn() => $pane-
 
 $toolOnly = new ChatPane(new Terminal(), new MarkdownRenderer());
 captured(fn() => $toolOnly->beginAssistantMessage());
-check('a turn that only calls a tool clears it too',
-    str_starts_with(captured(fn() => $toolOnly->showToolCall('file_read', ['path' => 'a.php'])), $clear));
+check(
+    'a turn that only calls a tool clears it too',
+    str_starts_with(captured(fn() => $toolOnly->showToolCall('file_read', ['path' => 'a.php'])), $clear),
+);
 
 // ---- Terminal::plain -------------------------------------------------------
 check('plain text is untouched', Terminal::plain('hello world') === 'hello world');
@@ -139,16 +139,22 @@ $table = "| Method | Pros |\n|---|---|\n| External tool | No code to write, work
 $drawn = $plainOf((new MarkdownRenderer(41))->render($table));
 check('a table is drawn with borders, not left as pipes', str_contains($drawn, '┌') && str_contains($drawn, '└') && !str_contains($drawn, '|---'), $drawn);
 check('its cells keep their text', str_contains($drawn, 'External tool') && str_contains($drawn, 'A window of its own.'), $drawn);
-check('it fits the terminal, long cells wrapped',
-    max(array_map('mb_strwidth', explode("\n", $drawn))) <= 40 && str_contains($drawn, 'works at once,'), $drawn);
+check(
+    'it fits the terminal, long cells wrapped',
+    max(array_map('mb_strwidth', explode("\n", $drawn))) <= 40 && str_contains($drawn, 'works at once,'),
+    $drawn,
+);
 
 $aligned = $plainOf((new MarkdownRenderer(80))->render("| a | n |\n|:---|---:|\n| x | 7 |\n| **yy** | `123` |"));
 check('right-aligned columns line up on the right', str_contains($aligned, '│   7 │') && str_contains($aligned, '│ 123 │'), $aligned);
 check('markdown inside a cell shows as its text', preg_match('/│ yy +│/u', $aligned) === 1 && !str_contains($aligned, '**'), $aligned);
 
 $wide = $plainOf((new MarkdownRenderer(220))->render("| What works | Why |\n|---|---|\n| " . str_repeat('word ', 60) . "| lines 1-9 |"));
-check('on a very wide terminal a table stays readable, 120 columns at most',
-    max(array_map('mb_strwidth', explode("\n", $wide))) <= 120, (string) max(array_map('mb_strwidth', explode("\n", $wide))));
+check(
+    'on a very wide terminal a table stays readable, 120 columns at most',
+    max(array_map('mb_strwidth', explode("\n", $wide))) <= 120,
+    (string) max(array_map('mb_strwidth', explode("\n", $wide))),
+);
 $exact = $plainOf((new MarkdownRenderer(30))->render("| a | b |\n|---|---|\n| " . str_repeat('x ', 20) . "| y |"));
 check('and never fills the terminal to its last column', max(array_map('mb_strwidth', explode("\n", $exact))) < 30, $exact);
 
@@ -191,9 +197,14 @@ check('tool arguments cannot clear the screen', !str_contains($out, "\e[2J"), bi
 
 // A model's name and details come from the server, and are shown as text.
 $selector = new App\TUI\ModelSelector(new Terminal(), new App\TUI\LineEditor(), new App\Platform\OllamaPlatform(
-    new Symfony\Component\HttpClient\MockHttpClient(), 'http://ollama.test', 'x'));
-$heading = (new ReflectionMethod($selector, 'heading'))->invoke($selector,
-    new App\Platform\ModelInfo("piège\e[2J\nfaux", 8192, ["tools\e]0;titre\x07"], null, "7B\e[31m"));
+    new Symfony\Component\HttpClient\MockHttpClient(),
+    'http://ollama.test',
+    'x',
+));
+$heading = (new ReflectionMethod($selector, 'heading'))->invoke(
+    $selector,
+    new App\Platform\ModelInfo("piège\e[2J\nfaux", 8192, ["tools\e]0;titre\x07"], null, "7B\e[31m"),
+);
 check('a model name from the server cannot clear the screen', !str_contains($heading, "\e[2J") && !str_contains($heading, "\e]0;"), bin2hex($heading));
 check('nor draw a line of its own', !str_contains($heading, "piège\n"), $heading);
 check('and its details are still shown', str_contains(Terminal::plain($heading), 'piège') && str_contains(Terminal::plain($heading), '7B'), $heading);
@@ -211,7 +222,10 @@ $render = new ReflectionMethod($selector, 'render');
 $long = [new App\Platform\ModelInfo('nvidia/llama-3.3-nemotron-super-49b-v1.5-instruct', 131072), new App\Platform\ModelInfo('qwen/qwen3-coder', 262144)];
 $drawn = static function () use ($render, $wide, $long): string {
     $selector = new App\TUI\ModelSelector($wide, new App\TUI\LineEditor(), new App\Platform\OllamaPlatform(
-        new Symfony\Component\HttpClient\MockHttpClient(), 'http://ollama.test', 'x'));
+        new Symfony\Component\HttpClient\MockHttpClient(),
+        'http://ollama.test',
+        'x',
+    ));
     ob_start();
     $render->invoke($selector, $long, 0, null, false);
 

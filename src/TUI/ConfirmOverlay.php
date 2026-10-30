@@ -10,6 +10,7 @@ use App\Permission\Offer;
 use App\Tool\FilePatchTool;
 use App\Tool\FileWriteTool;
 use App\Tool\ShellExecTool;
+use Throwable;
 
 class ConfirmOverlay implements Approver
 {
@@ -255,7 +256,7 @@ class ConfirmOverlay implements Approver
     {
         try {
             return $this->renderPreview($call);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // Building the preview must never be able to kill the session. The
             // tools resolve paths to build it, and a path outside the project
             // throws — which would take Sherpa down at the exact moment it was

@@ -9,6 +9,7 @@ use App\Platform\EmbeddingBackend;
 use App\Platform\ModelInfo;
 use App\Platform\PlatformInterface;
 use App\Platform\UnknownEmbeddingModel;
+use Throwable;
 
 /**
  * Which embedding model the provider offers, found without asking anyone: the
@@ -35,7 +36,7 @@ final class EmbeddingDetector
     {
         try {
             $offered = array_map(static fn(ModelInfo $m) => $m->name, $this->platform->catalogue());
-        } catch (\Throwable) {
+        } catch (Throwable) {
             $offered = [];
         }
 
@@ -57,7 +58,7 @@ final class EmbeddingDetector
                 $vectors = $this->platform->embed(['test'], $model);
             } catch (UnknownEmbeddingModel) {
                 continue;
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 return EmbeddingDetection::undetermined($e->getMessage());
             }
 

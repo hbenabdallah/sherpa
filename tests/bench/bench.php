@@ -1,4 +1,5 @@
 <?php
+
 // Sherpa's benchmark: realistic tasks on throwaway projects, run end to end
 // against a real model and scored automatically — how "good enough" gets a
 // number. Not part of `make test`: it needs an API and costs a little. Run
@@ -31,8 +32,11 @@ final class BenchRun
 
     /** @var array<string, mixed> */
     public array $transcript = [];
+
     public string $output = '';
+
     public float $seconds = 0.0;
+
     public ?int $exitCode = null;
 
     public function __construct(
@@ -126,6 +130,7 @@ final class BenchRun
         );
 
         $started = microtime(true);
+
         try {
             $process->run();
             $this->exitCode = $process->getExitCode();
@@ -373,7 +378,8 @@ if (isset($options['list'])) {
             "%-28s %-26s %d/%d · %.1f req · %s tokens par tâche%s\n",
             $id,
             (string) ($data['model'] ?? '?'),
-            $s['passed'], $s['total'],
+            $s['passed'],
+            $s['total'],
             $s['total'] > 0 ? $s['requests'] / $s['total'] : 0,
             short($s['total'] > 0 ? $s['tokens'] / $s['total'] : 0),
             ($data['commit'] ?? '') === '' ? '' : ' · ' . $data['commit'],
@@ -504,9 +510,14 @@ Gap with %s (%s)
             "  %-18s %d/%d → %d/%d · %.1f → %.1f req · %s → %s tokens
 ",
             $name,
-            $a['passed'], $a['runs'], $b['passed'], $b['runs'],
-            $a['requests'], $b['requests'],
-            short($a['tokens']), short($b['tokens']),
+            $a['passed'],
+            $a['runs'],
+            $b['passed'],
+            $b['runs'],
+            $a['requests'],
+            $b['requests'],
+            short($a['tokens']),
+            short($b['tokens']),
         );
     }
 
@@ -524,9 +535,12 @@ Gap with %s (%s)
         "  %-18s %d %% → %d %% passed · %.1f → %.1f req · %s → %s tokens per task
 ",
         'ensemble',
-        (int) round($rate($was) * 100), (int) round($rate($summary) * 100),
-        $avg($was, 'requests'), $avg($summary, 'requests'),
-        short($avg($was, 'tokens')), short($avg($summary, 'tokens')),
+        (int) round($rate($was) * 100),
+        (int) round($rate($summary) * 100),
+        $avg($was, 'requests'),
+        $avg($summary, 'requests'),
+        short($avg($was, 'tokens')),
+        short($avg($summary, 'tokens')),
     );
 }
 
@@ -675,8 +689,15 @@ $commit = trim($commit->getOutput()) . (trim((new Process(['git', '-c', 'safe.di
 
 $mcp = $mcpName === '' ? null : loadMcp($repo, $mcpName);
 
-printf("Sherpa benchmark · %s · %d scenario(s) × %d · %s%s%s\n\n", $model, count($scenarios), $repeat, $commit,
-    $mcp === null ? '' : " · MCP {$mcpName}", $pause === 0 ? '' : " · {$pause} s between runs");
+printf(
+    "Sherpa benchmark · %s · %d scenario(s) × %d · %s%s%s\n\n",
+    $model,
+    count($scenarios),
+    $repeat,
+    $commit,
+    $mcp === null ? '' : " · MCP {$mcpName}",
+    $pause === 0 ? '' : " · {$pause} s between runs",
+);
 
 $rows = [];
 
@@ -766,8 +787,11 @@ ksort($errors);
 echo "\n";
 printf("Passed              %d/%d (%d %%)\n", $passed, $n, $n > 0 ? (int) round($passed / $n * 100) : 0);
 printf("Requests            %.1f on average\n", $n > 0 ? $sum('requests') / $n : 0);
-printf("Tokens              %s in total, %s on average\n",
-    number_format($sum('tokens'), 0, ',', ' '), number_format($n > 0 ? $sum('tokens') / $n : 0, 0, ',', ' '));
+printf(
+    "Tokens              %s in total, %s on average\n",
+    number_format($sum('tokens'), 0, ',', ' '),
+    number_format($n > 0 ? $sum('tokens') / $n : 0, 0, ',', ' '),
+);
 printf("Searches            %d greps, %d with no result · %d groping turn(s)\n", $sum('greps'), $sum('grep_miss'), $sum('groping'));
 printf("Tools               %s\n", implode(' · ', array_map(fn($t, $c) => "{$t} {$c}", array_keys($tools), $tools)));
 printf("Failing calls       %s\n", $errors === [] ? 'none' : implode(' · ', array_map(

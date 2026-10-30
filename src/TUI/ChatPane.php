@@ -9,7 +9,9 @@ use App\Tool\ListDirTool;
 class ChatPane implements AgentOutput
 {
     private array $history = [];
+
     private string $spinner = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏';
+
     private int $spinnerFrame = 0;
 
     /** Trailing partial line of the reply being streamed, not yet terminated by "\n". */
@@ -20,6 +22,7 @@ class ChatPane implements AgentOutput
 
     /** Whether the waiting line is on screen and must be erased before anything else. */
     private bool $waiting = false;
+
     private float $lastWaitFrame = 0.0;
 
     /** Redraws of the waiting line, at most — reasoning can arrive fifty fragments a second. */
@@ -30,6 +33,7 @@ class ChatPane implements AgentOutput
      * call written as prose. See appendToken().
      */
     private string $withheld = '';
+
     private bool $holding = true;
 
     public function __construct(

@@ -10,6 +10,7 @@ use App\Platform\OllamaPlatform;
 use App\Platform\OpenAiCompatiblePlatform;
 use App\Platform\PlatformInterface;
 use App\Platform\SwitchablePlatform;
+use RuntimeException;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -25,6 +26,7 @@ class BackendEmbeddings implements EmbeddingProvider
 {
     /** The platform for embeddings elsewhere, kept while where it points stays the same. */
     private ?PlatformInterface $elsewhere = null;
+
     private string $elsewhereKey = '';
 
     public function __construct(
@@ -67,7 +69,7 @@ class BackendEmbeddings implements EmbeddingProvider
         } elseif (is_string($where['url'] ?? null)) {
             $platform = new OpenAiCompatiblePlatform($client, $where['url'], (string) $where['model'], (string) ($where['key'] ?? ''));
         } else {
-            throw new \RuntimeException("embeddings.provider in config.yaml is \"{$provider}\", which is no recorded provider: /provider lists them, or say ollama.");
+            throw new RuntimeException("embeddings.provider in config.yaml is \"{$provider}\", which is no recorded provider: /provider lists them, or say ollama.");
         }
 
         $this->elsewhereKey = $key;

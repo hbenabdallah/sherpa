@@ -4,6 +4,7 @@ namespace App\Acp;
 
 use App\Agent\PlanMode;
 use App\TUI\Terminal;
+use stdClass;
 
 /**
  * A saved conversation sent back to an editor that loads it, as session
@@ -54,7 +55,7 @@ final class Replay
                 'title'         => ToolDescriptions::title($name, $args),
                 'kind'          => ToolDescriptions::kind($name),
                 'status'        => 'completed',
-                'rawInput'      => $args === [] ? new \stdClass() : $args,
+                'rawInput'      => $args === [] ? new stdClass() : $args,
             ]);
         }
     }

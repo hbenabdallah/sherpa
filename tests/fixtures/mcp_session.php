@@ -1,4 +1,5 @@
 <?php
+
 // Runs one /mcp command in a session, answering its questions from stdin, and
 // prints what happened as JSON — so declaring a server from a session can be
 // tested without a terminal.
@@ -35,9 +36,14 @@ $memory = new MemoryStore();
 $memory->open($dir . '/memory-' . bin2hex(random_bytes(3)) . '.db');
 $prompt = new SystemPromptBuilder($memory, new SkillRegistry(), new StackDetector(), null, null, null, $registry);
 $project = new Project(
-    slug: 'essai', name: 'Essai', path: $dir, memoryDb: $dir . '/memory.db',
-    docker: new DockerConfig(enabled: false), stack: '',
-    createdAt: new DateTimeImmutable(), lastUsedAt: new DateTimeImmutable(),
+    slug: 'essai',
+    name: 'Essai',
+    path: $dir,
+    memoryDb: $dir . '/memory.db',
+    docker: new DockerConfig(enabled: false),
+    stack: '',
+    createdAt: new DateTimeImmutable(),
+    lastUsedAt: new DateTimeImmutable(),
 );
 
 ob_start();

@@ -7,6 +7,7 @@ namespace App\Project;
 use App\TUI\LineEditor;
 use App\TUI\Terminal;
 use Symfony\Component\Process\Process;
+use Throwable;
 
 /**
  * The questions a new directory gets, once: its name, and whether its commands
@@ -18,6 +19,7 @@ class ProjectQuestions
 {
     /** Service names that usually hold the application and its database. */
     private const APP_HINTS = ['app', 'php', 'web', 'api', 'backend'];
+
     private const DB_HINTS = ['db', 'database', 'mysql', 'mariadb', 'postgres', 'pgsql'];
 
     public function __construct(
@@ -172,7 +174,7 @@ class ProjectQuestions
         try {
             $process = new Process(['docker', 'ps', '--format', '{{.Names}}'], timeout: 3);
             $process->run();
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return [];
         }
 

@@ -1,4 +1,5 @@
 <?php
+
 // The vector path, without a network: a hashing stand-in plays the embedding
 // model. What is tested is the plumbing — what gets embedded and when, what
 // happens when the model changes or the provider fails. Whether vectors find
@@ -8,10 +9,10 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 
 use App\Memory\MemoryStore;
 use App\Permission\ProjectPermissions;
+use App\Project\DockerConfig;
 use App\Project\ProjectPathResolver;
 use App\Project\ProjectStore;
 use App\Project\StackDetector;
-use App\Project\DockerConfig;
 use App\Project\WorkingProject;
 use App\Rag\Bm25Retriever;
 use App\Rag\Chunker;
@@ -71,8 +72,11 @@ $chunks = $search->counts()['chunks'];
 
 check('the first sync gives every chunk a vector', $first->embedded === $chunks && $embeddings->texts === $chunks, "{$first->embedded} / {$chunks}");
 check('which /docs reports as searching by meaning and keywords', $search->mode()['mode'] === 'by meaning and by keywords', json_encode($search->mode(), JSON_UNESCAPED_UNICODE));
-check('the vectors fused with the keywords, and the keywords alone behind them',
-    preg_match('/^vectors\+[^,]+, else /u', $search->retriever()->name()) === 1, $search->retriever()->name());
+check(
+    'the vectors fused with the keywords, and the keywords alone behind them',
+    preg_match('/^vectors\+[^,]+, else /u', $search->retriever()->name()) === 1,
+    $search->retriever()->name(),
+);
 
 $before = $embeddings->texts;
 $search->sync();
@@ -81,8 +85,11 @@ check('an unchanged project embeds nothing again', $embeddings->texts === $befor
 file_put_contents($root . '/home/boutique/docs/glossaire.md', "\n## Basket\n\nWhat the customer is about to buy.\n", FILE_APPEND);
 $before = $embeddings->texts;
 $changed = $search->sync();
-check('a changed document has its own chunks embedded, nothing else', $changed->embedded > 0 && $changed->embedded < 6 && $embeddings->texts - $before === $changed->embedded,
-    "{$changed->embedded} embedded");
+check(
+    'a changed document has its own chunks embedded, nothing else',
+    $changed->embedded > 0 && $changed->embedded < 6 && $embeddings->texts - $before === $changed->embedded,
+    "{$changed->embedded} embedded",
+);
 
 $answer = $search->search('basket customer buy');
 check('and what it says is found through the vectors', str_contains($answer, 'glossaire.md › Glossaire › Basket'), $answer);
@@ -93,13 +100,25 @@ $search = searcher($working, $other);
 $switched = $search->sync();
 check('a new model re-embeds everything: two models\' vectors are never compared', $switched->embedded === $search->counts()['chunks'], (string) $switched->embedded);
 
-$stale = new VectorRetriever((function () use ($working) { $i = new DocIndex(); $i->open(DocSearch::databaseFor($working->project())); return $i; })(), new HashingEmbeddings('modele-c'));
+$stale = new VectorRetriever((function () use ($working) {
+    $i = new DocIndex();
+    $i->open(DocSearch::databaseFor($working->project()));
+
+    return $i;
+})(), new HashingEmbeddings('modele-c'));
 check('vectors from another model are never searched', $stale->retrieve('panier', 5) === []);
 
 // ---- a provider that fails ------------------------------------------------------------
 $broken = new class implements EmbeddingProvider {
-    public function model(): string { return 'modele-en-panne'; }
-    public function embed(array $texts): array { throw new RuntimeException('HTTP 429: quota exceeded'); }
+    public function model(): string
+    {
+        return 'modele-en-panne';
+    }
+
+    public function embed(array $texts): array
+    {
+        throw new RuntimeException('HTTP 429: quota exceeded');
+    }
 };
 $search = searcher($working, $broken);
 $answer = $search->search('invoice numbering format');
@@ -115,8 +134,15 @@ check('with how to turn meaning on', str_contains($search->mode()['detail'], 'em
 
 // ---- falling back ---------------------------------------------------------------------
 $failing = new class implements Retriever {
-    public function name(): string { return 'panne'; }
-    public function retrieve(string $question, int $limit): array { throw new RuntimeException('unreachable'); }
+    public function name(): string
+    {
+        return 'panne';
+    }
+
+    public function retrieve(string $question, int $limit): array
+    {
+        throw new RuntimeException('unreachable');
+    }
 };
 $index = new DocIndex();
 $index->open(DocSearch::databaseFor($working->project()));

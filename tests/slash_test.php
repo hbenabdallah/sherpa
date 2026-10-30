@@ -1,4 +1,5 @@
 <?php
+
 // The slash commands: what a session is steered with. They were three hundred
 // lines inside the command that also boots the session and runs its loop, and
 // nothing exercised them. Apart, they answer without a terminal and without a
@@ -35,21 +36,21 @@ use App\Project\Project;
 use App\Project\ProjectPathResolver;
 use App\Project\ProjectQuestions;
 use App\Project\ProjectStore;
+use App\Project\StackDetector;
 use App\Project\WorkingProject;
 use App\Rag\Chunker;
 use App\Rag\DocIndex;
 use App\Rag\DocSearch;
 use App\Rag\DocSource;
 use App\Rag\Ingestor;
-use App\Tool\ShellExecTool;
-use App\Project\StackDetector;
+use App\Session\SessionStore;
 use App\Skills\SkillRegistry;
+use App\Tool\ShellExecTool;
 use App\TUI\ChatPane;
 use App\TUI\LineEditor;
 use App\TUI\MarkdownRenderer;
 use App\TUI\ModelSelector;
 use App\TUI\Terminal;
-use App\Session\SessionStore;
 use App\Usage\UsageMeter;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
@@ -117,24 +118,52 @@ $config->setPath($root . '/config.yaml');
 $models = new ModelResolver($config, 'local:7b', 32768);
 $sessions = new SessionStore();
 $modelSession = new ModelSession(
-    $platform, $models, new ModelSelector(new Terminal(), $editor, $platform),
-    $budget, $speed, $usage, $chat, $editor, $prompt, $context, $toolbox, $sessions,
+    $platform,
+    $models,
+    new ModelSelector(new Terminal(), $editor, $platform),
+    $budget,
+    $speed,
+    $usage,
+    $chat,
+    $editor,
+    $prompt,
+    $context,
+    $toolbox,
+    $sessions,
 );
 $modelSession->apply(new ModelProfile('distant/modele', 32768, 'machine config', Backend::Api));
 
 $commands = new SlashCommands(
-    $chat, $memory, $context, $skills, new McpRegistry($mcpConfig), $toolbox,
-    $budget, $speed, $usage, $platform, $modelSession, $permissions, $session,
-    new HistoryCompactor($platform, $budget), $prompt, $sessions,
+    $chat,
+    $memory,
+    $context,
+    $skills,
+    new McpRegistry($mcpConfig),
+    $toolbox,
+    $budget,
+    $speed,
+    $usage,
+    $platform,
+    $modelSession,
+    $permissions,
+    $session,
+    new HistoryCompactor($platform, $budget),
+    $prompt,
+    $sessions,
     $working = new WorkingProject($projects, $memory, $permissions, $sessions, new ProjectPathResolver(), new ShellExecTool()),
     new ProjectQuestions($editor, $projects),
     $docSearch = new DocSearch(new DocIndex(), new Ingestor(new DocSource(), new Chunker()), $working),
 );
 
 $project = new Project(
-    slug: 'projet', name: 'projet', path: $root . '/projet', memoryDb: $root . '/memory.db',
-    docker: new DockerConfig(enabled: false), stack: 'PHP >=8.3',
-    createdAt: new DateTimeImmutable(), lastUsedAt: new DateTimeImmutable(),
+    slug: 'projet',
+    name: 'projet',
+    path: $root . '/projet',
+    memoryDb: $root . '/memory.db',
+    docker: new DockerConfig(enabled: false),
+    stack: 'PHP >=8.3',
+    createdAt: new DateTimeImmutable(),
+    lastUsedAt: new DateTimeImmutable(),
 );
 // Opened the way the command opens one: memory, permissions, sessions and the
 // tools' root all bound in one place.
@@ -186,24 +215,33 @@ check('and says so when there was nothing to remove', str_contains($out, 'No suc
 check('/project shows the project in force', str_contains($out, $root . '/projet') && str_contains($out, 'PHP >=8.3'), $out);
 
 [, $out] = $slash('/docs');
-check('/docs says what the documentation index holds, even when it is nothing',
-    str_contains($out, 'Project documentation') && str_contains($out, 'No document read'), $out);
+check(
+    '/docs says what the documentation index holds, even when it is nothing',
+    str_contains($out, 'Project documentation') && str_contains($out, 'No document read'),
+    $out,
+);
 
 file_put_contents($root . '/projet/GUIDE.md', "# Guide\n\n## Deployment\n\nWe deploy on Tuesdays.\n");
 [, $out] = $slash('/docs when do we deploy');
 check('/docs <question> shows exactly what the model would be given', str_contains($out, 'GUIDE.md › Guide › Deployment') && str_contains($out, 'Tuesdays'), $out);
 
 [, $out] = $slash('/docs eval');
-check('/docs eval without questions says where they go, and what they look like',
-    str_contains($out, '.sherpa/rag-questions.json') && str_contains($out, '"expect"'), $out);
+check(
+    '/docs eval without questions says where they go, and what they look like',
+    str_contains($out, '.sherpa/rag-questions.json') && str_contains($out, '"expect"'),
+    $out,
+);
 
 mkdir($root . '/projet/.sherpa', 0777, true);
 file_put_contents($root . '/projet/.sherpa/rag-questions.json', json_encode([
     ['kind' => 'procedure', 'q' => 'Which day do we deploy?', 'expect' => [['path' => 'GUIDE.md', 'section' => 'Deployment']]],
 ]));
 [, $out] = $slash('/docs eval');
-check('/docs eval measures the search on the project\'s own questions',
-    str_contains($out, 'measured on 1 questions') && preg_match('/keywords\s+procedure\s+1\s+100%/u', $out) === 1, $out);
+check(
+    '/docs eval measures the search on the project\'s own questions',
+    str_contains($out, 'measured on 1 questions') && preg_match('/keywords\s+procedure\s+1\s+100%/u', $out) === 1,
+    $out,
+);
 
 [, $out] = $slash('/tools');
 check('/tools lists what the model can call', str_contains($out, 'compter'), $out);
@@ -251,8 +289,11 @@ check('revoking what was never granted says so', str_contains($out, 'Not a grant
 $permissions->allow('shell_exec');
 $session->allowForSession('shell_exec');
 [, $out] = $slash('/permissions revoke shell_exec');
-check('a grant made "always" in this session is withdrawn from the session too',
-    !$permissions->isAllowed('shell_exec') && !$session->isSessionAllowed('shell_exec'), $out);
+check(
+    'a grant made "always" in this session is withdrawn from the session too',
+    !$permissions->isAllowed('shell_exec') && !$session->isSessionAllowed('shell_exec'),
+    $out,
+);
 [, $out] = $slash('/permissions revoke file_write');
 check('a grant for this session only can be withdrawn as well', str_contains($out, 'Withdrawn') && !$session->isSessionAllowed('file_write'), $out);
 // A command is withdrawn by naming it, with or without the tool's name.
@@ -267,8 +308,11 @@ check('or as it is listed', str_contains($out, 'Withdrawn') && $session->all() =
 $permissions->allow('file_patch');
 $session->allowForSession('project_grep');
 [, $out] = $slash('/permissions clear');
-check('/permissions clear withdraws the session\'s grants with the project\'s',
-    $permissions->all() === [] && $session->all() === [] && str_contains($out, '2 grant'), $out);
+check(
+    '/permissions clear withdraws the session\'s grants with the project\'s',
+    $permissions->all() === [] && $session->all() === [] && str_contains($out, '2 grant'),
+    $out,
+);
 
 // ---- what the session is spending ------------------------------------------
 [, $out] = $slash('/context');
@@ -280,8 +324,11 @@ check('and no residency line, which means nothing on an API', !str_contains($out
 $usage->record(['prompt' => 1200, 'completion' => 300, 'cached' => 400]);
 $speed->observe(900.0, 40.0);
 [, $out] = $slash('/context');
-check('once a request has been made, consumption is shown',
-    str_contains($out, 'Session usage') && str_contains($out, '1,200'), $out);
+check(
+    'once a request has been made, consumption is shown',
+    str_contains($out, 'Session usage') && str_contains($out, '1,200'),
+    $out,
+);
 check('with the provider\'s cache hits apart', str_contains($out, '400 of them cached'), $out);
 check('and no cost claimed without a declared price', str_contains($out, 'no price'), $out);
 check('the measured throughput appears too', str_contains($out, '900 tokens/s'), $out);
@@ -293,8 +340,11 @@ check('/compact on a short conversation has nothing to do', str_contains($out, '
 $context->keep('file_read', str_repeat("ligne\n", 50));
 [, $out] = $slash('/reset');
 check('/reset empties the conversation', $bag->conversationSize() === 0, (string) $bag->conversationSize());
-check('and rebuilds the system prompt rather than losing it',
-    $bag->count() === 1 && str_contains($bag->all()[0]['content'] ?? '', 'Sherpa'), json_encode($bag->all()));
+check(
+    'and rebuilds the system prompt rather than losing it',
+    $bag->count() === 1 && str_contains($bag->all()[0]['content'] ?? '', 'Sherpa'),
+    json_encode($bag->all()),
+);
 check('the excerpts of that conversation go with it', $context->count() === 0, (string) $context->count());
 check('and it says so', str_contains($out, 'History cleared'), $out);
 
@@ -325,30 +375,49 @@ $bag->assistant('Il y en a quatre.');
 $commands->saveSession($bag);
 
 [, $out] = $slash('/sessions');
-check('/sessions lists both, the one in progress marked',
-    str_contains($out, 'List the routes') && str_contains($out, 'subtotal') && str_contains($out, 'current'), $out);
+check(
+    '/sessions lists both, the one in progress marked',
+    str_contains($out, 'List the routes') && str_contains($out, 'subtotal') && str_contains($out, 'current'),
+    $out,
+);
 
 // Resumed with another model than the one that held it.
 $platform->useModel('autre/modele', 32768);
 [$handled, $out] = $slash('/resume 2');
 check('/resume <n> picks that line of /sessions', $handled && str_contains($out, 'resumed') && str_contains($out, 'subtotal'), $out);
-check('the conversation is back, message for message',
-    $bag->conversationSize() === 4 && ($bag->all()[3]['tool_call_id'] ?? null) === 'call00007', json_encode($bag->all()));
-check('under a freshly built system prompt, which says it is a resumed conversation',
+check(
+    'the conversation is back, message for message',
+    $bag->conversationSize() === 4 && ($bag->all()[3]['tool_call_id'] ?? null) === 'call00007',
+    json_encode($bag->all()),
+);
+check(
+    'under a freshly built system prompt, which says it is a resumed conversation',
     str_contains($bag->all()[0]['content'] ?? '', 'Sherpa') && str_contains($bag->all()[0]['content'] ?? '', 'Resumed conversation'),
-    (string) ($bag->all()[0]['content'] ?? ''));
-check('and warns that the files may have changed since',
-    str_contains($bag->all()[0]['content'] ?? '', 'read a file again'), (string) ($bag->all()[0]['content'] ?? ''));
-check('the excerpt its stub quotes answers under the same id',
-    str_contains((string) $context->get($excerptId, 2000), 'subtotal'), (string) $context->get($excerptId, 2000));
-check('a model change since is said, not left to be noticed',
-    str_contains($out, 'distant/modele') && str_contains($out, 'autre/modele'), $out);
+    (string) ($bag->all()[0]['content'] ?? ''),
+);
+check(
+    'and warns that the files may have changed since',
+    str_contains($bag->all()[0]['content'] ?? '', 'read a file again'),
+    (string) ($bag->all()[0]['content'] ?? ''),
+);
+check(
+    'the excerpt its stub quotes answers under the same id',
+    str_contains((string) $context->get($excerptId, 2000), 'subtotal'),
+    (string) $context->get($excerptId, 2000),
+);
+check(
+    'a model change since is said, not left to be noticed',
+    str_contains($out, 'distant/modele') && str_contains($out, 'autre/modele'),
+    $out,
+);
 check('and where it stopped is shown', str_contains($out, 'Last answer') && str_contains($out, 'quantity'), $out);
 check('what is written next goes into the resumed conversation', $sessions->currentId() === $first, (string) $sessions->currentId());
 
 // Nothing was confirmed because nothing was lost: the one just left is there.
-check('the conversation left behind is still listed',
-    count(array_filter($sessions->all(), fn($s) => $s->title === 'List the routes')) === 1);
+check(
+    'the conversation left behind is still listed',
+    count(array_filter($sessions->all(), fn($s) => $s->title === 'List the routes')) === 1,
+);
 
 [, $out] = $slash('/resume 1');
 check('resuming the conversation already open says so', str_contains($out, 'already the conversation you are in'), $out);
@@ -358,8 +427,11 @@ check('a number past the list is named, not guessed at', str_contains($out, 'No 
 // Two conversations, and a bare /resume going back and forth between them —
 // which only works if resuming counts as activity.
 [, $out] = $slash('/resume');
-check('a bare /resume goes back to the conversation just left',
-    str_contains($out, 'List the routes') && ($bag->all()[1]['content'] ?? '') === 'List the routes', $out);
+check(
+    'a bare /resume goes back to the conversation just left',
+    str_contains($out, 'List the routes') && ($bag->all()[1]['content'] ?? '') === 'List the routes',
+    $out,
+);
 [, $out] = $slash('/resume');
 check('and again, back to the other one', str_contains($out, 'subtotal'), $out);
 
@@ -395,11 +467,20 @@ $copyBag->assistant("| a | b |\n|---|---|\n| 1 | 2 |");
 $copyBag->user('thanks');
 [$handled, $out] = run($commands, '/copy', $copyBag, $project);
 check('/copy is a command', $handled);
-check('it copies the last reply as the model wrote it, Markdown and all',
-    @file_get_contents("{$root}/copied.txt") === "| a | b |\n|---|---|\n| 1 | 2 |", (string) @file_get_contents("{$root}/copied.txt"));
+check(
+    'it copies the last reply as the model wrote it, Markdown and all',
+    @file_get_contents("{$root}/copied.txt") === "| a | b |\n|---|---|\n| 1 | 2 |",
+    (string) @file_get_contents("{$root}/copied.txt"),
+);
 check('and says how', str_contains($out, 'copied') && str_contains($out, 'pbcopy'), $out);
 
-[, $out] = run($commands, '/copy', (function () { $b = new MessageBag(); $b->system('P'); $b->user('q'); return $b; })(), $project);
+[, $out] = run($commands, '/copy', (function () {
+    $b = new MessageBag();
+    $b->system('P');
+    $b->user('q');
+
+    return $b;
+})(), $project);
 check('with no reply yet, it says so', str_contains($out, 'No reply to copy'), $out);
 putenv("PATH={$oldPath}");
 

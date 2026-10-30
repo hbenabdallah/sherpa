@@ -2,6 +2,8 @@
 
 namespace App\Mcp;
 
+use RuntimeException;
+
 /**
  * Anything that goes wrong talking to an MCP server.
  *
@@ -9,6 +11,4 @@ namespace App\Mcp;
  * shape nobody promised. None of that is allowed to take Sherpa down with it,
  * so every failure arrives here and is dealt with at the boundary.
  */
-class McpException extends \RuntimeException
-{
-}
+class McpException extends RuntimeException {}

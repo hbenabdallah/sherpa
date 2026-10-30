@@ -1,4 +1,5 @@
 <?php
+
 // The pieces of `sherpa acp` that turn Sherpa's turn into what an editor
 // draws, and an editor's prompt into what the model reads.
 
@@ -39,12 +40,18 @@ $text = PromptText::from([
 ], '/work/shop');
 check('a file mentioned becomes its path in the project, in its place', $text === 'Why does @src/Billing/Invoice.php return 0?', $text);
 
-check('a file outside the project keeps its full path',
-    PromptText::from([['type' => 'resource_link', 'uri' => 'file:///etc/hosts', 'name' => 'hosts']], '/work/shop') === '@/etc/hosts ');
-check('a link that is no file keeps its name',
-    PromptText::from([['type' => 'resource_link', 'uri' => 'https://x.test/a', 'name' => 'the spec']], '/work/shop') === '@the spec ');
-check('a path with spaces is decoded',
-    str_contains(PromptText::from([['type' => 'resource_link', 'uri' => 'file:///work/shop/My%20File.php', 'name' => 'x']], '/work/shop'), '@My File.php'));
+check(
+    'a file outside the project keeps its full path',
+    PromptText::from([['type' => 'resource_link', 'uri' => 'file:///etc/hosts', 'name' => 'hosts']], '/work/shop') === '@/etc/hosts ',
+);
+check(
+    'a link that is no file keeps its name',
+    PromptText::from([['type' => 'resource_link', 'uri' => 'https://x.test/a', 'name' => 'the spec']], '/work/shop') === '@the spec ',
+);
+check(
+    'a path with spaces is decoded',
+    str_contains(PromptText::from([['type' => 'resource_link', 'uri' => 'file:///work/shop/My%20File.php', 'name' => 'x']], '/work/shop'), '@My File.php'),
+);
 
 $embedded = PromptText::from([
     ['type' => 'text', 'text' => 'Explain this'],
@@ -55,8 +62,10 @@ $png = base64_encode((string) hex2bin('89504e470d0a1a0a'));
 $look = [['type' => 'text', 'text' => 'Look'], ['type' => 'image', 'mimeType' => 'image/png', 'data' => $png]];
 check('an image goes with the text to a model that sees', PromptText::from($look, '/w', seesImages: true) === 'Look'
     && PromptText::images($look) === [['mimeType' => 'image/png', 'data' => $png]]);
-check('to one that does not, it is said to be there rather than dropped',
-    str_contains(PromptText::from($look, '/w'), 'an image was attached, which this model cannot see'));
+check(
+    'to one that does not, it is said to be there rather than dropped',
+    str_contains(PromptText::from($look, '/w'), 'an image was attached, which this model cannot see'),
+);
 $tiff = [['type' => 'image', 'mimeType' => 'image/tiff', 'data' => $png]];
 check('a type providers refuse is not sent, and said', PromptText::images($tiff) === [] && str_contains(PromptText::from($tiff, '/w', true), 'image/tiff'));
 $huge = [['type' => 'image', 'mimeType' => 'image/png', 'data' => base64_encode(str_repeat('x', 6 * 1024 * 1024))]];
@@ -68,9 +77,11 @@ check('a read says where from', ToolDescriptions::title('file_read', ['path' => 
 check('a search says what and where', ToolDescriptions::title('project_grep', ['pattern' => 'subtotal', 'path' => 'src']) === 'Search for subtotal in src');
 check('a title is one line, and short', ToolDescriptions::title('shell_exec', ['command' => "a\nb" . str_repeat('x', 200)]) === mb_strimwidth("a b" . str_repeat('x', 200), 0, 80, '…'));
 check('an unknown tool is titled by its name', ToolDescriptions::title('github__create_issue', ['title' => 'x']) === 'github__create_issue');
-check('kinds pick the editor\'s icons',
+check(
+    'kinds pick the editor\'s icons',
     [ToolDescriptions::kind('file_patch'), ToolDescriptions::kind('shell_exec'), ToolDescriptions::kind('project_grep'), ToolDescriptions::kind('file_read'), ToolDescriptions::kind('github__x')]
-    === ['edit', 'execute', 'search', 'read', 'other']);
+    === ['edit', 'execute', 'search', 'read', 'other'],
+);
 
 // ---- the frontend --------------------------------------------------------------------
 $project = sys_get_temp_dir() . '/sherpa-acpfront-' . bin2hex(random_bytes(4));
@@ -124,8 +135,11 @@ foreach (["\n\n", 'Hello', ' there'] as $token) {
 }
 $front->flushBuffer();
 $sent = updates(out($editor));
-check('prose streams, without the blank lines some models open with',
-    array_column(array_column($sent, 'content'), 'text') === ['Hello', ' there'] && array_unique(array_column($sent, 'messageId')) === [$sent[0]['messageId']], json_encode($sent));
+check(
+    'prose streams, without the blank lines some models open with',
+    array_column(array_column($sent, 'content'), 'text') === ['Hello', ' there'] && array_unique(array_column($sent, 'messageId')) === [$sent[0]['messageId']],
+    json_encode($sent),
+);
 
 $front->beginAssistantMessage();
 $front->appendToken('{ "not": "a call" }');
@@ -144,8 +158,11 @@ check('a rate-limit wait is said once, as a thought', count($sent) === 1 && $sen
 $front->forSession('s1', true);
 $front->showInfo("Context compacted: \e[31m~9000\e[0m → ~4000 tokens.");
 $sent = updates(out($editor));
-check('a remark is a notice where the editor takes them, without escape codes',
-    ($sent[0]['sessionUpdate'] ?? '') === 'notice' && $sent[0]['title'] === 'Context compacted: ~9000 → ~4000 tokens.', json_encode($sent));
+check(
+    'a remark is a notice where the editor takes them, without escape codes',
+    ($sent[0]['sessionUpdate'] ?? '') === 'notice' && $sent[0]['title'] === 'Context compacted: ~9000 → ~4000 tokens.',
+    json_encode($sent),
+);
 $front->forSession('s1', false);
 
 $front->showError('The API refused the key.');
@@ -157,8 +174,11 @@ $front->showToolCall('shell_exec', ['command' => 'make test'], 'c1');
 $front->showToolResult('shell_exec', "(exit code 2)\nFAILED tests/InvoiceTest.php", false, 'c1');
 $sent = updates(out($editor));
 check('a command is shown before it runs, as it will run', ($sent[0]['kind'] ?? '') === 'execute' && str_contains($sent[0]['content'][0]['content']['text'] ?? '', '$ make test'), json_encode($sent[0] ?? null));
-check('a command that failed is failed, its output in a code block',
-    ($sent[1]['status'] ?? '') === 'failed' && str_starts_with($sent[1]['content'][0]['content']['text'] ?? '', "```\n(exit code 2)"), json_encode($sent[1] ?? null));
+check(
+    'a command that failed is failed, its output in a code block',
+    ($sent[1]['status'] ?? '') === 'failed' && str_starts_with($sent[1]['content'][0]['content']['text'] ?? '', "```\n(exit code 2)"),
+    json_encode($sent[1] ?? null),
+);
 
 $front->showToolCall('shell_exec', ['command' => 'cat notes.md'], 'c2');
 $front->showToolResult('shell_exec', "```php\necho 1;\n```", false, 'c2');
@@ -213,8 +233,10 @@ $shellCall = new ToolCall('x1', 'shell_exec', ['command' => 'make test']);
 $front->showToolCall('shell_exec', $shellCall->arguments, 'x1');
 check('a command granted for the project', $front->confirm($shellCall, $shellDef, new App\Permission\Offer(['shell_exec: make test *'])) === ConfirmChoice::Project);
 $front->showToolCall('shell_exec', ['command' => 'git push'], 'x2');
-check('"for this session" is no answer where only once is offered',
-    $front->confirm(new ToolCall('x2', 'shell_exec', ['command' => 'git push']), $shellDef, new App\Permission\Offer([], 'it pushes to a remote')) === ConfirmChoice::Deny);
+check(
+    '"for this session" is no answer where only once is offered',
+    $front->confirm(new ToolCall('x2', 'shell_exec', ['command' => 'git push']), $shellDef, new App\Permission\Offer([], 'it pushes to a remote')) === ConfirmChoice::Deny,
+);
 $asked = array_values(array_map(fn(array $m) => $m['params'], array_filter(out($editor), fn(array $m) => ($m['method'] ?? '') === 'session/request_permission')));
 check('the grant offered names the command', str_contains(json_encode($asked[0]['options'] ?? []), 'Always allow make test * in this project'), json_encode($asked[0]['options'] ?? []));
 check('only once or refuse for what is asked every time', array_column($asked[1]['options'] ?? [], 'optionId') === ['allow-once', 'reject'], json_encode($asked[1]['options'] ?? []));

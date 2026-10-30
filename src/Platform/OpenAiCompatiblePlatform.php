@@ -6,7 +6,11 @@ namespace App\Platform;
 
 use App\Config\ApiEndpoint;
 use App\Runtime\Interrupt;
+use Closure;
+use RuntimeException;
+use stdClass;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Throwable;
 
 /**
  * Any backend that speaks OpenAI's /chat/completions: one class, since that
@@ -76,7 +80,9 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
      * rejections, once per session, rather than configured per provider.
      */
     private bool $sendsTemperature = true;
+
     private bool $sendsStreamOptions = true;
+
     private string $maxTokensField = 'max_tokens';
 
     /** A provider's own key, over the environment's; null to use that one. */
@@ -135,7 +141,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
         /** What to call this backend in a message; the host, by default. */
         private readonly ?string $label = null,
         /** How a wait passes, in seconds; tests make it instant. */
-        private readonly ?\Closure $sleep = null,
+        private readonly ?Closure $sleep = null,
     ) {
         $this->baseUrl = rtrim($this->baseUrl, '/');
     }
@@ -194,7 +200,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
                     return $this->attempt($payload, $onToken, $onWait, $negotiations + 1);
                 }
 
-                throw new \RuntimeException($this->explain($status, $body));
+                throw new RuntimeException($this->explain($status, $body));
             }
 
             $this->noteLimits($response);
@@ -323,7 +329,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
     private function send(array $payload, string $path = '/chat/completions', string $accept = 'text/event-stream', ?callable $onWait = null): \Symfony\Contracts\HttpClient\ResponseInterface
     {
         if ($this->baseUrl === '') {
-            throw new \RuntimeException('No API address configured: set SHERPA_API_URL.');
+            throw new RuntimeException('No API address configured: set SHERPA_API_URL.');
         }
 
         $headers = $this->headers($accept);
@@ -447,7 +453,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
                     // The first chunk is the headers; the body is read later.
                     return true;
                 }
-            } catch (\Throwable) {
+            } catch (Throwable) {
                 return true; // a transport failure, which the status reports
             }
 
@@ -463,7 +469,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
     {
         try {
             $this->rateLimits = RateLimits::fromHeaders($response->getHeaders(throw: false)) ?? $this->rateLimits;
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // No headers to read is no news.
         }
     }
@@ -490,7 +496,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
     {
         try {
             return $response->getStatusCode();
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return 0;
         }
     }
@@ -874,7 +880,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
                         'name'      => (string) ($call['function']['name'] ?? ''),
                         'arguments' => is_string($arguments)
                             ? $arguments
-                            : (json_encode($arguments === [] ? new \stdClass() : $arguments) ?: '{}'),
+                            : (json_encode($arguments === [] ? new stdClass() : $arguments) ?: '{}'),
                     ],
                 ];
                 // Handed back as it came, and only by the provider that sent it.
@@ -946,7 +952,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
                     continue;
                 }
 
-                throw new \RuntimeException($this->explain($status, $body));
+                throw new RuntimeException($this->explain($status, $body));
             }
 
             $this->noteLimits($response);
@@ -1039,12 +1045,12 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
                 throw new UnknownEmbeddingModel('Embeddings: ' . $this->explain($status, $body, $model));
             }
             if ($status >= 400) {
-                throw new \RuntimeException('Embeddings: ' . $this->explain($status, $body, $model));
+                throw new RuntimeException('Embeddings: ' . $this->explain($status, $body, $model));
             }
 
             $rows = json_decode($body, true)['data'] ?? null;
             if (!is_array($rows) || count($rows) !== count($batch)) {
-                throw new \RuntimeException("Embeddings: unexpected answer from {$this->name()} for \"{$model}\".");
+                throw new RuntimeException("Embeddings: unexpected answer from {$this->name()} for \"{$model}\".");
             }
 
             // Answers carry their index; nothing promises they come in order.
@@ -1156,7 +1162,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
 
         try {
             $data = $response->toArray(throw: false);
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return null;
         }
 
@@ -1187,7 +1193,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
         if ($response !== null && $this->statusOf($response) === 200) {
             try {
                 $data = $response->toArray(throw: false);
-            } catch (\Throwable) {
+            } catch (Throwable) {
                 $data = [];
             }
 
@@ -1249,7 +1255,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
                 'headers' => $headers,
                 'timeout' => self::PROBE_TIMEOUT,
             ]);
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return null;
         }
     }

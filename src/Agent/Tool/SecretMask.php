@@ -38,7 +38,7 @@ final class SecretMask
             $text = (string) preg_replace_callback(
                 $pattern,
                 // The AWS secret keeps what comes before it: the name and the "=".
-                static fn (array $m): string => ($m[1] ?? '') . self::MARKER . " {$what}]",
+                static fn(array $m): string => ($m[1] ?? '') . self::MARKER . " {$what}]",
                 $text,
             );
         }

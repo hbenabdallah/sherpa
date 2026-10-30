@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace App\Project;
 
+use RuntimeException;
+
 /**
  * Thrown when a tool is asked to touch a path outside the current project.
  *
  * Toolbox::execute() turns this into an error ToolResult, so the model sees the
  * refusal and can correct itself rather than the session dying.
  */
-final class PathOutsideProjectException extends \RuntimeException
+final class PathOutsideProjectException extends RuntimeException
 {
     public function __construct(
         public readonly string $requested,

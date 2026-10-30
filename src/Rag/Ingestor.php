@@ -8,6 +8,7 @@ use App\Rag\Parser\DocumentParser;
 use App\Rag\Parser\HtmlParser;
 use App\Rag\Parser\MarkdownParser;
 use App\Rag\Parser\TextParser;
+use Throwable;
 
 /**
  * The project's documents into the index — only what changed since last time.
@@ -71,7 +72,7 @@ final class Ingestor
                 $document = $parser->parse($path, self::utf8($content));
                 $index->replace($path, $hash, $size, $mtime, $document, $this->chunker->chunk($document));
                 $known === null ? $report->added++ : $report->updated++;
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 // One document that will not parse costs itself, not the index.
                 $report->failed[$path] = $e->getMessage();
             }

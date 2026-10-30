@@ -1,4 +1,5 @@
 <?php
+
 // The project is the directory Sherpa is launched from. A known one opens at
 // once; a new one is asked about and held — nothing written — until the first
 // message. These are the rules that replaced the project menu.
@@ -56,9 +57,11 @@ $config = $home . '/.config/sherpa';
 $working->hold($projects->draft($dir, 'atelier', new DockerConfig(enabled: true, container: 'atelier-app-1')));
 
 check('a held project is not saved', !$working->isSaved());
-check('and nothing is written: no projects.yaml, no project directory',
+check(
+    'and nothing is written: no projects.yaml, no project directory',
     !is_file($config . '/projects.yaml') && !is_dir($config . '/projects'),
-    implode(', ', glob($config . '/*') ?: []));
+    implode(', ', glob($config . '/*') ?: []),
+);
 check('yet the file tools are already confined to it', $paths->root() === ProjectStore::canonical($dir), $paths->root());
 check('and shell_exec already knows its container', (new ReflectionProperty($shell, 'dockerContainer'))->getValue($shell) === 'atelier-app-1');
 
@@ -98,24 +101,35 @@ function answer(string $dir, string $input, string $home): array
 
 mkdir($home . '/boutique', 0777, true);
 $draft = answer($home . '/boutique', "\n\n", $home);
-check('Enter all the way through is a valid setup: the directory\'s name, no Docker',
-    ($draft['name'] ?? null) === 'boutique' && ($draft['docker'] ?? null) === false, json_encode($draft));
+check(
+    'Enter all the way through is a valid setup: the directory\'s name, no Docker',
+    ($draft['name'] ?? null) === 'boutique' && ($draft['docker'] ?? null) === false,
+    json_encode($draft),
+);
 
 $draft = answer($home . '/boutique', "Ma Boutique\no\nboutique-php-1\nboutique-db-1\n", $home);
-check('typed answers are taken as typed',
+check(
+    'typed answers are taken as typed',
     ($draft['name'] ?? null) === 'Ma Boutique' && ($draft['container'] ?? null) === 'boutique-php-1' && ($draft['db'] ?? null) === 'boutique-db-1',
-    json_encode($draft));
+    json_encode($draft),
+);
 
 // Docker with no container named is no setting at all — and a question that
 // repeated until answered would never end on Ctrl+D.
 $draft = answer($home . '/boutique', "\no\n\n", $home);
-check('Docker without a container falls back to no Docker, instead of asking forever',
-    ($draft['docker'] ?? null) === false, json_encode($draft));
+check(
+    'Docker without a container falls back to no Docker, instead of asking forever',
+    ($draft['docker'] ?? null) === false,
+    json_encode($draft),
+);
 
 file_put_contents($home . '/boutique/compose.yaml', "services: {}\n");
 $draft = answer($home . '/boutique', "\n\nboutique-app-1\n\n", $home);
-check('a compose file makes Docker the default answer',
-    ($draft['docker'] ?? null) === true && ($draft['container'] ?? null) === 'boutique-app-1', json_encode($draft));
+check(
+    'a compose file makes Docker the default answer',
+    ($draft['docker'] ?? null) === true && ($draft['container'] ?? null) === 'boutique-app-1',
+    json_encode($draft),
+);
 
 // Sherpa's own repository: a compose file, and a Makefile whose test target
 // runs docker compose itself. Said yes to, every command went into the
@@ -145,8 +159,10 @@ check('a project never saved has nothing to forget', $held->forget() === false &
 $slug = $working->project()->slug;
 $own = dirname($working->project()->memoryDb);
 $sessions->save([['role' => 'user', 'content' => 'une conversation']], [], 'api', 'm');
-check('the project to forget has a memory and a conversation on disk',
-    is_file($working->project()->memoryDb) && glob($own . '/sessions/*.json') !== []);
+check(
+    'the project to forget has a memory and a conversation on disk',
+    is_file($working->project()->memoryDb) && glob($own . '/sessions/*.json') !== [],
+);
 
 check('forget() forgets it', $working->forget() === true && $working->isForgotten());
 check('its entry is gone', (new ProjectStore(new StackDetector()))->forDirectory($dir) === null);
@@ -157,8 +173,10 @@ check('the directory itself is untouched', is_dir($dir) && is_dir($dir . '/src')
 // of a session — saving the conversation, writing facts — must not put back
 // one file at a time what was just deleted.
 check('saving it again does nothing', $working->save() === false);
-check('a conversation saved afterwards goes nowhere',
-    $sessions->save([['role' => 'user', 'content' => 'after']], [], 'api', 'm') === false && !is_dir($own));
+check(
+    'a conversation saved afterwards goes nowhere',
+    $sessions->save([['role' => 'user', 'content' => 'after']], [], 'api', 'm') === false && !is_dir($own),
+);
 $memory->remember('after', 'the fact');
 check('nor does a fact remembered afterwards', !is_dir($own));
 

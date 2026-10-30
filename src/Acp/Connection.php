@@ -2,6 +2,9 @@
 
 namespace App\Acp;
 
+use Closure;
+use stdClass;
+
 /**
  * JSON-RPC 2.0 over a pair of streams, one message per line: ACP's stdio
  * transport. The editor launches Sherpa and holds both ends.
@@ -30,10 +33,11 @@ final class Connection
     private array $replies = [];
 
     private int $lastId = 0;
+
     private bool $ended = false;
 
-    /** @var (\Closure(array<string, mixed>): bool)|null */
-    private ?\Closure $intercept = null;
+    /** @var (Closure(array<string, mixed>): bool)|null */
+    private ?Closure $intercept = null;
 
     /**
      * @param resource $in
@@ -48,9 +52,9 @@ final class Connection
      * Sees every request and notification as it arrives, before the queue:
      * returns true for one it dealt with, which then goes no further.
      *
-     * @param (\Closure(array<string, mixed>): bool)|null $intercept
+     * @param (Closure(array<string, mixed>): bool)|null $intercept
      */
-    public function intercept(?\Closure $intercept): void
+    public function intercept(?Closure $intercept): void
     {
         $this->intercept = $intercept;
     }
@@ -153,9 +157,9 @@ final class Connection
      *
      * @param array<string, mixed> $value
      */
-    private static function object(array $value): array|\stdClass
+    private static function object(array $value): array|stdClass
     {
-        return $value === [] ? new \stdClass() : $value;
+        return $value === [] ? new stdClass() : $value;
     }
 
     /** @param array<string, mixed> $message */
@@ -247,8 +251,10 @@ final class Connection
         }
 
         if (!is_string($message['method'])) {
-            $this->fail(is_int($message['id'] ?? null) || is_string($message['id'] ?? null) ? $message['id'] : null,
-                new AcpError('The method must be a string.', AcpError::INVALID_REQUEST));
+            $this->fail(
+                is_int($message['id'] ?? null) || is_string($message['id'] ?? null) ? $message['id'] : null,
+                new AcpError('The method must be a string.', AcpError::INVALID_REQUEST),
+            );
 
             return;
         }

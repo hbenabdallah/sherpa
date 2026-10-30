@@ -20,6 +20,7 @@ use App\Version;
 final class UpdateNotice
 {
     private const DAY = 86_400;
+
     private const TIMEOUT = 1.5;
 
     public function __construct(

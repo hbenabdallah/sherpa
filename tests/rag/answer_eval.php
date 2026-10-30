@@ -1,4 +1,5 @@
 <?php
+
 // The documentation search measured where it counts: in the agent's answers.
 //
 // tests/rag/eval_live.php measures whether the right passage is found. This
@@ -111,6 +112,7 @@ $docs->open($index);
 (new Ingestor(new DocSource(), new Chunker()))->sync($copy, $docs);
 if ($embeddingModel !== '') {
     $platform = new OpenAiCompatiblePlatform(HttpClient::create(), $url, $model, (string) getenv('SHERPA_API_KEY'));
+
     try {
         (new ChunkEmbedder())->embed($docs, new FixedEmbeddings($platform, $embeddingModel));
     } catch (\Throwable $e) {
@@ -123,9 +125,15 @@ if ($embeddingModel !== '') {
 $counts = $docs->counts();
 unset($docs);
 
-printf("\n  %s · %d documents, %d passages%s\n  %d question(s) · %s\n\n",
-    basename($source), $counts['documents'], $counts['chunks'],
-    $embeddingModel !== '' ? " · vectors {$embeddingModel}" : ' · keywords only', $only === null ? count($questions) : count($only), $model);
+printf(
+    "\n  %s · %d documents, %d passages%s\n  %d question(s) · %s\n\n",
+    basename($source),
+    $counts['documents'],
+    $counts['chunks'],
+    $embeddingModel !== '' ? " · vectors {$embeddingModel}" : ' · keywords only',
+    $only === null ? count($questions) : count($only),
+    $model,
+);
 
 // ---- one question, one session ---------------------------------------------------
 
@@ -170,6 +178,7 @@ function ask(string $repo, string $dir, string $copy, string $index, string $nam
     ], input: $question . "\n/exit\n", timeout: $timeout);
 
     $started = microtime(true);
+
     try {
         $process->run();
     } catch (Symfony\Component\Process\Exception\ProcessTimedOutException) {
@@ -305,10 +314,21 @@ foreach ($attempts as [$n, $attempt, $question]) {
     $rows[] = $row;
 
     $yes = static fn(?bool $b) => $b === null ? '—' : ($b ? 'oui' : 'NON');
-    printf("  %2d%s  %-12s searched %-3s  found %-3s  cites file %-3s section %-3s  %s  %3.0f s  %2d req%s%s\n",
-        $n, $repeat > 1 ? ".{$attempt}" : '', mb_substr($row['kind'], 0, 12), $row['searched'] > 0 ? 'oui' : 'NON', $yes($row['found']),
-        $yes($row['file']), $yes($row['section']), $answerable ? '           ' : 'says so ' . $yes($row['declined']), $row['seconds'], $row['requests'],
-        $row['capped'] ? '  · token cap reached' : '', $row['unsaved'] ? '  · conversation not saved' : '');
+    printf(
+        "  %2d%s  %-12s searched %-3s  found %-3s  cites file %-3s section %-3s  %s  %3.0f s  %2d req%s%s\n",
+        $n,
+        $repeat > 1 ? ".{$attempt}" : '',
+        mb_substr($row['kind'], 0, 12),
+        $row['searched'] > 0 ? 'oui' : 'NON',
+        $yes($row['found']),
+        $yes($row['file']),
+        $yes($row['section']),
+        $answerable ? '           ' : 'says so ' . $yes($row['declined']),
+        $row['seconds'],
+        $row['requests'],
+        $row['capped'] ? '  · token cap reached' : '',
+        $row['unsaved'] ? '  · conversation not saved' : '',
+    );
 
     $report .= "\n## {$n}" . ($repeat > 1 ? ".{$attempt}" : '') . ". {$row['q']}\n\n"
         . '- expected: ' . ($answerable ? implode(' ; ', array_map(static fn($t) => $t['path'] . ($t['section'] !== '' ? ' › ' . $t['section'] : ''), $expect)) : 'nothing — the documentation does not answer') . "\n"
@@ -331,8 +351,10 @@ echo '  cites the right file             ' . $share($answerable, static fn($r) =
 echo '  cites the right section          ' . $share($answerable, static fn($r) => $r['section']) . "\n";
 echo '  says when the docs do not answer ' . $share($outside, static fn($r) => $r['declined']) . "\n";
 echo '  answered                         ' . $share($rows, static fn($r) => $r['answered']) . "\n";
-printf("  on average                       %.0f s, %.1f requests, %s tokens per question\n",
+printf(
+    "  on average                       %.0f s, %.1f requests, %s tokens per question\n",
     array_sum(array_column($rows, 'seconds')) / max(1, count($rows)),
     array_sum(array_column($rows, 'requests')) / max(1, count($rows)),
-    number_format(array_sum(array_column($rows, 'tokens')) / max(1, count($rows)), 0, ',', ' '));
+    number_format(array_sum(array_column($rows, 'tokens')) / max(1, count($rows)), 0, ',', ' '),
+);
 echo "\n  Answers to read: {$out}/answers.md\n\n";

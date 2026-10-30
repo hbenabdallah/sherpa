@@ -1,4 +1,5 @@
 <?php
+
 // What a project is written in. The prompt says "a PHP development agent"
 // {langue}", so getting this wrong is not a display problem.
 
@@ -85,15 +86,20 @@ foreach ($cases as $name => [$files, $language, $expected]) {
     $stack = $detector->detect(project($root, $name, $files));
 
     check("{$name}: the language is identified", $stack->language === $language, (string) $stack->language);
-    check("{$name}: its frameworks are listed", array_values(array_intersect($expected, $stack->parts)) === $expected,
-        implode(',', $stack->parts));
+    check(
+        "{$name}: its frameworks are listed",
+        array_values(array_intersect($expected, $stack->parts)) === $expected,
+        implode(',', $stack->parts),
+    );
 }
 
 // A package.json without typescript is JavaScript, not TypeScript.
 $plain = $detector->detect(project($root, 'js', ['package.json' => '{"dependencies":{"express":"4"}}']));
 check('a project with no typescript is JavaScript', $plain->language === 'JavaScript', (string) $plain->language);
-check('and tsconfig.json alone is enough to make it TypeScript',
-    $detector->detect(project($root, 'ts2', ['package.json' => '{}', 'tsconfig.json' => '{}']))->language === 'TypeScript');
+check(
+    'and tsconfig.json alone is enough to make it TypeScript',
+    $detector->detect(project($root, 'ts2', ['package.json' => '{}', 'tsconfig.json' => '{}']))->language === 'TypeScript',
+);
 
 // ---- the language is not decided by whichever file is read first -----------
 // A Symfony application with a package.json for its assets is a PHP project.
@@ -116,8 +122,11 @@ $dockerised = $detector->detect(project($root, 'docker-go', [
     'k8s/deploy.yaml' => "kind: Deployment\n",
 ]));
 check('a Go service with a Dockerfile is still a Go project', $dockerised->language === 'Go', (string) $dockerised->language);
-check('with its infrastructure listed alongside',
-    in_array('Docker', $dockerised->parts, true) && in_array('Kubernetes', $dockerised->parts, true), implode(',', $dockerised->parts));
+check(
+    'with its infrastructure listed alongside',
+    in_array('Docker', $dockerised->parts, true) && in_array('Kubernetes', $dockerised->parts, true),
+    implode(',', $dockerised->parts),
+);
 
 $onlyDocker = $detector->detect(project($root, 'infra', ['Dockerfile' => "FROM alpine\n"]));
 check('infrastructure alone names no language', $onlyDocker->language === null && $onlyDocker->parts === ['Docker'], $onlyDocker->summary());
@@ -141,28 +150,42 @@ $builder = new SystemPromptBuilder($memory, new SkillRegistry(), $detector);
 function projectAt(string $path): Project
 {
     return new Project(
-        slug: 'x', name: 'exemple', path: $path, memoryDb: '/dev/null',
-        docker: new DockerConfig(enabled: false), stack: 'stale, written when it was created',
-        createdAt: new \DateTimeImmutable(), lastUsedAt: new \DateTimeImmutable(),
+        slug: 'x',
+        name: 'exemple',
+        path: $path,
+        memoryDb: '/dev/null',
+        docker: new DockerConfig(enabled: false),
+        stack: 'stale, written when it was created',
+        createdAt: new \DateTimeImmutable(),
+        lastUsedAt: new \DateTimeImmutable(),
     );
 }
 
 $goPrompt = $builder->build(projectAt($root . '/go'));
-check('the prompt introduces the agent in the project language',
-    str_contains($goPrompt, 'Go development agent'), substr($goPrompt, 0, 200));
+check(
+    'the prompt introduces the agent in the project language',
+    str_contains($goPrompt, 'Go development agent'),
+    substr($goPrompt, 0, 200),
+);
 check('and no longer claims to be a PHP/Symfony agent', !str_contains($goPrompt, 'PHP/Symfony'), substr($goPrompt, 0, 200));
 
 $phpPrompt = $builder->build(projectAt($root . '/mixte'));
 check('a PHP project still gets a PHP agent', str_contains($phpPrompt, 'PHP development agent'), substr($phpPrompt, 0, 200));
 
 $vaguePrompt = $builder->build(projectAt($root . '/vide'));
-check('an unrecognised project gets no invented language',
-    str_contains($vaguePrompt, "Sherpa, a development agent running"), substr($vaguePrompt, 0, 200));
+check(
+    'an unrecognised project gets no invented language',
+    str_contains($vaguePrompt, "Sherpa, a development agent running"),
+    substr($vaguePrompt, 0, 200),
+);
 
 // The stored stack is written at creation and goes stale; the prompt must not
 // be reading it.
-check('the prompt detects rather than trusting what was stored',
-    !str_contains($goPrompt, 'stale'), substr($goPrompt, 0, 400));
+check(
+    'the prompt detects rather than trusting what was stored',
+    !str_contains($goPrompt, 'stale'),
+    substr($goPrompt, 0, 400),
+);
 check('and states the stack it actually found', str_contains($goPrompt, 'Stack detected: Go 1.23'), $goPrompt);
 
 // ---- a task file that calls docker itself -----------------------------------
@@ -172,18 +195,28 @@ check('and states the stack it actually found', str_contains($goPrompt, 'Stack d
 $wrapped = project($root, 'enveloppe', ['composer.json' => '{}', 'compose.yaml' => "services: {}\n",
     'Makefile' => "test:\n\tdocker compose run --rm --no-deps app php tests/run.php\n"]);
 check('a Makefile that runs docker itself is recognised', App\Project\DockerWrapper::in($wrapped) === 'Makefile');
-check('one that only starts the containers is not',
-    App\Project\DockerWrapper::in(project($root, 'demarre', ['Makefile' => "up:\n\tdocker compose up -d && npm run dev\n"])) === null);
+check(
+    'one that only starts the containers is not',
+    App\Project\DockerWrapper::in(project($root, 'demarre', ['Makefile' => "up:\n\tdocker compose up -d && npm run dev\n"])) === null,
+);
 check('nor is a project with no task file', App\Project\DockerWrapper::in(project($root, 'nu', ['README.md' => 'x'])) === null);
 
 $inContainer = new Project(
-    slug: 'x', name: 'exemple', path: $wrapped, memoryDb: '/dev/null',
-    docker: new DockerConfig(enabled: true, container: 'enveloppe-app-1'), stack: '',
-    createdAt: new \DateTimeImmutable(), lastUsedAt: new \DateTimeImmutable(),
+    slug: 'x',
+    name: 'exemple',
+    path: $wrapped,
+    memoryDb: '/dev/null',
+    docker: new DockerConfig(enabled: true, container: 'enveloppe-app-1'),
+    stack: '',
+    createdAt: new \DateTimeImmutable(),
+    lastUsedAt: new \DateTimeImmutable(),
 );
 $told = $builder->build($inContainer);
-check('with Docker on, the model is told to run what a target runs, not the target',
-    str_contains($told, 'container enveloppe-app-1 — but its Makefile already runs commands through docker'), $told);
+check(
+    'with Docker on, the model is told to run what a target runs, not the target',
+    str_contains($told, 'container enveloppe-app-1 — but its Makefile already runs commands through docker'),
+    $told,
+);
 check('and not told so with Docker off', !str_contains($builder->build(projectAt($wrapped)), 'already runs commands through docker'));
 
 // ---- how the project runs its tests ---------------------------------------
@@ -200,19 +233,29 @@ check('with its comment dropped, and its source named', $readme?->source === 'RE
 $fenced = $found(['README.md' => "Pour les tests :\n\n```sh\n$ make test\n```\n"]);
 check('a fenced block works too, prompt sign dropped', $fenced?->command === 'make test', json_encode($fenced));
 
-check('prose that merely mentions tests is not a command',
-    $found(['README.md' => "Les tests sont dans tests/, lancez-les avant de pousser.\n"]) === null);
-check('a code line that is not about tests is not one either',
-    $found(['README.md' => "    composer install\n    php bin/console serve\n"]) === null);
+check(
+    'prose that merely mentions tests is not a command',
+    $found(['README.md' => "Les tests sont dans tests/, lancez-les avant de pousser.\n"]) === null,
+);
+check(
+    'a code line that is not about tests is not one either',
+    $found(['README.md' => "    composer install\n    php bin/console serve\n"]) === null,
+);
 
-check('a composer test script wins over the README',
-    $found(['composer.json' => '{"scripts": {"test": "phpunit"}}', 'README.md' => "    php tests/run.php\n"])?->command === 'composer test');
+check(
+    'a composer test script wins over the README',
+    $found(['composer.json' => '{"scripts": {"test": "phpunit"}}', 'README.md' => "    php tests/run.php\n"])?->command === 'composer test',
+);
 check('a make target is found', $found(['Makefile' => "build:\n\tdocker build .\n\ntest: build\n\tphpunit\n"])?->command === 'make test');
-check('Symfony gets its phpunit wrapper',
-    $found(['phpunit.xml.dist' => '<phpunit/>', 'bin/phpunit' => '#!/usr/bin/env php'])?->command === 'php bin/phpunit');
+check(
+    'Symfony gets its phpunit wrapper',
+    $found(['phpunit.xml.dist' => '<phpunit/>', 'bin/phpunit' => '#!/usr/bin/env php'])?->command === 'php bin/phpunit',
+);
 check('plain PHPUnit gets vendor/bin/phpunit', $found(['phpunit.xml' => '<phpunit/>'])?->command === 'vendor/bin/phpunit');
-check('npm\'s placeholder test script is not a test command',
-    $found(['package.json' => '{"scripts": {"test": "echo \\"Error: no test specified\\" && exit 1"}}']) === null);
+check(
+    'npm\'s placeholder test script is not a test command',
+    $found(['package.json' => '{"scripts": {"test": "echo \\"Error: no test specified\\" && exit 1"}}']) === null,
+);
 check('a real one is', $found(['package.json' => '{"scripts": {"test": "vitest run"}}'])?->command === 'npm test');
 check('Go and Rust have their own', $found(['go.mod' => "module x\n"])?->command === 'go test ./...'
     && $found(['Cargo.toml' => "[package]\n"])?->command === 'cargo test');
@@ -222,12 +265,17 @@ check('nothing declared means no command, not a guess', $found(['src/a.php' => '
 $withTests = new SystemPromptBuilder($memory, new SkillRegistry(), $detector, null, null, $tests);
 $boutique = project($root, 'boutique', ['composer.json' => '{"require": {"php": ">=8.3"}}', 'README.md' => "    php tests/run.php    # lance les tests\n"]);
 $testPrompt = $withTests->build(projectAt($boutique));
-check('the prompt states the command and where it came from',
-    str_contains($testPrompt, "Test command: `php tests/run.php` (from README.md)"), $testPrompt);
+check(
+    'the prompt states the command and where it came from',
+    str_contains($testPrompt, "Test command: `php tests/run.php` (from README.md)"),
+    $testPrompt,
+);
 check('and says a silent command has checked nothing', str_contains($testPrompt, "prints nothing has checked nothing"));
 
-check('an unknown command is said to be unknown, with where to look',
-    str_contains($withTests->build(projectAt(project($root, 'sans-tests', ['README.md' => 'rien']))), 'unknown — find it'));
+check(
+    'an unknown command is said to be unknown, with where to look',
+    str_contains($withTests->build(projectAt(project($root, 'sans-tests', ['README.md' => 'rien']))), 'unknown — find it'),
+);
 
 // What MCP servers say about their tools goes in with the rest; none, nothing.
 $mcp = new class (new McpConfig()) extends McpRegistry {
@@ -238,8 +286,11 @@ $mcp = new class (new McpConfig()) extends McpRegistry {
 };
 $withMcp = (new SystemPromptBuilder($memory, new SkillRegistry(), $detector, null, null, null, $mcp))->build(projectAt($boutique));
 check("the MCP servers' instructions are in the prompt", str_contains($withMcp, "## graphe\nCall overview first."), $withMcp);
-check('before the rules, which they do not replace',
-    strpos($withMcp, '# MCP servers') < strpos($withMcp, '# Rules'), $withMcp);
+check(
+    'before the rules, which they do not replace',
+    strpos($withMcp, '# MCP servers') < strpos($withMcp, '# Rules'),
+    $withMcp,
+);
 check('and a prompt without servers has no MCP section', !str_contains($testPrompt, '# MCP servers'));
 
 exec('rm -rf ' . escapeshellarg($root));

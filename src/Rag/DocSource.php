@@ -4,7 +4,13 @@ declare(strict_types=1);
 
 namespace App\Rag;
 
+use FilesystemIterator;
+use RecursiveCallbackFilterIterator;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
+use SplFileInfo;
 use Symfony\Component\Process\Process;
+use Throwable;
 
 /**
  * Which files of a project are its documentation. Asked of git first, since
@@ -85,7 +91,7 @@ final class DocSource
         try {
             $process = new Process(['git', '-C', $root, 'ls-files', '-z', '--cached', '--others', '--exclude-standard'], timeout: 20);
             $process->run();
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return null;
         }
 
@@ -100,12 +106,12 @@ final class DocSource
     private function walk(string $root): array
     {
         $files = [];
-        $directories = new \RecursiveCallbackFilterIterator(
-            new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS),
-            static fn(\SplFileInfo $file) => !($file->isDir() && in_array($file->getFilename(), self::SKIPPED, true)),
+        $directories = new RecursiveCallbackFilterIterator(
+            new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS),
+            static fn(SplFileInfo $file) => !($file->isDir() && in_array($file->getFilename(), self::SKIPPED, true)),
         );
 
-        foreach (new \RecursiveIteratorIterator($directories) as $file) {
+        foreach (new RecursiveIteratorIterator($directories) as $file) {
             if ($file->isFile()) {
                 $files[] = substr($file->getPathname(), strlen($root) + 1);
             }

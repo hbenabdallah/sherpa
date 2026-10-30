@@ -1,4 +1,5 @@
 <?php
+
 // Verification of ContextBudget accounting/calibration and HistoryCompactor.
 
 require dirname(__DIR__) . '/vendor/autoload.php';
@@ -49,14 +50,21 @@ check('a huge conversation does trigger compaction', $b->needsCompaction($huge))
 // Each crossing rewrites history from the front, which costs a full re-read of
 // the window on the next request — the largest recurring bill in a long
 // session, paid per compaction.
-check('the target sits below the trigger', $b->compactTarget() < $b->compactThreshold(),
-    "{$b->compactTarget()} vs {$b->compactThreshold()}");
-check('and is a real share of the window, not a token below it',
-    $b->compactTarget() < (int) ($b->compactThreshold() * 0.8));
+check(
+    'the target sits below the trigger',
+    $b->compactTarget() < $b->compactThreshold(),
+    "{$b->compactTarget()} vs {$b->compactThreshold()}",
+);
+check(
+    'and is a real share of the window, not a token below it',
+    $b->compactTarget() < (int) ($b->compactThreshold() * 0.8),
+);
 
 $nonsense = new ContextBudget(contextWindow: 32768, compactAtFraction: 0.40, compactToFraction: 0.90);
-check('a target above the trigger is clamped, never inverted',
-    $nonsense->compactTarget() <= $nonsense->compactThreshold());
+check(
+    'a target above the trigger is clamped, never inverted',
+    $nonsense->compactTarget() <= $nonsense->compactThreshold(),
+);
 
 // ---- allowances as a share of the window -----------------------------------
 // Every fixed cap in the codebase was chosen against a 32k window on a machine
@@ -78,20 +86,27 @@ check('and costs nothing until it is', $speed->secondsToPrefill(10_000) === null
 
 $speed->observe(1000.0, 50.0);
 check('the first sample is taken as-is', $speed->prefillTokensPerSecond() === 1000.0);
-check('a re-read is costed in seconds, which is the question callers have',
-    (int) round($speed->secondsToPrefill(10_000) ?? 0) === 10);
+check(
+    'a re-read is costed in seconds, which is the question callers have',
+    (int) round($speed->secondsToPrefill(10_000) ?? 0) === 10,
+);
 
 $speed->observe(2000.0, 50.0);
-check('later samples are smoothed, not replaced',
+check(
+    'later samples are smoothed, not replaced',
     $speed->prefillTokensPerSecond() > 1000.0 && $speed->prefillTokensPerSecond() < 2000.0,
-    (string) $speed->prefillTokensPerSecond());
+    (string) $speed->prefillTokensPerSecond(),
+);
 
 // A request served from the prefix cache evaluates no prompt: true, and no
 // information about the machine.
 $before = $speed->prefillTokensPerSecond();
 $speed->observe(0.0, 45.0);
-check('a zero-duration phase is discarded rather than folded in',
-    $speed->prefillTokensPerSecond() === $before, (string) $speed->prefillTokensPerSecond());
+check(
+    'a zero-duration phase is discarded rather than folded in',
+    $speed->prefillTokensPerSecond() === $before,
+    (string) $speed->prefillTokensPerSecond(),
+);
 
 $speed->useModel('autre-modele:7b');
 check('changing model forgets figures that described the previous weights', !$speed->isMeasured());
@@ -216,8 +231,11 @@ $pairBag->user('turn 2 ' . str_repeat('bla ', 400));
 $pairBag->assistant('fin');
 
 $pairActions = (new HistoryCompactor(platform(), new ContextBudget(contextWindow: 2048, reservedForResponse: 256)))->compact($pairBag);
-check('the summary ran on a history cut among tool results', in_array('history summarised', $pairActions, true),
-    json_encode($pairActions, JSON_UNESCAPED_UNICODE));
+check(
+    'the summary ran on a history cut among tool results',
+    in_array('history summarised', $pairActions, true),
+    json_encode($pairActions, JSON_UNESCAPED_UNICODE),
+);
 
 $callIds = [];
 $orphans = 0;
@@ -254,10 +272,13 @@ $long = $longBag->all();
 $shape = json_encode(array_map(fn($m) => $m['role'] . ': ' . mb_substr((string) ($m['content'] ?? ''), 0, 25), $long), JSON_UNESCAPED_UNICODE);
 
 check('one long exchange is summarised like several', in_array('history summarised', $longActions, true), json_encode($longActions, JSON_UNESCAPED_UNICODE));
-check('its question comes right after the summary, word for word',
+check(
+    'its question comes right after the summary, word for word',
     str_starts_with((string) ($long[1]['content'] ?? ''), '[Summary')
     && ($long[2]['role'] ?? '') === 'user'
-    && ($long[2]['content'] ?? '') === 'Which version added the current date on estimates?', $shape);
+    && ($long[2]['content'] ?? '') === 'Which version added the current date on estimates?',
+    $shape,
+);
 check('once', substr_count(json_encode($long, JSON_UNESCAPED_UNICODE), 'current date on estimates') === 1, $shape);
 check('and followed by a call, not by a result without one', ($long[3]['role'] ?? '') === 'assistant' && !empty($long[3]['tool_calls']), $shape);
 
@@ -298,8 +319,11 @@ $window = fn() => new ContextBudget(contextWindow: 8192, reservedForResponse: 51
 // Unmeasured: the frugal order, which is also what a slow machine wants.
 $slowBag = loadedBag();
 $slowActions = (new HistoryCompactor(platform(), $window()))->compact($slowBag);
-check('an unmeasured machine elides and does not pay for a summary',
-    !in_array('history summarised', $slowActions, true), json_encode($slowActions, JSON_UNESCAPED_UNICODE));
+check(
+    'an unmeasured machine elides and does not pay for a summary',
+    !in_array('history summarised', $slowActions, true),
+    json_encode($slowActions, JSON_UNESCAPED_UNICODE),
+);
 
 // Measured and fast: summarise first, and the recent tool output survives.
 $fast = new InferenceSpeed();
@@ -308,13 +332,20 @@ $fast->observe(100_000.0, 500.0);
 $fastBag = loadedBag();
 $fastActions = (new HistoryCompactor(platform(), $window(), $fast))->compact($fastBag);
 
-check('a fast machine summarises first', in_array('history summarised', $fastActions, true),
-    json_encode($fastActions, JSON_UNESCAPED_UNICODE));
-check('and having summarised, elides nothing',
+check(
+    'a fast machine summarises first',
+    in_array('history summarised', $fastActions, true),
+    json_encode($fastActions, JSON_UNESCAPED_UNICODE),
+);
+check(
+    'and having summarised, elides nothing',
     !str_contains(json_encode($fastActions, JSON_UNESCAPED_UNICODE), 'elided'),
-    json_encode($fastActions, JSON_UNESCAPED_UNICODE));
-check('so recent tool output is kept verbatim rather than stubbed',
-    !str_contains(json_encode($fastBag->all(), JSON_UNESCAPED_UNICODE), 'elided'));
+    json_encode($fastActions, JSON_UNESCAPED_UNICODE),
+);
+check(
+    'so recent tool output is kept verbatim rather than stubbed',
+    !str_contains(json_encode($fastBag->all(), JSON_UNESCAPED_UNICODE), 'elided'),
+);
 
 // A measured but slow machine must behave like the unmeasured one: the branch
 // is about seconds, not about whether a number exists.
@@ -322,16 +353,21 @@ $slow = new InferenceSpeed();
 $slow->observe(12.0, 3.0);
 $crawlBag = loadedBag();
 $crawlActions = (new HistoryCompactor(platform(), $window(), $slow))->compact($crawlBag);
-check('a measured but slow machine still takes the frugal branch',
-    !in_array('history summarised', $crawlActions, true), json_encode($crawlActions, JSON_UNESCAPED_UNICODE));
+check(
+    'a measured but slow machine still takes the frugal branch',
+    !in_array('history summarised', $crawlActions, true),
+    json_encode($crawlActions, JSON_UNESCAPED_UNICODE),
+);
 
 // ---- compaction aims at the target, not merely under the trigger -----------
 $deepBag = loadedBag();
 $deepBudget = $window();
 (new HistoryCompactor(platform(), $deepBudget))->compact($deepBag);
-check('compaction lands at or below the target, so the next one is far off',
+check(
+    'compaction lands at or below the target, so the next one is far off',
     !$deepBudget->isAboveTarget($deepBag->all()),
-    $deepBudget->estimateMessages($deepBag->all()) . ' vs target ' . $deepBudget->compactTarget());
+    $deepBudget->estimateMessages($deepBag->all()) . ' vs target ' . $deepBudget->compactTarget(),
+);
 
 // ---- a cancelled summary must not replace the history ----------------------
 // askForSummary used to call chat(), which has no cancellation checkpoint: a
@@ -349,8 +385,11 @@ $cancelled->request();
 $c4 = new HistoryCompactor(platform(), new ContextBudget(contextWindow: 2048, reservedForResponse: 256), null, $cancelled);
 $c4->compact($bag4);
 
-check('a cancelled summary leaves the history alone', $bag4->count() === $countBefore,
-    "{$countBefore} -> {$bag4->count()}");
+check(
+    'a cancelled summary leaves the history alone',
+    $bag4->count() === $countBefore,
+    "{$countBefore} -> {$bag4->count()}",
+);
 
 // ---- elision stops being a loss --------------------------------------------
 // The stub used to be the whole story: the only way back to an elided body was
@@ -370,20 +409,31 @@ for ($i = 0; $i < 8; $i++) {
 
 $swapActions = (new HistoryCompactor(platform(), $window(), null, null, $kept))->compact($swapBag);
 
-check('eliding still happens', str_contains(json_encode($swapActions, JSON_UNESCAPED_UNICODE), 'elided'),
-    json_encode($swapActions, JSON_UNESCAPED_UNICODE));
+check(
+    'eliding still happens',
+    str_contains(json_encode($swapActions, JSON_UNESCAPED_UNICODE), 'elided'),
+    json_encode($swapActions, JSON_UNESCAPED_UNICODE),
+);
 check('but the body was kept rather than dropped', $kept->count() > 0, (string) $kept->count());
-check('and it is findable again without re-running the tool',
+check(
+    'and it is findable again without re-running the tool',
     str_contains($kept->search('PaymentGateway', 4000), 'PaymentGateway'),
-    substr($kept->search('PaymentGateway', 4000), 0, 200));
+    substr($kept->search('PaymentGateway', 4000), 0, 200),
+);
 
 // A file where every line matches is the whole file, and handing that back
 // would undo the compaction. It must be capped — and never silently emptied.
 $flood = $kept->search('PaymentGateway', 4000);
-check('a match-heavy excerpt is capped rather than returned whole',
-    substr_count($flood, "\n") < 200, (string) substr_count($flood, "\n"));
-check('and the overflow is counted out loud',
-    str_contains($flood, 'more matching'), substr($flood, -200));
+check(
+    'a match-heavy excerpt is capped rather than returned whole',
+    substr_count($flood, "\n") < 200,
+    (string) substr_count($flood, "\n"),
+);
+check(
+    'and the overflow is counted out loud',
+    str_contains($flood, 'more matching'),
+    substr($flood, -200),
+);
 
 // The index ignores accents; the passages were cut by a plain substring match,
 // so "facture" found the excerpt holding "facturé", then no line in it.
@@ -410,8 +460,10 @@ for ($i = 0; $i < 8; $i++) {
     $lossyBag->tool('file_read', str_repeat("ligne de contenu\n", 200));
 }
 (new HistoryCompactor(platform(), $window()))->compact($lossyBag);
-check('with no store, the stub still says to re-run the tool',
-    str_contains(json_encode($lossyBag->all(), JSON_UNESCAPED_UNICODE), 'Call the tool again'));
+check(
+    'with no store, the stub still says to re-run the tool',
+    str_contains(json_encode($lossyBag->all(), JSON_UNESCAPED_UNICODE), 'Call the tool again'),
+);
 
 $withImage = $b->estimateMessages([['role' => 'user', 'content' => 'Look', 'images' => [['mimeType' => 'image/png', 'data' => str_repeat('A', 400000)]]]]);
 $without = $b->estimateMessages([['role' => 'user', 'content' => 'Look']]);

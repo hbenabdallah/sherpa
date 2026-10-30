@@ -16,10 +16,10 @@ use App\Config\ModelProfile;
 use App\Config\ModelResolver;
 use App\Config\ProviderName;
 use App\Memory\ContextStore;
-use App\Session\SessionStore;
 use App\Platform\SwitchablePlatform;
 use App\Project\Project;
 use App\Rag\Embedding\EmbeddingDetector;
+use App\Session\SessionStore;
 use App\TUI\ChatPane;
 use App\TUI\LineEditor;
 use App\TUI\ModelSelector;
@@ -107,6 +107,7 @@ final class ModelSession
 
         return $chosen;
     }
+
     /**
      * Settle, in a terminal, what an editor cannot ask: where the model is,
      * its key, which model. Each answer is kept, as at a first run, and the
@@ -177,6 +178,7 @@ final class ModelSession
 
         return $profile;
     }
+
     /**
      * Bind a profile to the services holding a copy of it — always together: a
      * window from one model beside a name from another is undetectable.
@@ -203,6 +205,7 @@ final class ModelSession
         // already made keep the price they were made at.
         $this->usage->usePrice($this->models->price($profile));
     }
+
     /**
      * The model in force and, when it is not on this machine, where the code it
      * reads goes. Sending it is the user's call; knowing it is, is not.
@@ -224,6 +227,7 @@ final class ModelSession
             }
         }
     }
+
     /**
      * Settle the embedding model for $backend, once: nobody is asked, since the
      * user gives an address, a key and a chat model, and a chat model cannot
@@ -266,6 +270,7 @@ final class ModelSession
             ? 'local, Ollama'
             : 'online, ' . $this->platform->name();
     }
+
     /** What to do about a model the backend does not know, in that backend's terms. */
     private function missingModelHint(string $model, Backend $backend): string
     {
@@ -273,6 +278,7 @@ final class ModelSession
             ? "Pull it:  ollama pull {$model}"
             : 'Check the exact id with the provider: /model lists them.';
     }
+
     /**
      * Make sure the API has an address: the environment's, this machine's, or
      * one asked for now.
@@ -348,6 +354,7 @@ final class ModelSession
 
         return true;
     }
+
     /** One typed address, asked until it is one; null when the line is left empty. */
     private function askApiEndpoint(string $emptyMeans = 'Enter to run locally'): ?string
     {
@@ -365,6 +372,7 @@ final class ModelSession
             echo Terminal::YELLOW . "  \"{$typed}\" is not an http(s) address. Try again, or {$emptyMeans}.\n" . Terminal::RESET;
         }
     }
+
     /**
      * Why the backend in force cannot be reached, and the way out — including
      * the other backend, since either one is a complete way to run Sherpa.
@@ -398,6 +406,7 @@ final class ModelSession
             . "  Or use a local model:  sherpa -b ollama\n"
             . "  make doctor spells out what is missing.\n" . Terminal::RESET;
     }
+
     /**
      * Change models without leaving the session.
      *
@@ -447,6 +456,7 @@ final class ModelSession
 
         $this->switchTo($profile, $bag, $project);
     }
+
     /**
      * Apply a new profile mid-session. A different model starts from a clean
      * slate — the history holds tool calls shaped by the old template — and
@@ -478,7 +488,7 @@ final class ModelSession
             // may no longer fit in what is left of it.
             $this->chat->showInfo(
                 'The conversation is already past this window\'s compaction threshold: '
-                . 'it will be compacted before the next request.'
+                . 'it will be compacted before the next request.',
             );
         }
 
@@ -499,6 +509,7 @@ final class ModelSession
 
         return true;
     }
+
     /**
      * Move between a model in the cloud and one on this machine, mid-session:
      * the same path as /model, one step earlier. Anything that fails on the way
@@ -553,6 +564,7 @@ final class ModelSession
 
         $this->settleEmbeddings($target);
     }
+
     /**
      * The API providers this machine knows, and moving between them.
      *
@@ -845,6 +857,7 @@ final class ModelSession
 
         $this->settleEmbeddings(Backend::Api);
     }
+
     /**
      * Ask, but only when the answer could cost something: a model changed in
      * the first seconds discards nothing, one changed thirty turns in discards
@@ -871,6 +884,7 @@ final class ModelSession
             true,
         );
     }
+
     /**
      * Everything the previous model left behind, cleared: the conversation, the
      * chars-per-token calibration, the counts from the server. What stays is

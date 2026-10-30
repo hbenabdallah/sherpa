@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\TUI\Input;
 
 use App\TUI\Terminal;
+use Closure;
 
 /**
  * The list under the prompt while a command is being typed: "/" shows every
@@ -21,15 +22,18 @@ final class SlashMenu
 
     /** @var list<array{name: string, hint: string, description: string}> */
     private array $matches = [];
+
     private int $selected = 0;
+
     private string $for = '';
+
     private ?string $dismissedFor = null;
 
     /**
-     * @param \Closure(): list<array{name: string, hint: string, description: string}> $entries
+     * @param Closure(): list<array{name: string, hint: string, description: string}> $entries
      *        read at each keystroke: a skill added mid-session shows at once
      */
-    public function __construct(private readonly \Closure $entries) {}
+    public function __construct(private readonly Closure $entries) {}
 
     public function update(string $text, bool $cursorAtEnd): void
     {

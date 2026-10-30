@@ -2,10 +2,14 @@
 
 namespace App\Memory;
 
+use DateTimeImmutable;
+use DateTimeInterface;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\ParameterType;
+use LogicException;
+use Throwable;
 
 /**
  * Per-project long-term memory. A fact's key is a label, never an identity:
@@ -24,7 +28,9 @@ class MemoryStore
      * returning to belongs in the prompt. Recency is what is left.
      */
     private const WEIGHT_SITUATION = 0.50;
+
     private const WEIGHT_USAGE     = 0.25;
+
     private const WEIGHT_RECENCY   = 0.25;
 
     /** Recalls past this stop counting; the signal is "used", not "popular". */
@@ -49,6 +55,7 @@ class MemoryStore
     private const DIGEST_TAIL_RESERVE = 20;
 
     private ?Connection $conn = null;
+
     private ?string $currentDb = null;
 
     /** FTS5 is compiled into every SQLite worth using, but not into all of them. */
@@ -462,7 +469,7 @@ class MemoryStore
                 ['q' => $query, 'limit' => $limit],
                 ['limit' => ParameterType::INTEGER],
             );
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // A malformed expression must degrade to a worse search, never to a
             // broken tool call in the middle of a turn.
             return null;
@@ -488,20 +495,20 @@ class MemoryStore
             id: (int) $row['id'],
             key: (string) $row['key'],
             value: (string) $row['value'],
-            createdAt: new \DateTimeImmutable((string) $row['created_at']),
-            updatedAt: new \DateTimeImmutable((string) $row['updated_at']),
-            supersededAt: $row['superseded_at'] === null ? null : new \DateTimeImmutable((string) $row['superseded_at']),
+            createdAt: new DateTimeImmutable((string) $row['created_at']),
+            updatedAt: new DateTimeImmutable((string) $row['updated_at']),
+            supersededAt: $row['superseded_at'] === null ? null : new DateTimeImmutable((string) $row['superseded_at']),
             recalledCount: (int) ($row['recalled_count'] ?? 0),
             lastRecalledAt: ($row['last_recalled_at'] ?? null) === null
                 ? null
-                : new \DateTimeImmutable((string) $row['last_recalled_at']),
+                : new DateTimeImmutable((string) $row['last_recalled_at']),
             source: isset($row['source']) ? (string) $row['source'] : null,
         ), $rows);
     }
 
     private function now(): string
     {
-        return (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM);
+        return (new DateTimeImmutable())->format(DateTimeInterface::ATOM);
     }
 
     private function migrate(): void
@@ -634,7 +641,7 @@ class MemoryStore
             }
 
             return true;
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return false;
         }
     }
@@ -642,7 +649,7 @@ class MemoryStore
     private function assertOpen(): void
     {
         if ($this->conn === null) {
-            throw new \LogicException('MemoryStore: no database opened. Call open($dbPath) first.');
+            throw new LogicException('MemoryStore: no database opened. Call open($dbPath) first.');
         }
     }
 }

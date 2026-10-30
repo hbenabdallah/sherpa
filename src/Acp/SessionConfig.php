@@ -5,6 +5,7 @@ namespace App\Acp;
 use App\Config\ModelProfile;
 use App\Platform\ModelInfo;
 use App\Platform\SwitchablePlatform;
+use Throwable;
 
 /**
  * What an editor shows beside its prompt box and lets the user change: the
@@ -15,6 +16,7 @@ use App\Platform\SwitchablePlatform;
 final class SessionConfig
 {
     public const MODE = 'mode';
+
     public const MODEL = 'model';
 
     private const MODES = [
@@ -211,7 +213,7 @@ final class SessionConfig
 
         try {
             $models = array_values($this->platform->catalogue());
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             fwrite(STDERR, 'sherpa acp: the list of models: ' . $e->getMessage() . "\n");
             $models = [];
         }

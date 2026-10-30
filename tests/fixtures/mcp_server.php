@@ -1,5 +1,6 @@
 #!/usr/bin/env php
 <?php
+
 /**
  * A stand-in MCP server over stdio, so the client can be tested without node,
  * without a network, and — more to the point — while misbehaving on purpose.

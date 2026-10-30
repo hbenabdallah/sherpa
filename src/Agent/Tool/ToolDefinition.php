@@ -2,6 +2,8 @@
 
 namespace App\Agent\Tool;
 
+use stdClass;
+
 final class ToolDefinition
 {
     public function __construct(
@@ -42,7 +44,7 @@ final class ToolDefinition
                     // whole request with a 400 over it — which no native tool
                     // ever triggered, because every one of them takes at least
                     // one argument. An MCP server's need not.
-                    'properties' => $properties === [] ? new \stdClass() : $properties,
+                    'properties' => $properties === [] ? new stdClass() : $properties,
                     'required'   => $required,
                 ],
             ],

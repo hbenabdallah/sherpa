@@ -17,7 +17,9 @@ namespace App\Agent;
 final class TodoList
 {
     public const TODO = 'todo';
+
     public const DOING = 'doing';
+
     public const DONE = 'done';
 
     /** @var list<array{status: string, text: string}> */

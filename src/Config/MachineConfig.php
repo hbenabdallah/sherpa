@@ -6,6 +6,7 @@ namespace App\Config;
 
 use App\Usage\Price;
 use Symfony\Component\Yaml\Yaml;
+use Throwable;
 
 /**
  * What this machine has settled on: ~/.config/sherpa/config.yaml.
@@ -373,7 +374,7 @@ class MachineConfig
 
         try {
             $keys = Yaml::parseFile($this->keysPath());
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return [];
         }
 
@@ -401,7 +402,7 @@ class MachineConfig
 
         try {
             Yaml::parseFile($path);
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return true;
         }
 
@@ -584,7 +585,7 @@ class MachineConfig
 
         try {
             $data = Yaml::parseFile($this->path());
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // A hand-edited file with a typo in it. Better to fall through to
             // the defaults and say so than to refuse to start.
             return null;

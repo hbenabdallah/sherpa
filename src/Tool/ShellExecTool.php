@@ -10,6 +10,7 @@ use App\Project\DockerConfig;
 use App\Project\PathOutsideProjectException;
 use App\Project\ProjectPathResolver;
 use App\Runtime\Interrupt;
+use RuntimeException;
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
 
@@ -26,7 +27,9 @@ class ShellExecTool
      * the suite. They scale with the window, and a small one is unaffected.
      */
     private const MIN_OUTPUT_LINES = 100;
+
     private const MIN_OUTPUT_BYTES = 24000;
+
     private const MAX_OUTPUT_BYTES = 200000;
 
     /** Share of the prompt window one command's output may occupy. */
@@ -86,9 +89,12 @@ class ShellExecTool
     }
 
     public function __invoke(
-        #[Param('Shell command to execute')] string $command,
-        #[Param('Working directory relative to project root (optional)')] ?string $cwd = null,
-        #[Param('True to leave it running and get a job id, for what does not end by itself or takes long (optional)')] bool $background = false,
+        #[Param('Shell command to execute')]
+        string $command,
+        #[Param('Working directory relative to project root (optional)')]
+        ?string $cwd = null,
+        #[Param('True to leave it running and get a job id, for what does not end by itself or takes long (optional)')]
+        bool $background = false,
     ): string {
         $workDir = $this->workDir($cwd);
 
@@ -189,7 +195,7 @@ class ShellExecTool
      * Process exception about a missing binary, or a daemon error, for a
      * configuration problem the user can actually fix.
      *
-     * @throws \RuntimeException
+     * @throws RuntimeException
      */
     private function assertContainerRuns(): void
     {
@@ -203,7 +209,7 @@ class ShellExecTool
             . 'tell the user and wait for them.';
 
         if ($inspected === null) {
-            throw new \RuntimeException("Not run: this project's commands run in the container \"{$container}\", "
+            throw new RuntimeException("Not run: this project's commands run in the container \"{$container}\", "
                 . 'and docker cannot reach it — not started, removed, or no docker client here. '
                 . "The user has to start it, or turn the project's Docker setting off with /project edit. "
                 . 'If Sherpa itself runs in Docker, it has neither a docker client nor a socket: run it on the machine (make php).'
@@ -212,7 +218,8 @@ class ShellExecTool
 
         if (($inspected['running'] ?? true) === false) {
             $status = ($inspected['status'] ?? '') !== '' ? " ({$inspected['status']})" : '';
-            throw new \RuntimeException("Not run: this project's commands run in the container \"{$container}\", "
+
+            throw new RuntimeException("Not run: this project's commands run in the container \"{$container}\", "
                 . "which is stopped{$status}. The user has to start it on their machine (docker start {$container}, "
                 . "or docker compose up -d), or turn the project's Docker setting off with /project edit."
                 . $after);
@@ -228,9 +235,14 @@ class ShellExecTool
         // The container and user of now, not of when it is stopped: after a
         // /project edit, the kill would go to another container, or to the host.
         [$container, $user] = [$this->dockerContainer, $this->dockerUser];
-        $id = $this->jobs->start($command, $command, $workDir, $container,
+        $id = $this->jobs->start(
+            $command,
+            $command,
+            $workDir,
+            $container,
             fn(string $script) => $this->commandIn($container, $user, $script, $workDir),
-            $container === null ? $this->sandbox->prefix($this->paths->root()) : []);
+            $container === null ? $this->sandbox->prefix($this->paths->root()) : [],
+        );
         $this->jobs->firstLook($id);
         $state = $this->jobs->read($id);
         $output = trim($state['output']);

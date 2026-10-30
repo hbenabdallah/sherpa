@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Update;
 
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Throwable;
 
 /**
  * Sherpa's releases on GitHub: which is the latest, and where each executable
@@ -34,7 +35,7 @@ final class Releases
                 'max_duration'  => $timeout,
             ]);
             $location = $response->getHeaders(false)['location'][0] ?? '';
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return null;
         }
 

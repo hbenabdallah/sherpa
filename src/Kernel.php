@@ -3,10 +3,15 @@
 namespace App;
 
 use App\DI\ToolboxPass;
+use FilesystemIterator;
+use Phar;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpKernel\Kernel as BaseKernel;
+use Throwable;
 
 class Kernel extends BaseKernel
 {
@@ -18,7 +23,7 @@ class Kernel extends BaseKernel
 
         // An executable cannot change under its own cache: its key already
         // names the file, its size and its date.
-        if (!$debug && \Phar::running(false) === '') {
+        if (!$debug && Phar::running(false) === '') {
             $this->dropStaleContainer();
         }
     }
@@ -36,7 +41,7 @@ class Kernel extends BaseKernel
      */
     public function getCacheDir(): string
     {
-        $binary = \Phar::running(false);
+        $binary = Phar::running(false);
         if ($binary !== '') {
             return self::userCacheDir() . '/' . $this->environment . '-'
                 . substr(md5($binary . '|' . @filesize($binary) . '|' . @filemtime($binary)), 0, 12);
@@ -47,7 +52,7 @@ class Kernel extends BaseKernel
 
     public function getLogDir(): string
     {
-        return \Phar::running(false) !== '' ? self::userCacheDir() . '/log' : parent::getLogDir();
+        return Phar::running(false) !== '' ? self::userCacheDir() . '/log' : parent::getLogDir();
     }
 
     /**
@@ -82,8 +87,8 @@ class Kernel extends BaseKernel
                 continue;
             }
 
-            $files = new \RecursiveIteratorIterator(
-                new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS),
+            $files = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS),
             );
 
             foreach ($files as $file) {
@@ -92,7 +97,7 @@ class Kernel extends BaseKernel
                     // so a cache we cannot remove is not a fatal condition.
                     try {
                         (new Filesystem())->remove($this->getCacheDir());
-                    } catch (\Throwable) {
+                    } catch (Throwable) {
                     }
 
                     return;

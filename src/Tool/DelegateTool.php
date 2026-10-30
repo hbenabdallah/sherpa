@@ -17,6 +17,7 @@ use App\Platform\PlatformInterface;
 use App\Project\ProjectPathResolver;
 use App\Runtime\Interrupt;
 use App\Usage\UsageMeter;
+use RuntimeException;
 
 #[AsTool(
     name: 'delegate',
@@ -63,11 +64,12 @@ PROMPT;
     ) {}
 
     public function __invoke(
-        #[Param('The task, complete on its own: what to find out, and what to report')] string $task,
+        #[Param('The task, complete on its own: what to find out, and what to report')]
+        string $task,
     ): string {
         $task = trim($task);
         if ($task === '') {
-            throw new \RuntimeException('an empty task: say what the sub-agent should find out.');
+            throw new RuntimeException('an empty task: say what the sub-agent should find out.');
         }
 
         // Its own window, sized as the main one: what it reads never reaches

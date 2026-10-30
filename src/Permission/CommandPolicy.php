@@ -198,9 +198,9 @@ final class CommandPolicy
 
         $program = basename($words[0]);
         $args = array_slice($words, 1);
-        $flag = static fn (string $short, string ...$long): bool => array_filter(
+        $flag = static fn(string $short, string ...$long): bool => array_filter(
             $args,
-            static fn (string $arg): bool => in_array($arg, $long, true)
+            static fn(string $arg): bool => in_array($arg, $long, true)
                 || preg_match('/^-[A-Za-z]*' . $short . '[A-Za-z]*$/', $arg) === 1,
         ) !== [];
 
@@ -231,9 +231,9 @@ final class CommandPolicy
         }
 
         $command = array_shift($args) ?? '';
-        $has = static fn (string ...$options): bool => array_filter(
+        $has = static fn(string ...$options): bool => array_filter(
             $args,
-            static fn (string $arg): bool => in_array($arg, $options, true)
+            static fn(string $arg): bool => in_array($arg, $options, true)
                 || preg_match('/^-[A-Za-z]*f[A-Za-z]*$/', $arg) === 1 && in_array('-f', $options, true),
         ) !== [];
 

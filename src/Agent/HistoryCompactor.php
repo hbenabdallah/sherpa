@@ -7,6 +7,7 @@ namespace App\Agent;
 use App\Memory\ContextStore;
 use App\Platform\PlatformInterface;
 use App\Runtime\Interrupt;
+use Throwable;
 
 /**
  * Keeps the conversation inside the context window, two ways: elide old tool
@@ -273,7 +274,7 @@ final class HistoryCompactor
                 ],
                 ['role' => 'user', 'content' => implode("\n\n", $transcript)],
             ]);
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return null;
         }
 

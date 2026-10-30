@@ -1,4 +1,5 @@
 <?php
+
 // The GitHub workflows, read as GitHub reads them. A line with ": " inside an
 // unquoted value made tests.yml invalid YAML, and GitHub then ran none of its
 // jobs — reported as one failure with nothing in it, after the push.
@@ -24,6 +25,7 @@ check('there are workflows to read', $files !== []);
 
 foreach ($files as $file) {
     $name = basename($file);
+
     try {
         $workflow = Yaml::parseFile($file);
         $error = '';
@@ -48,8 +50,11 @@ foreach ($files as $file) {
             }
         }
     }
-    check("{$name}: every run is a command, not something YAML read as a mapping",
-        array_filter($runs, fn($run) => !is_string($run)) === [], json_encode($runs));
+    check(
+        "{$name}: every run is a command, not something YAML read as a mapping",
+        array_filter($runs, fn($run) => !is_string($run)) === [],
+        json_encode($runs),
+    );
 }
 
 printf("\n%d passed, %d failed\n", $pass, $fail);

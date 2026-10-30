@@ -1,4 +1,5 @@
 <?php
+
 // Retrieval, measured. A small documentation corpus written for this purpose,
 // 32 questions written before any search ran, and the strategies side by side.
 //
@@ -56,21 +57,31 @@ foreach ($results as $name => $result) {
 echo "\n";
 
 // What keyword search has no excuse to miss.
-check('exact references are found in the first five', $results['bm25']['kinds']['exact']['rk'] >= 0.9,
-    sprintf('%.0f%%', $results['bm25']['kinds']['exact']['rk'] * 100));
-check('a value in a table is found through its row', $results['bm25']['kinds']['table']['rk'] >= 0.66,
-    sprintf('%.0f%%', $results['bm25']['kinds']['table']['rk'] * 100));
+check(
+    'exact references are found in the first five',
+    $results['bm25']['kinds']['exact']['rk'] >= 0.9,
+    sprintf('%.0f%%', $results['bm25']['kinds']['exact']['rk'] * 100),
+);
+check(
+    'a value in a table is found through its row',
+    $results['bm25']['kinds']['table']['rk'] >= 0.66,
+    sprintf('%.0f%%', $results['bm25']['kinds']['table']['rk'] * 100),
+);
 
 // The default is the fusion because it measured best: plain BM25's precision
 // and the stemmed variant's recall at once. Should that stop being true, the
 // default has to be decided again — this is where it would show.
 $fused = $results['rrf(les deux)']['overall'];
-check('the fused default ranks as well as the best single strategy',
+check(
+    'the fused default ranks as well as the best single strategy',
     $fused['mrr'] >= max($results['bm25']['overall']['mrr'], $results['bm25+racines']['overall']['mrr']),
-    sprintf('MRR %.2f', $fused['mrr']));
-check('and recalls as much as the best single strategy',
+    sprintf('MRR %.2f', $fused['mrr']),
+);
+check(
+    'and recalls as much as the best single strategy',
     $fused['rk'] >= max($results['bm25']['overall']['rk'], $results['bm25+racines']['overall']['rk']),
-    sprintf('recall@5 %.0f%%', $fused['rk'] * 100));
+    sprintf('recall@5 %.0f%%', $fused['rk'] * 100),
+);
 
 // ---- incremental re-indexing -------------------------------------------------
 $copy = sys_get_temp_dir() . '/sherpa-rag-' . bin2hex(random_bytes(4));

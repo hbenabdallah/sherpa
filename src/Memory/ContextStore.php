@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Memory;
 
+use DateTimeImmutable;
+use DateTimeInterface;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\ParameterType;
 use Symfony\Component\String\UnicodeString;
+use Throwable;
 
 /**
  * What compaction took out of the window, still reachable: elision is a swap
@@ -35,6 +38,7 @@ final class ContextStore
     private const MAX_EXCERPT_LINES = 40;
 
     private ?Connection $conn = null;
+
     private bool $fullText = false;
 
     public function open(): void
@@ -79,7 +83,7 @@ final class ContextStore
                 'c'   => $content,
                 'l'   => substr_count($content, "\n") + 1,
                 'n'   => mb_strlen($content),
-                'now' => (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM),
+                'now' => (new DateTimeImmutable())->format(DateTimeInterface::ATOM),
             ],
         );
 
@@ -193,7 +197,7 @@ final class ContextStore
                     ['q' => $expression, 'limit' => self::MAX_EXCERPTS],
                     ['limit' => ParameterType::INTEGER],
                 );
-            } catch (\Throwable) {
+            } catch (Throwable) {
                 // A malformed expression degrades to a worse search, never to a
                 // broken tool call in the middle of a turn.
             }
@@ -316,7 +320,7 @@ final class ContextStore
             SQL);
 
             return true;
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return false;
         }
     }
@@ -381,7 +385,7 @@ final class ContextStore
                     'c'  => $content,
                     'l'  => substr_count($content, "\n") + 1,
                     'n'  => mb_strlen($content),
-                    'at' => (string) ($excerpt['created_at'] ?? (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM)),
+                    'at' => (string) ($excerpt['created_at'] ?? (new DateTimeImmutable())->format(DateTimeInterface::ATOM)),
                 ],
                 ['id' => ParameterType::INTEGER],
             );

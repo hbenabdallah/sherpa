@@ -1,4 +1,5 @@
 <?php
+
 // An OpenAI-compatible provider for `php -S`, scripted and stateless, so the
 // single executable can be run end to end without a real model or any quota.
 //

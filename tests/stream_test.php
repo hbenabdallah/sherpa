@@ -1,4 +1,5 @@
 <?php
+
 // Verification of OllamaPlatform::stream() tool-call accumulation.
 require dirname(__DIR__) . '/vendor/autoload.php';
 
@@ -32,7 +33,9 @@ $msg = platform([
     '{"message":{"role":"assistant","content":"Hel',
     'lo "}}' . "\n" . '{"message":{"role":"assistant","content":"world"}}' . "\n",
     '{"message":{"role":"assistant","content":"!"},"done":true}',  // no trailing \n
-])->stream([], [], function (string $t) use (&$tokens) { $tokens[] = $t; });
+])->stream([], [], function (string $t) use (&$tokens) {
+    $tokens[] = $t;
+});
 
 check('text reassembled across a split line', 'Hello world!', $msg['content']);
 check('tokens delivered individually', ['Hello ', 'world', '!'], $tokens);
@@ -127,10 +130,16 @@ check('and it is configurable', '2h', $bodies[1]['keep_alive'] ?? null);
 // system that only ever emits tool calls, JSON and summaries. And num_predict
 // is what makes ContextBudget's response reservation true rather than hopeful.
 check('temperature is sent, and low', true, ($bodies[0]['options']['temperature'] ?? 1.0) <= 0.3);
-check('it is not zero, which traps some models in repetition loops',
-    true, ($bodies[0]['options']['temperature'] ?? 0.0) > 0.0);
-check('a reply is capped so the budget’s reservation is real',
-    4096, $bodies[0]['options']['num_predict'] ?? null);
+check(
+    'it is not zero, which traps some models in repetition loops',
+    true,
+    ($bodies[0]['options']['temperature'] ?? 0.0) > 0.0,
+);
+check(
+    'a reply is capped so the budget’s reservation is real',
+    4096,
+    $bodies[0]['options']['num_predict'] ?? null,
+);
 check('and num_ctx still travels with them', 32768, $bodies[0]['options']['num_ctx'] ?? null);
 
 (new OllamaPlatform($spy, 'http://x', 'm', 32768, -1.0, null, '30m', 0.7, 512))->stream([]);
@@ -242,7 +251,9 @@ $msg = platform([
     '',
     '{"message":{"content":" apres"}}' . "\n",
     '{"message":{"content":"","done":true},"prompt_eval_count":11,"eval_count":3}',
-])->stream([], [], function (string $t) use (&$tokens) { $tokens[] = $t; });
+])->stream([], [], function (string $t) use (&$tokens) {
+    $tokens[] = $t;
+});
 
 check('a pause mid-reply does not truncate it', 'avant apres', $msg['content']);
 check('tokens after the pause still reach the caller', ['avant', ' apres'], $tokens);

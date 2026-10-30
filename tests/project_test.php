@@ -1,4 +1,5 @@
 <?php
+
 // Project identity. A project is its directory — one per directory — and its
 // slug names the memory directory, so getting either wrong is not cosmetic.
 
@@ -72,8 +73,10 @@ check('a repeated name does not overwrite the first project', $first->slug !== $
 check('both are still listed', count(array_filter($store->all(), fn($p) => $p->name === 'Duplicata')) === 2);
 
 // Accents must not collide two different names into one slug either.
-check('accented and unaccented names stay distinct',
-    $store->create('Café', $fresh(), $none)->slug !== $store->create('Cafe', $fresh(), $none)->slug);
+check(
+    'accented and unaccented names stay distinct',
+    $store->create('Café', $fresh(), $none)->slug !== $store->create('Cafe', $fresh(), $none)->slug,
+);
 
 // ---- deleting takes the memory with it -------------------------------------
 // Slugs come from names, so re-adding a project called the same thing lands on
@@ -137,8 +140,11 @@ check('the stack is re-detected at the new path', str_contains($after->stack, 'S
 check('creation date is preserved', $after->createdAt == $before->createdAt);
 
 $reloaded = new ProjectStore(new StackDetector());
-check('the change survives a reload', $reloaded->get($before->slug)?->name === 'Après déménagement',
-    (string) $reloaded->get($before->slug)?->name);
+check(
+    'the change survives a reload',
+    $reloaded->get($before->slug)?->name === 'Après déménagement',
+    (string) $reloaded->get($before->slug)?->name,
+);
 
 // Standing permissions belong to the project, not to its address.
 $store->allowTool($after, 'file_write');
@@ -162,19 +168,26 @@ $beta = $sessionB2->create('Beta', $fresh(), $none);
 $sessionA->allowTool($alpha, 'file_write');
 
 $reloaded = new ProjectStore(new StackDetector());
-check('a write in one session does not delete another session\'s project',
-    $reloaded->get($beta->slug) !== null, implode(',', array_map(fn($p) => $p->slug, $reloaded->all())));
-check('and its own change is still recorded',
+check(
+    'a write in one session does not delete another session\'s project',
+    $reloaded->get($beta->slug) !== null,
+    implode(',', array_map(fn($p) => $p->slug, $reloaded->all())),
+);
+check(
+    'and its own change is still recorded',
     in_array('file_write', $reloaded->get($alpha->slug)?->allowedTools ?? [], true),
-    json_encode($reloaded->get($alpha->slug)?->allowedTools));
+    json_encode($reloaded->get($alpha->slug)?->allowedTools),
+);
 
 // The same guarantee for deletion: A deleting alpha must not resurrect or
 // remove anything of B's.
 $sessionA->delete($alpha->slug);
 $reloaded = new ProjectStore(new StackDetector());
-check('a deletion removes only what it deleted',
+check(
+    'a deletion removes only what it deleted',
     $reloaded->get($alpha->slug) === null && $reloaded->get($beta->slug) !== null,
-    implode(',', array_map(fn($p) => $p->slug, $reloaded->all())));
+    implode(',', array_map(fn($p) => $p->slug, $reloaded->all())),
+);
 
 // Hand-editing the file is currently the only way to change a project, and it
 // used to be reverted by the next write of any running session.
@@ -186,9 +199,11 @@ mkdir($gammaDir . '/deplace', 0777, true);
 
 $sessionB2->allowTool($beta, 'file_write');
 $afterEdit = new ProjectStore(new StackDetector());
-check('a hand edit to an untouched project survives a later write',
+check(
+    'a hand edit to an untouched project survives a later write',
     $afterEdit->get($gamma->slug)?->path === $gammaDir . '/deplace',
-    (string) $afterEdit->get($gamma->slug)?->path);
+    (string) $afterEdit->get($gamma->slug)?->path,
+);
 
 // ---- noticing that someone else wrote --------------------------------------
 $watcher = new ProjectStore(new StackDetector());
@@ -221,15 +236,19 @@ check('an exact directory finds its project', $store->forDirectory($work . '/api
 check('a subdirectory finds the project above it', $store->forDirectory($work . '/api/config')?->slug === $api->slug);
 
 // A project nested inside another opens as itself, not as its parent.
-check('the deepest matching project wins',
+check(
+    'the deepest matching project wins',
     $store->forDirectory($work . '/api/src/Domain/Order')?->slug === $nested->slug,
-    (string) $store->forDirectory($work . '/api/src/Domain/Order')?->slug);
+    (string) $store->forDirectory($work . '/api/src/Domain/Order')?->slug,
+);
 
 // "api-legacy" starts with "api", and matching on the raw prefix would open
 // the wrong project entirely.
-check('a sibling with a shared prefix is not mistaken for it',
+check(
+    'a sibling with a shared prefix is not mistaken for it',
     $store->forDirectory($work . '/api-legacy')?->slug === $legacy->slug,
-    (string) $store->forDirectory($work . '/api-legacy')?->slug);
+    (string) $store->forDirectory($work . '/api-legacy')?->slug,
+);
 
 check('a trailing slash changes nothing', $store->forDirectory($work . '/api/')?->slug === $api->slug);
 check('a directory under no project finds none', $store->forDirectory('/tmp') === null);
@@ -261,9 +280,11 @@ check('a second draft for the same directory is the same project', $twin->slug =
 check('and adds no entry', count(array_filter($store->all(), fn($p) => $p->path === $adopted->path)) === 1);
 
 symlink($newDir, $home . '/raccourci');
-check('reached through a symlink, it is still the same directory',
+check(
+    'reached through a symlink, it is still the same directory',
     $store->forDirectory($home . '/raccourci')?->slug === $adopted->slug,
-    (string) $store->forDirectory($home . '/raccourci')?->slug);
+    (string) $store->forDirectory($home . '/raccourci')?->slug,
+);
 $viaLink = $store->adopt($store->draft($home . '/raccourci', 'Par le lien', $none));
 check('and adopting it through the link finds the project instead of making a twin', $viaLink->slug === $adopted->slug);
 
@@ -276,8 +297,11 @@ $leftDraft = $left->draft($otherDir, 'Gauche', $none);
 $rightDraft = $right->draft($otherDir, 'Droite', $none);
 $leftProject = $left->adopt($leftDraft);
 $rightProject = $right->adopt($rightDraft);
-check('two sessions drafting one directory end up in one project',
-    $rightProject->slug === $leftProject->slug, "{$leftProject->slug} vs {$rightProject->slug}");
+check(
+    'two sessions drafting one directory end up in one project',
+    $rightProject->slug === $leftProject->slug,
+    "{$leftProject->slug} vs {$rightProject->slug}",
+);
 
 // ---- writing projects.yaml -------------------------------------------------
 // Rewritten in place, a second session reading during the write found an empty
@@ -318,8 +342,11 @@ if (posix_getuid() !== 0) {
     chmod($home . '/.config/sherpa', 0755);
     $locked->create('Ensuite', $fresh(), $none);
     $saved = (string) file_get_contents($configFile);
-    check('the change it kept is saved with the next one, once writable again',
-        str_contains($saved, 'Verrouillé') && str_contains($saved, 'Ensuite') && $locked->takeWriteError() === null, $saved);
+    check(
+        'the change it kept is saved with the next one, once writable again',
+        str_contains($saved, 'Verrouillé') && str_contains($saved, 'Ensuite') && $locked->takeWriteError() === null,
+        $saved,
+    );
     $locked->delete('verrouille');
     $locked->delete('ensuite');
 } else {

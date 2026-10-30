@@ -3,13 +3,15 @@
 namespace App\Agent;
 
 use App\Agent\Tool\TextToolCallParser;
+use App\Agent\Tool\Toolbox;
 use App\Agent\Tool\ToolCall;
 use App\Agent\Tool\ToolResult;
-use App\Agent\Tool\Toolbox;
 use App\Permission\PermissionBroker;
 use App\Platform\PlatformInterface;
 use App\Runtime\Interrupt;
 use App\Usage\UsageMeter;
+use Fiber;
+use Throwable;
 
 class AgentLoop
 {
@@ -36,15 +38,22 @@ class AgentLoop
     private const REPEATED_ERROR_LIMIT = 3;
 
     private const INTERRUPTED = 'Interrupted by the user.';
+
     private const REFUSED = 'Refused by the user.';
+
     private const STUCK = 'Stopped: the model repeated the same tool call without getting anywhere.';
+
     private const WALLED = 'Stopped: every call came back with the same error, %d times running: %s';
+
     private const ABANDONED = 'Not run: the turn stopped on an error before this call.';
+
     private const EMPTY_RETRY = 'Empty reply from the model: trying again.';
+
     /** Longer than this, a reply is an answer, whatever it says about tools. */
     private const ANNOUNCEMENT_MAX_CHARS = 800;
 
     private const NUDGE_SHOWN = 'The model described a tool call without making it: asking it to go ahead.';
+
     /** Said for a call whose arguments did not arrive whole. */
     private const CUT_OFF = 'Not run: the arguments of this call were not valid JSON (%s characters arrived), '
         . 'most likely cut off by the output limit. Send it again in smaller pieces: a file in parts, '
@@ -54,6 +63,7 @@ class AgentLoop
     private array $cutOff = [];
 
     private const NUDGE = 'You described what you are going to do but did not call the tool. Call it now, through the tool interface, rather than describing it.';
+
     private const EMPTY = 'The model returned two empty replies in a row. Rephrase the request, or change model with /model.';
 
     /**
@@ -62,10 +72,15 @@ class AgentLoop
      * once, while there is still room for the answer.
      */
     private const CLOSING_SHOWN = 'Asking the model to answer now: %s.';
+
     private const CLOSING = 'Stop investigating: %s. Answer the request now with what you have found, without calling any tool, and say plainly what you could not check.';
+
     private const NOT_RUN_CLOSING = 'Not run: there is no room left for tools in this turn. Answer with what you have found.';
+
     private const CLOSED_WITHOUT_ANSWER = 'Stopped: asked to answer with what it had found, the model kept calling tools instead.';
+
     private const OUT_OF_TOKENS = 'the token budget of this session is nearly spent';
+
     private const OUT_OF_STEPS = 'this turn has reached its limit of steps';
 
     /** Tools that show their own work, or wait on the user: no "running" line over them. */
@@ -476,7 +491,7 @@ class AgentLoop
                 $call = $waiting[$i];
                 unset($waiting[$i]);
                 // Shown as it starts, with the number its lines will carry.
-                $running[$i] = new \Fiber(function () use ($call): ToolResult {
+                $running[$i] = new Fiber(function () use ($call): ToolResult {
                     $this->chat->showToolCall($call->name, $call->arguments, $call->id);
 
                     return $this->decide($call);
@@ -490,7 +505,7 @@ class AgentLoop
                     if ($fiber->isTerminated()) {
                         $results[$i] = $fiber->getReturn();
                     }
-                } catch (\Throwable $e) {
+                } catch (Throwable $e) {
                     $results[$i] = new ToolResult($calls[$i]->id, 'Error: ' . $e->getMessage(), isError: true);
                 }
 

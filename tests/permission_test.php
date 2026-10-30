@@ -1,4 +1,5 @@
 <?php
+
 // Per-project permissions: they have to survive the process that granted them,
 // and they have to be revocable.
 
@@ -103,6 +104,7 @@ check('revoke() of an unknown tool reports failure', !$perms->revoke('file_patch
 final class ScriptedOverlay extends ConfirmOverlay
 {
     public int $asked = 0;
+
     public ?App\Permission\Offer $offer = null;
 
     public function __construct(private readonly ConfirmChoice $answer)
@@ -186,7 +188,7 @@ check('so the overlay is still consulted for others', $overlay->asked === 1);
 // A grant for shell_exec names the commands of the call, never the tool.
 $freshPerms->revokeAll();
 $shell = definition('shell_exec', Permission::CONFIRM);
-$run = fn (string $command) => new ToolCall('id', 'shell_exec', ['command' => $command]);
+$run = fn(string $command) => new ToolCall('id', 'shell_exec', ['command' => $command]);
 
 [$b, $overlay] = broker(ConfirmChoice::Project, $freshPerms);
 check('a command allowed for good runs', $b->check($run('make test'), $shell));

@@ -8,6 +8,7 @@ use App\Agent\Tool\Param;
 use App\Agent\Tool\Permission;
 use App\Project\PathSuggestions;
 use App\Project\ProjectPathResolver;
+use RuntimeException;
 
 #[AsTool(
     name: 'list_dir',
@@ -24,6 +25,7 @@ class ListDirTool
     private const NOT_EXPANDED = ['vendor', 'node_modules', '.git', 'var', '.idea', '.vscode', '.claude', '__pycache__', '.venv', 'target'];
 
     private const DEFAULT_DEPTH = 2;
+
     private const MAX_DEPTH = 4;
 
     /** Entries shown per directory before the rest are counted rather than named. */
@@ -31,12 +33,17 @@ class ListDirTool
 
     /** Floors and ceiling on lines, scaled with the window like project_grep's. */
     private const MIN_LINES = 150;
+
     private const MAX_LINES = 1200;
+
     private const LINE_SHARE = 0.04;
+
     private const CHARS_PER_LINE = 40;
 
     private int $lines = 0;
+
     private int $cap = self::MIN_LINES;
+
     private bool $truncated = false;
 
     public function __construct(
@@ -47,8 +54,10 @@ class ListDirTool
     ) {}
 
     public function __invoke(
-        #[Param('Directory to list, relative to the project root (optional, defaults to the root)')] ?string $path = null,
-        #[Param('How many levels to open, 1 to 4 (optional, defaults to 2)')] ?int $depth = null,
+        #[Param('Directory to list, relative to the project root (optional, defaults to the root)')]
+        ?string $path = null,
+        #[Param('How many levels to open, 1 to 4 (optional, defaults to 2)')]
+        ?int $depth = null,
     ): string {
         $root = $this->paths->root();
         $target = $path === null || trim($path) === '' || trim($path) === '.'
@@ -56,10 +65,10 @@ class ListDirTool
             : $this->paths->resolve($path);
 
         if (!file_exists($target)) {
-            throw new \RuntimeException("directory not found: {$path}" . PathSuggestions::hint($root, (string) $path, directory: true));
+            throw new RuntimeException("directory not found: {$path}" . PathSuggestions::hint($root, (string) $path, directory: true));
         }
         if (!is_dir($target)) {
-            throw new \RuntimeException("{$path} is a file, not a directory: use file_read to read it");
+            throw new RuntimeException("{$path} is a file, not a directory: use file_read to read it");
         }
 
         $depth = max(1, min(self::MAX_DEPTH, $depth ?? self::DEFAULT_DEPTH));

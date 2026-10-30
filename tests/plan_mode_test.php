@@ -1,4 +1,5 @@
 <?php
+
 // Plan mode: the model reads and proposes, nothing changes until the plan is
 // approved — and once it is, the work goes on in the same turn.
 
@@ -16,22 +17,14 @@ use App\Agent\Tool\Toolbox;
 use App\Permission\Approver;
 use App\Permission\ConfirmChoice;
 use App\Permission\PermissionBroker;
-use App\Permission\ProjectPermissions;
-use App\Permission\SessionPermissions;
 use App\Platform\ModelInfo;
 use App\Platform\ModelResidency;
 use App\Platform\PlatformInterface;
 use App\Project\DockerConfig;
 use App\Project\Project;
-use App\Project\ProjectStore;
-use App\Project\StackDetector;
 use App\Runtime\Interrupt;
-use App\Tool\FilePatchTool;
-use App\Tool\FileWriteTool;
 use App\Tool\PlanReadyTool;
-use App\Tool\ShellExecTool;
 use App\TUI\ChatPane;
-use App\TUI\ConfirmOverlay;
 use App\TUI\MarkdownRenderer;
 use App\TUI\StatusBar;
 use App\TUI\Terminal;
@@ -52,14 +45,26 @@ function check(string $label, bool $ok, string $detail = ''): void
 final class WriteIt
 {
     public int $ran = 0;
-    public function __invoke(#[Param('what')] string $what = ''): string { $this->ran++; return "written {$what}"; }
+
+    public function __invoke(#[Param('what')] string $what = ''): string
+    {
+        $this->ran++;
+
+        return "written {$what}";
+    }
 }
 
 #[AsTool(name: 'read_it', description: 'Reads', permission: Permission::AUTO)]
 final class ReadIt
 {
     public int $ran = 0;
-    public function __invoke(#[Param('what')] string $what = ''): string { $this->ran++; return "read {$what}"; }
+
+    public function __invoke(#[Param('what')] string $what = ''): string
+    {
+        $this->ran++;
+
+        return "read {$what}";
+    }
 }
 
 /** Answers the plan question as told, and keeps the plans it was shown. */
@@ -67,16 +72,29 @@ final class PlanAnswer implements Approver
 {
     /** @var list<string> */
     public array $plans = [];
+
     public function __construct(private readonly bool $yes) {}
-    public function confirm(App\Agent\Tool\ToolCall $call, App\Agent\Tool\ToolDefinition $def, App\Permission\Offer $offer): ConfirmChoice { return ConfirmChoice::Once; }
-    public function approvePlan(string $plan): ?bool { $this->plans[] = $plan; return $this->yes; }
+
+    public function confirm(App\Agent\Tool\ToolCall $call, App\Agent\Tool\ToolDefinition $def, App\Permission\Offer $offer): ConfirmChoice
+    {
+        return ConfirmChoice::Once;
+    }
+
+    public function approvePlan(string $plan): ?bool
+    {
+        $this->plans[] = $plan;
+
+        return $this->yes;
+    }
 }
 
 /** Grants every confirmation, and counts how often it was asked. */
 final class YesBroker extends PermissionBroker
 {
     public int $asked = 0;
+
     public function __construct() {}
+
     public function check(App\Agent\Tool\ToolCall $call, ?App\Agent\Tool\ToolDefinition $def): bool
     {
         if ($def?->permission === Permission::CONFIRM) {
@@ -90,24 +108,67 @@ final class YesBroker extends PermissionBroker
 final class Scripted implements PlatformInterface
 {
     public array $seen = [];
+
     public function __construct(private array $replies) {}
+
     public function stream(array $messages, array $tools = [], ?callable $onToken = null, ?callable $onWait = null): array
     {
         $this->seen[] = $messages;
 
         return array_shift($this->replies) ?? ['role' => 'assistant', 'content' => 'done'];
     }
-    public function concurrency(): int { return 1; }
-    public function lastUsage(): ?array { return null; }
-    public function lastTimings(): ?array { return null; }
-    public function residency(): ?ModelResidency { return null; }
-    public function modelName(): string { return 's'; }
-    public function contextWindow(): int { return 32768; }
-    public function catalogue(): array { return []; }
-    public function describeModel(string $model): ?ModelInfo { return null; }
+
+    public function concurrency(): int
+    {
+        return 1;
+    }
+
+    public function lastUsage(): ?array
+    {
+        return null;
+    }
+
+    public function lastTimings(): ?array
+    {
+        return null;
+    }
+
+    public function residency(): ?ModelResidency
+    {
+        return null;
+    }
+
+    public function modelName(): string
+    {
+        return 's';
+    }
+
+    public function contextWindow(): int
+    {
+        return 32768;
+    }
+
+    public function catalogue(): array
+    {
+        return [];
+    }
+
+    public function describeModel(string $model): ?ModelInfo
+    {
+        return null;
+    }
+
     public function useModel(string $model, int $contextWindow): void {}
-    public function name(): string { return 's'; }
-    public function isAvailable(): bool { return true; }
+
+    public function name(): string
+    {
+        return 's';
+    }
+
+    public function isAvailable(): bool
+    {
+        return true;
+    }
 }
 
 $call = fn(string $name, array $args) => ['role' => 'assistant', 'content' => '', 'tool_calls' => [['id' => 'c' . random_int(1, 99999), 'function' => ['name' => $name, 'arguments' => $args]]]];
@@ -115,8 +176,16 @@ $call = fn(string $name, array $args) => ['role' => 'assistant', 'content' => ''
 function run(PlatformInterface $model, array $tools, PlanMode $plan, PermissionBroker $broker): array
 {
     $budget = new ContextBudget(contextWindow: 32768);
-    $loop = new AgentLoop($model, new Toolbox($tools), $broker, new ChatPane(new Terminal(), new MarkdownRenderer()),
-        $budget, new HistoryCompactor($model, $budget), new Interrupt(), planMode: $plan);
+    $loop = new AgentLoop(
+        $model,
+        new Toolbox($tools),
+        $broker,
+        new ChatPane(new Terminal(), new MarkdownRenderer()),
+        $budget,
+        new HistoryCompactor($model, $budget),
+        new Interrupt(),
+        planMode: $plan,
+    );
     $bag = new MessageBag();
     $bag->system('S');
     $bag->user($plan->frame('fix the subtotal'));
@@ -174,8 +243,16 @@ check('and the model is told to wait', str_contains(json_encode($model->seen[1])
 check('outside plan mode, plan_ready changes nothing', str_contains((new PlanReadyTool(new PlanMode(), new PlanAnswer(true)))('x'), 'Not in plan mode'));
 
 // ---- the status bar says it -------------------------------------------------------
-$project = new Project(slug: 'p', name: 'p', path: '/tmp', memoryDb: '/tmp/m.db', docker: new DockerConfig(enabled: false),
-    stack: '', createdAt: new DateTimeImmutable(), lastUsedAt: new DateTimeImmutable());
+$project = new Project(
+    slug: 'p',
+    name: 'p',
+    path: '/tmp',
+    memoryDb: '/tmp/m.db',
+    docker: new DockerConfig(enabled: false),
+    stack: '',
+    createdAt: new DateTimeImmutable(),
+    lastUsedAt: new DateTimeImmutable(),
+);
 $bar = (new ReflectionClass(StatusBar::class))->newInstanceWithoutConstructor();
 ob_start();
 $bar->render($project, 'm', planning: true);

@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tool\Edit;
 
+use ParseError;
+use Phar;
 use Symfony\Component\Process\Process;
+use Throwable;
 
 /**
  * Whether a file's new content still parses, for the kinds of file where
@@ -68,7 +71,7 @@ class SyntaxGuard
 
     private function php(string $path, string $content): ?string
     {
-        if ($this->inProcess ?? \Phar::running(false) !== '') {
+        if ($this->inProcess ?? Phar::running(false) !== '') {
             return $this->parse($path, $content);
         }
 
@@ -80,7 +83,7 @@ class SyntaxGuard
         try {
             $lint = new Process([PHP_BINARY, '-n', '-l', $tmp], timeout: 15);
             $lint->run();
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return null;
         } finally {
             @unlink($tmp);
@@ -108,9 +111,9 @@ class SyntaxGuard
     {
         try {
             token_get_all($content, TOKEN_PARSE);
-        } catch (\ParseError $e) {
+        } catch (ParseError $e) {
             return sprintf('PHP Parse error: %s in %s on line %d', $e->getMessage(), $path, $e->getLine());
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return null;
         }
 

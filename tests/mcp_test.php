@@ -1,4 +1,5 @@
 <?php
+
 // The MCP client, driven against a server that misbehaves on purpose.
 //
 // Every server is somebody else's process: it can die at the handshake, print
@@ -7,16 +8,16 @@
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
+use App\Agent\Tool\Permission;
 use App\Agent\Tool\Toolbox;
 use App\Agent\Tool\ToolCall;
-use App\Agent\Tool\Permission;
 use App\Mcp\McpClient;
-use App\Runtime\Interrupt;
 use App\Mcp\McpConfig;
 use App\Mcp\McpException;
 use App\Mcp\McpRegistry;
 use App\Mcp\PromptArguments;
 use App\Mcp\ServerConfig;
+use App\Runtime\Interrupt;
 use App\Tool\FileReadTool;
 
 $pass = 0;
@@ -96,12 +97,24 @@ check('a single huge line is cut too, without breaking a character', strlen($wid
 // ---- servers that fail ------------------------------------------------------
 $missing = McpClient::for(new ServerConfig(name: 'absent', command: 'nexistepasdutout'));
 $threw = false;
-try { $missing->listTools(); } catch (McpException $e) { $threw = true; $message = $e->getMessage(); }
+
+try {
+    $missing->listTools();
+} catch (McpException $e) {
+    $threw = true;
+    $message = $e->getMessage();
+}
 check('a missing command is reported before anything else', $threw && str_contains($message ?? '', 'command not found'), $message ?? '');
 
 $crashing = McpClient::for(server('crash'));
 $threw = false;
-try { $crashing->listTools(); } catch (McpException $e) { $threw = true; $message = $e->getMessage(); }
+
+try {
+    $crashing->listTools();
+} catch (McpException $e) {
+    $threw = true;
+    $message = $e->getMessage();
+}
 check('a server that dies at the handshake is reported', $threw, $message ?? '');
 check("and its stderr is quoted, since that is where the reason is", str_contains($message ?? '', 'missing configuration'), $message ?? '');
 $crashing->close();
@@ -114,7 +127,13 @@ $broken->close();
 
 $protocolError = McpClient::for(server('protoerror'));
 $threw = false;
-try { $protocolError->callTool('echo', ['text' => 'x']); } catch (McpException $e) { $threw = true; $message = $e->getMessage(); }
+
+try {
+    $protocolError->callTool('echo', ['text' => 'x']);
+} catch (McpException $e) {
+    $threw = true;
+    $message = $e->getMessage();
+}
 check('a JSON-RPC error is raised rather than returned as content', $threw && str_contains($message ?? '', 'invalid parameter'), $message ?? '');
 // That message becomes the tool result, and the tool result goes to the
 // model's provider: the server's log, which can hold a token, stays out.
@@ -127,7 +146,13 @@ $protocolError->close();
 $hanging = McpClient::for(server('silent'), handshakeTimeout: 1.0, callTimeout: 1.0);
 $started = microtime(true);
 $threw = false;
-try { $hanging->listTools(); } catch (McpException $e) { $threw = true; $message = $e->getMessage(); }
+
+try {
+    $hanging->listTools();
+} catch (McpException $e) {
+    $threw = true;
+    $message = $e->getMessage();
+}
 $waited = microtime(true) - $started;
 check('a server that never answers times out', $threw && $waited < 5.0, sprintf('%.1fs: %s', $waited, $message ?? 'no throw'));
 $hanging->close();
@@ -140,8 +165,17 @@ $dying->listTools();
 usleep(200_000);
 $started = microtime(true);
 $notices = [];
-set_error_handler(function (int $severity, string $text) use (&$notices): bool { $notices[] = $text; return true; });
-try { $result = $dying->callTool('echo', ['text' => 'revenu']); } catch (McpException $e) { $result = ['text' => $e->getMessage()]; }
+set_error_handler(function (int $severity, string $text) use (&$notices): bool {
+    $notices[] = $text;
+
+    return true;
+});
+
+try {
+    $result = $dying->callTool('echo', ['text' => 'revenu']);
+} catch (McpException $e) {
+    $result = ['text' => $e->getMessage()];
+}
 restore_error_handler();
 $waited = microtime(true) - $started;
 check('a server that exited is started again and the call goes through', str_contains($result['text'], 'revenu') && $waited < 2.0, sprintf('%.1fs: %s', $waited, $result['text']));
@@ -182,18 +216,26 @@ check('remote tools are namespaced under their server', in_array('mcp__demo__ech
 // The fixture deliberately exposes a tool called file_read. Shadowing the
 // agent's own file access with somebody else's process is not a name clash,
 // it is a redirection.
-check('a native tool is not shadowed by a remote one of the same name',
-    $toolbox->find('file_read')?->handler instanceof FileReadTool, get_debug_type($toolbox->find('file_read')?->handler));
-check('the remote one is still reachable under its own name',
-    $toolbox->find('mcp__demo__file_read') !== null, implode(',', $names));
+check(
+    'a native tool is not shadowed by a remote one of the same name',
+    $toolbox->find('file_read')?->handler instanceof FileReadTool,
+    get_debug_type($toolbox->find('file_read')?->handler),
+);
+check(
+    'the remote one is still reachable under its own name',
+    $toolbox->find('mcp__demo__file_read') !== null,
+    implode(',', $names),
+);
 
 $definition = $toolbox->find('mcp__demo__echo');
 check('a remote tool asks before it runs', $definition?->permission === Permission::CONFIRM);
 check('its description says where it comes from', str_contains($definition?->description ?? '', 'MCP · demo'), $definition?->description ?? '');
 check('its schema survives the trip', ($definition?->parameters['fois']['type'] ?? null) === 'integer', json_encode($definition?->parameters));
-check('and so does which arguments are required',
+check(
+    'and so does which arguments are required',
     ($definition?->parameters['text']['required'] ?? null) === true && ($definition?->parameters['fois']['required'] ?? null) === false,
-    json_encode($definition?->parameters));
+    json_encode($definition?->parameters),
+);
 
 // What the server says of a parameter beyond its type reaches the model: an
 // array's items, a closed list of values. OpenAI refuses the whole request over
@@ -201,8 +243,11 @@ check('and so does which arguments are required',
 $sent = $definition?->toFunctionSchema()['function']['parameters']['properties'] ?? [];
 check('an array parameter keeps its items', ($sent['tags']['items']['type'] ?? null) === 'string', json_encode($sent['tags'] ?? null));
 check('an enum keeps its values', ($sent['ton']['enum'] ?? null) === ['calme', 'fort'], json_encode($sent['ton'] ?? null));
-check('an array declared without items is given some, so the request is not refused',
-    isset($sent['brut']['items']) && json_encode($sent['brut']['items']) === '{}', json_encode($sent['brut'] ?? null));
+check(
+    'an array declared without items is given some, so the request is not refused',
+    isset($sent['brut']['items']) && json_encode($sent['brut']['items']) === '{}',
+    json_encode($sent['brut'] ?? null),
+);
 check('and a native tool\'s schema is unchanged', array_keys($sent['fois'] ?? []) === ['type', 'description'], json_encode($sent['fois'] ?? null));
 
 // Through the Toolbox, which is how the agent actually calls it — including the
@@ -236,8 +281,11 @@ $report = implode("\n", $registry->report());
 check('the failure is named in the report', str_contains($report, 'dead'), $report);
 check('a disabled server is listed as disabled, not as broken', str_contains($report, 'eteint: disabled'), $report);
 $section = $registry->promptSection();
-check('a broken or disabled server gives the prompt no instructions',
-    !str_contains($section, '## dead') && !str_contains($section, '## eteint') && str_contains($section, '## vivant'), $section);
+check(
+    'a broken or disabled server gives the prompt no instructions',
+    !str_contains($section, '## dead') && !str_contains($section, '## eteint') && str_contains($section, '## vivant'),
+    $section,
+);
 $registry->shutdown();
 unlink($path);
 
@@ -253,8 +301,11 @@ $names = array_map(fn($d) => $d->name, $toolbox->getDefinitions());
 check('two servers cannot both claim one tool name', count(array_filter($names, fn($n) => $n === 'mcp__demo__echo')) === 1, implode(',', $names));
 
 $report = implode("\n", $registry->report());
-check('and the one that lost is named rather than passed over',
-    str_contains($report, 'skipped') && str_contains($report, 'echo'), $report);
+check(
+    'and the one that lost is named rather than passed over',
+    str_contains($report, 'skipped') && str_contains($report, 'echo'),
+    $report,
+);
 $registry->shutdown();
 unlink($path);
 
@@ -262,14 +313,20 @@ unlink($path);
 $path = sys_get_temp_dir() . '/mcp-bad-' . bin2hex(random_bytes(4)) . '.json';
 file_put_contents($path, '{ ceci ne parse pas');
 [$registry, $toolbox] = registryFor($path);
-check('an unparseable config is reported, not ignored',
-    str_contains(implode(' ', $registry->report()), 'Invalid MCP configuration'), implode(' | ', $registry->report()));
+check(
+    'an unparseable config is reported, not ignored',
+    str_contains(implode(' ', $registry->report()), 'Invalid MCP configuration'),
+    implode(' | ', $registry->report()),
+);
 unlink($path);
 
 file_put_contents($path, json_encode(['mcpServers' => ['sansCommande' => ['args' => ['x']]]]));
 [$registry, $toolbox] = registryFor($path);
-check('a server with no command is reported by name',
-    str_contains(implode(' ', $registry->report()), 'sansCommande'), implode(' | ', $registry->report()));
+check(
+    'a server with no command is reported by name',
+    str_contains(implode(' ', $registry->report()), 'sansCommande'),
+    implode(' | ', $registry->report()),
+);
 unlink($path);
 
 $config = new McpConfig();
@@ -283,20 +340,38 @@ check('and adds no MCP section to the prompt', $registry->promptSection() === ''
 // Two ways in, and the file says which by what it holds. Declaring neither or
 // both is a question nobody can answer for the user.
 $threw = false;
-try { ServerConfig::fromArray('deux', ['command' => 'php', 'url' => 'https://exemple/mcp']); }
-catch (McpException $e) { $threw = true; $message = $e->getMessage(); }
+
+try {
+    ServerConfig::fromArray('deux', ['command' => 'php', 'url' => 'https://exemple/mcp']);
+} catch (McpException $e) {
+    $threw = true;
+    $message = $e->getMessage();
+}
 check('command and url together are refused', $threw && str_contains($message ?? '', 'pick one'), $message ?? '');
 
 $threw = false;
-try { ServerConfig::fromArray('nulle-part', ['args' => ['x']]); }
-catch (McpException $e) { $threw = true; $message = $e->getMessage(); }
+
+try {
+    ServerConfig::fromArray('nulle-part', ['args' => ['x']]);
+} catch (McpException $e) {
+    $threw = true;
+    $message = $e->getMessage();
+}
 check('and declaring neither is refused too', $threw && str_contains($message ?? '', 'missing'), $message ?? '');
 
 $threw = false;
-try { ServerConfig::fromArray('pas-une-url', ['url' => 'exemple.test/mcp']); }
-catch (McpException $e) { $threw = true; $message = $e->getMessage(); }
-check('a url that is not http(s) is caught at the file, not at the first call',
-    $threw && str_contains($message ?? '', 'http(s)'), $message ?? '');
+
+try {
+    ServerConfig::fromArray('pas-une-url', ['url' => 'exemple.test/mcp']);
+} catch (McpException $e) {
+    $threw = true;
+    $message = $e->getMessage();
+}
+check(
+    'a url that is not http(s) is caught at the file, not at the first call',
+    $threw && str_contains($message ?? '', 'http(s)'),
+    $message ?? '',
+);
 
 // ---- resources and prompts -------------------------------------------------
 // Both optional in the protocol: a tools-only server must cost nothing, and a
@@ -310,29 +385,47 @@ $plain->close();
 
 $rich = McpClient::for(server('rich'));
 $resources = $rich->listResources();
-check('resources are listed with their URI and description',
+check(
+    'resources are listed with their URI and description',
     array_column($resources, 'uri') === ['db://schema', 'file:///logo.png'] && $resources[0]['description'] === 'The database schema',
-    json_encode($resources));
+    json_encode($resources),
+);
 check('a text resource is read as its text', $rich->readResource('db://schema') === 'CREATE TABLE users (id INT, email TEXT);');
 $templates = $rich->listResourceTemplates();
-check('resource templates are listed, the URI with its parameters',
-    array_column($templates, 'uriTemplate') === ['db://tables/{name}'] && $templates[0]['description'] === 'The columns of one table', json_encode($templates));
+check(
+    'resource templates are listed, the URI with its parameters',
+    array_column($templates, 'uriTemplate') === ['db://tables/{name}'] && $templates[0]['description'] === 'The columns of one table',
+    json_encode($templates),
+);
 check('and a URI built from one is read like any other', $rich->readResource('db://tables/users') === 'users: id INT, email TEXT');
-check('a binary one is named with its size, not decoded into the context',
-    str_contains($rich->readResource('file:///logo.png'), 'image/png, 7 bytes'), $rich->readResource('file:///logo.png'));
+check(
+    'a binary one is named with its size, not decoded into the context',
+    str_contains($rich->readResource('file:///logo.png'), 'image/png, 7 bytes'),
+    $rich->readResource('file:///logo.png'),
+);
 $threw = false;
-try { $rich->readResource('db://nothing'); } catch (McpException $e) { $threw = true; $message = $e->getMessage(); }
+
+try {
+    $rich->readResource('db://nothing');
+} catch (McpException $e) {
+    $threw = true;
+    $message = $e->getMessage();
+}
 check('an unknown resource is an error naming it', $threw && str_contains($message ?? '', 'db://nothing'), $message ?? '');
 
 $prompts = $rich->listPrompts();
-check('prompts are listed with their arguments',
+check(
+    'prompts are listed with their arguments',
     array_column($prompts, 'name') === ['review', 'standup'] && $prompts[0]['arguments'][0]['required'] === true
         && $prompts[0]['arguments'][1]['required'] === false,
-    json_encode($prompts));
+    json_encode($prompts),
+);
 $messages = $rich->getPrompt('review', ['change' => 'the diff']);
-check('a prompt comes back filled in by the server',
+check(
+    'a prompt comes back filled in by the server',
     ($messages[0]['role'] ?? '') === 'user' && str_contains($messages[0]['text'] ?? '', 'PROMPT review {"change":"the diff"}'),
-    json_encode($messages));
+    json_encode($messages),
+);
 $rich->close();
 
 // How a typed line becomes arguments.
@@ -340,21 +433,32 @@ $declared = [
     ['name' => 'change', 'description' => '', 'required' => true],
     ['name' => 'focus', 'description' => '', 'required' => false],
 ];
-check('the whole line goes to the first argument', PromptArguments::parse('the login form fix', $declared) === ['change' => 'the login form fix'],
-    json_encode(PromptArguments::parse('the login form fix', $declared)));
-check('name=value sets an argument by name, and the rest still fills the first',
+check(
+    'the whole line goes to the first argument',
+    PromptArguments::parse('the login form fix', $declared) === ['change' => 'the login form fix'],
+    json_encode(PromptArguments::parse('the login form fix', $declared)),
+);
+check(
+    'name=value sets an argument by name, and the rest still fills the first',
     PromptArguments::parse('focus=security the login fix', $declared) === ['focus' => 'security', 'change' => 'the login fix'],
-    json_encode(PromptArguments::parse('focus=security the login fix', $declared)));
-check('a quoted value may hold spaces',
+    json_encode(PromptArguments::parse('focus=security the login fix', $declared)),
+);
+check(
+    'a quoted value may hold spaces',
     PromptArguments::parse('change="two words" focus=tests', $declared) === ['change' => 'two words', 'focus' => 'tests'],
-    json_encode(PromptArguments::parse('change="two words" focus=tests', $declared)));
-check('a word=word that names no argument is left in the text',
+    json_encode(PromptArguments::parse('change="two words" focus=tests', $declared)),
+);
+check(
+    'a word=word that names no argument is left in the text',
     PromptArguments::parse('set x=1 please', $declared) === ['change' => 'set x=1 please'],
-    json_encode(PromptArguments::parse('set x=1 please', $declared)));
+    json_encode(PromptArguments::parse('set x=1 please', $declared)),
+);
 check('the usage marks required and optional arguments', PromptArguments::usage($declared) === '<change> [focus]');
 check('one user message is sent as it is', PromptArguments::asMessage([['role' => 'user', 'text' => ' Do it. ']]) === 'Do it.');
-check('other roles are kept, labelled',
-    PromptArguments::asMessage([['role' => 'user', 'text' => 'Q'], ['role' => 'assistant', 'text' => 'A']]) === "[user]\nQ\n\n[assistant]\nA");
+check(
+    'other roles are kept, labelled',
+    PromptArguments::asMessage([['role' => 'user', 'text' => 'Q'], ['role' => 'assistant', 'text' => 'A']]) === "[user]\nQ\n\n[assistant]\nA",
+);
 
 // Through the registry: the reader is a tool, the prompts are commands.
 $path = writeConfig(['docs' => ['command' => PHP_BINARY, 'args' => $fixtureArgs('rich')], 'plain' => ['command' => PHP_BINARY, 'args' => $fixtureArgs('ok')]]);
@@ -362,12 +466,16 @@ $path = writeConfig(['docs' => ['command' => PHP_BINARY, 'args' => $fixtureArgs(
 $reader = $toolbox->find('mcp__docs__read_resource');
 check('a server with resources gets a reader tool', $reader !== null);
 check('which asks before it runs, like any remote tool', $reader?->permission === Permission::CONFIRM);
-check('and whose description lists what there is to read',
+check(
+    'and whose description lists what there is to read',
     str_contains($reader?->description ?? '', 'db://schema') && str_contains($reader?->description ?? '', 'The database schema'),
-    $reader?->description ?? '');
-check('and the templates, with how to use them',
+    $reader?->description ?? '',
+);
+check(
+    'and the templates, with how to use them',
     str_contains($reader?->description ?? '', 'db://tables/{name}') && str_contains($reader?->description ?? '', 'each {parameter} filled in'),
-    $reader?->description ?? '');
+    $reader?->description ?? '',
+);
 check('a tools-only server gets no reader', $toolbox->find('mcp__plain__read_resource') === null);
 $result = $toolbox->execute(new ToolCall(id: 'r0', name: 'mcp__docs__read_resource', arguments: ['uri' => 'db://tables/users']));
 check('the model reads a URI it built from a template', !$result->isError && str_contains($result->content, 'email TEXT'), $result->content);
@@ -384,20 +492,36 @@ check('and says nothing of them for a server that has none', str_contains($repor
 // as an empty list of resources.
 [$templated, $templatedTools] = registryFor(writeConfig(['tables' => ['command' => PHP_BINARY, 'args' => $fixtureArgs('templates')]]));
 $templateReader = $templatedTools->find('mcp__tables__read_resource');
-check('a server with templates only still gets a reader', $templateReader !== null && str_contains($templateReader->description, 'db://tables/{name}'),
-    (string) $templateReader?->description);
-check('listed under its templates, not as resources', isset($templated->templates()['tables']) && !isset($templated->resources()['tables']),
-    json_encode([$templated->templates(), $templated->resources()]));
-check('the prompts become /<server>:<prompt> commands',
+check(
+    'a server with templates only still gets a reader',
+    $templateReader !== null && str_contains($templateReader->description, 'db://tables/{name}'),
+    (string) $templateReader?->description,
+);
+check(
+    'listed under its templates, not as resources',
+    isset($templated->templates()['tables']) && !isset($templated->resources()['tables']),
+    json_encode([$templated->templates(), $templated->resources()]),
+);
+check(
+    'the prompts become /<server>:<prompt> commands',
     array_column($registry->promptCommands(), 'command') === ['/docs:review', '/docs:standup'],
-    json_encode(array_column($registry->promptCommands(), 'command')));
+    json_encode(array_column($registry->promptCommands(), 'command')),
+);
 
-check('a prompt command expands to what the server returns',
+check(
+    'a prompt command expands to what the server returns',
     str_contains((string) $registry->expandPrompt('/docs:review focus=tests the new parser'), 'PROMPT review {"focus":"tests","change":"the new parser"}'),
-    (string) $registry->expandPrompt('/docs:review focus=tests the new parser'));
+    (string) $registry->expandPrompt('/docs:review focus=tests the new parser'),
+);
 check('one with no arguments runs as it is', str_contains((string) $registry->expandPrompt('/docs:standup'), 'PROMPT standup'));
 $threw = false;
-try { $registry->expandPrompt('/docs:review'); } catch (McpException $e) { $threw = true; $message = $e->getMessage(); }
+
+try {
+    $registry->expandPrompt('/docs:review');
+} catch (McpException $e) {
+    $threw = true;
+    $message = $e->getMessage();
+}
 check('a missing required argument is refused with the usage', $threw && str_contains($message ?? '', 'missing change') && str_contains($message ?? '', '<change> [focus]'), $message ?? '');
 check('a command that names no prompt is left alone', $registry->expandPrompt('/docs:nothing') === null && $registry->expandPrompt('/help') === null);
 $registry->shutdown();
@@ -425,11 +549,14 @@ function interruptedCall(McpClient $client): array
     $client->listTools();
     $interrupt->beginTurn();
     $ticks = 0;
-    $interrupt->meanwhile(function () use (&$ticks) { $ticks++; });
+    $interrupt->meanwhile(function () use (&$ticks) {
+        $ticks++;
+    });
     pcntl_async_signals(true);
     pcntl_signal(SIGALRM, fn() => $interrupt->request());
     pcntl_alarm(1);
     $started = microtime(true);
+
     try {
         $client->callTool('echo', ['text' => 'x']);
         $said = 'answered';
@@ -491,7 +618,13 @@ $paged->close();
 // to reach one that asks who is calling.
 $unauth = McpClient::for(new ServerConfig(name: 'distant', url: $base . '/unauth'), handshakeTimeout: 5.0, callTimeout: 5.0);
 $threw = false;
-try { $unauth->listTools(); } catch (McpException $e) { $threw = true; $message = $e->getMessage(); }
+
+try {
+    $unauth->listTools();
+} catch (McpException $e) {
+    $threw = true;
+    $message = $e->getMessage();
+}
 check('a server that refuses the call is reported', $threw, $message ?? '');
 $unauth->close();
 
@@ -510,7 +643,13 @@ $authed->close();
 
 $broken = McpClient::for(new ServerConfig(name: 'distant', url: $base . '/http500'), handshakeTimeout: 5.0, callTimeout: 5.0);
 $threw = false;
-try { $broken->listTools(); } catch (McpException $e) { $threw = true; $message = $e->getMessage(); }
+
+try {
+    $broken->listTools();
+} catch (McpException $e) {
+    $threw = true;
+    $message = $e->getMessage();
+}
 check('an HTTP error is an McpException like any other failure', $threw && str_contains($message ?? '', 'distant'), $message ?? '');
 $broken->close();
 
@@ -527,8 +666,11 @@ check('and the agent calls it end to end', !$result->isError && str_contains($re
 // remote is the user's decision, made once in a JSON file — so /mcp says it
 // rather than letting a process and a host look alike.
 $report = implode("\n", $registry->report());
-check('and the report says the tools come from off the machine',
-    str_contains($report, 'online') && str_contains($report, '127.0.0.1'), $report);
+check(
+    'and the report says the tools come from off the machine',
+    str_contains($report, 'online') && str_contains($report, '127.0.0.1'),
+    $report,
+);
 $registry->shutdown();
 unlink($path);
 
@@ -537,8 +679,12 @@ unlink($path);
 // env of its own got that added to the whole of $_SERVER: the key went to
 // somebody else's process along with PATH.
 $_SERVER['SHERPA_API_KEY'] = 'sk-from-dotenv';
-$envClient = McpClient::for(new ServerConfig(name: 'envcheck', command: PHP_BINARY,
-    args: [dirname(__DIR__) . '/tests/fixtures/mcp_server.php', 'env'], env: ['SERVER_TOKEN' => 'declared']));
+$envClient = McpClient::for(new ServerConfig(
+    name: 'envcheck',
+    command: PHP_BINARY,
+    args: [dirname(__DIR__) . '/tests/fixtures/mcp_server.php', 'env'],
+    env: ['SERVER_TOKEN' => 'declared'],
+));
 $envClient->listTools();
 $seen = json_decode($envClient->callTool('echo', [])['text'], true) ?: [];
 $envClient->close();

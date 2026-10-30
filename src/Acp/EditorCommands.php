@@ -137,6 +137,7 @@ final class EditorCommands
     private function run(string $text, MessageBag $bag, Project $project): string
     {
         ob_start();
+
         try {
             $this->commands->handle($text, $bag, $project);
         } finally {

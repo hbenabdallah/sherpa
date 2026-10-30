@@ -20,8 +20,11 @@ final class Scrollback
 
     /** @var list<string> */
     private array $lines = [];
+
     private string $current = '';
+
     private bool $capturing = false;
+
     private bool $paused = false;
 
     /** Start capturing whatever is printed from now on. Once. */

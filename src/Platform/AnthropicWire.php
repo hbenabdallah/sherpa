@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Platform;
 
+use stdClass;
+
 /**
  * Sherpa's history in the shape of Anthropic's Messages API, which differs
  * from the OpenAI dialect in ways the server enforces: the system prompt is a
@@ -142,7 +144,7 @@ final class AnthropicWire
                         'type'  => 'tool_use',
                         'id'    => (string) ($call['id'] ?? ''),
                         'name'  => (string) ($call['function']['name'] ?? ''),
-                        'input' => is_array($arguments) && $arguments !== [] ? $arguments : new \stdClass(),
+                        'input' => is_array($arguments) && $arguments !== [] ? $arguments : new stdClass(),
                     ];
                 }
 
@@ -221,10 +223,10 @@ final class AnthropicWire
         $schema = $function['parameters'] ?? [];
 
         if (!is_array($schema) || $schema === []) {
-            $schema = ['type' => 'object', 'properties' => new \stdClass()];
+            $schema = ['type' => 'object', 'properties' => new stdClass()];
         }
         if (($schema['properties'] ?? null) === []) {
-            $schema['properties'] = new \stdClass();
+            $schema['properties'] = new stdClass();
         }
 
         return [

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Project;
 
 use Symfony\Component\Process\Process;
+use Throwable;
 
 /**
  * What this project has been worked on lately, as a handful of keywords. The
@@ -170,7 +171,7 @@ final class RecentActivity
             }
 
             return explode("\n", trim($process->getOutput()));
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return [];
         }
     }

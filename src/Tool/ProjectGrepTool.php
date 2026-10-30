@@ -25,10 +25,12 @@ class ProjectGrepTool
      * whole turn to recover matches that would have fitted.
      */
     private const MIN_RESULTS = 50;
+
     private const MAX_RESULTS = 600;
 
     /** Matches reported per file before grep moves on. */
     private const MIN_PER_FILE = 5;
+
     private const MAX_PER_FILE = 15;
 
     /** Share of the prompt window one search may occupy. */
@@ -76,9 +78,12 @@ class ProjectGrepTool
     }
 
     public function __invoke(
-        #[Param('Extended regular expression, as grep -E reads it: foo|bar, (get|set)Name, [0-9]+. Use [0-9] rather than \\d')] string $pattern,
-        #[Param('Subdirectory or file to search in, relative to project root (optional, defaults to entire project)')] ?string $path = null,
-        #[Param('File extension filter e.g. php, yaml, env (optional); also matches files where it is followed by another, like .env.example or phpunit.xml.dist')] ?string $ext = null,
+        #[Param('Extended regular expression, as grep -E reads it: foo|bar, (get|set)Name, [0-9]+. Use [0-9] rather than \\d')]
+        string $pattern,
+        #[Param('Subdirectory or file to search in, relative to project root (optional, defaults to entire project)')]
+        ?string $path = null,
+        #[Param('File extension filter e.g. php, yaml, env (optional); also matches files where it is followed by another, like .env.example or phpunit.xml.dist')]
+        ?string $ext = null,
     ): string {
         $base = $this->paths->root();
         // A subdirectory argument is confined too — otherwise grep becomes a

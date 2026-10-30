@@ -11,6 +11,7 @@ use App\Tool\Edit\Files;
 use App\Tool\Edit\LineDiff;
 use App\Tool\Edit\ProposedEdit;
 use App\Tool\Edit\SyntaxGuard;
+use RuntimeException;
 
 #[AsTool(
     name: 'file_write',
@@ -27,8 +28,10 @@ class FileWriteTool
     ) {}
 
     public function __invoke(
-        #[Param('Path to the file, relative to the project root. Must be inside the project.')] string $path,
-        #[Param('Full content to write to the file')] string $content,
+        #[Param('Path to the file, relative to the project root. Must be inside the project.')]
+        string $path,
+        #[Param('Full content to write to the file')]
+        string $content,
     ): string {
         $resolved = $this->paths->resolve($path);
 
@@ -38,7 +41,7 @@ class FileWriteTool
         // does not. A new file has nothing to protect but still has to parse.
         $problem = $this->syntax->problem($path, $content);
         if ($problem !== null && (!$exists || $this->syntax->problem($path, (string) $this->files->read($resolved)) === null)) {
-            throw new \RuntimeException(
+            throw new RuntimeException(
                 "this content would not parse, so {$path} was not written: {$problem}. Correct it and write again.",
             );
         }
@@ -49,6 +52,7 @@ class FileWriteTool
 
         $lines = substr_count($content, "\n") + 1;
         $action = $exists ? 'Updated' : 'Created';
+
         return "{$action}: {$path} ({$lines} lines)";
     }
 
@@ -68,6 +72,7 @@ class FileWriteTool
         if (!file_exists($resolved)) {
             $lines = explode("\n", $newContent);
             $added = array_map(fn($l) => "+ {$l}", $lines);
+
             return "(new file)\n" . implode("\n", $added);
         }
 

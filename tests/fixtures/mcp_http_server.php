@@ -1,4 +1,5 @@
 <?php
+
 /**
  * The same stand-in MCP server, reached over HTTP instead of a pipe.
  *

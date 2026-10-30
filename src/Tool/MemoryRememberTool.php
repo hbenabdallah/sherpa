@@ -23,9 +23,12 @@ class MemoryRememberTool
     ) {}
 
     public function __invoke(
-        #[Param('Short key identifying the fact (e.g. "auth_strategy", "db_naming_convention")')] string $key,
-        #[Param('Value of the fact — be concise and precise')] string $value,
-        #[Param('True only when this corrects what is already known under this key; otherwise the new fact is kept alongside the existing ones')] bool $replaces = false,
+        #[Param('Short key identifying the fact (e.g. "auth_strategy", "db_naming_convention")')]
+        string $key,
+        #[Param('Value of the fact — be concise and precise')]
+        string $value,
+        #[Param('True only when this corrects what is already known under this key; otherwise the new fact is kept alongside the existing ones')]
+        bool $replaces = false,
     ): string {
         $source = Provenance::sourceOf('the model', $this->provenance);
         $recorded = $replaces

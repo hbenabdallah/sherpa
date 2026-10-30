@@ -1,4 +1,5 @@
 <?php
+
 // Lance chaque fonction test_* de tests/*Test.php.
 
 require dirname(__DIR__) . '/autoload.php';

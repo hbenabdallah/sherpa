@@ -9,6 +9,7 @@ use App\Update\Releases;
 use App\Update\SelfUpdater;
 use App\Update\UpdateFailed;
 use App\Version;
+use Phar;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Formatter\OutputFormatter;
@@ -27,6 +28,7 @@ final class UpdateCommand extends Command
 {
     /** Asked for, so worth waiting for longer than the start-up notice does. */
     private const LATEST_TIMEOUT = 15.0;
+
     private const NOTES_LINES = 40;
 
     public function __construct(
@@ -56,7 +58,7 @@ final class UpdateCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $executable = $this->executable ?? (\Phar::running(false) ?: null);
+        $executable = $this->executable ?? (Phar::running(false) ?: null);
         if ($executable === null) {
             return $this->fail($output, 'Sherpa runs from its source here: update it with git pull.');
         }
@@ -94,6 +96,7 @@ final class UpdateCommand extends Command
         // and only copied to the screen once the new one is in place.
         $said = [];
         $formatter = $output->getFormatter();
+
         try {
             $this->updater->install($version, $platform, $executable, function (?string $notes) use (&$said, $formatter, $version, $executable, $current): void {
                 $lines = ["<info>✓</info> Sherpa {$version} installed in " . OutputFormatter::escape($executable) . " (was {$current})."];
@@ -110,7 +113,7 @@ final class UpdateCommand extends Command
 
         // Nothing is left to do: stop here, before the console's own teardown
         // loads anything else.
-        if ($executable === \Phar::running(false)) {
+        if ($executable === Phar::running(false)) {
             exit(Command::SUCCESS);
         }
 

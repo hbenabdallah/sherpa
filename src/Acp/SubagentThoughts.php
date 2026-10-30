@@ -20,34 +20,22 @@ final class SubagentThoughts implements AgentOutput
         $this->messageId = 'sub_' . bin2hex(random_bytes(6));
     }
 
-    public function beginAssistantMessage(): void
-    {
-    }
+    public function beginAssistantMessage(): void {}
 
-    public function appendToken(string $token): void
-    {
-    }
+    public function appendToken(string $token): void {}
 
-    public function flushBuffer(bool $wasToolCall = false): void
-    {
-    }
+    public function flushBuffer(bool $wasToolCall = false): void {}
 
-    public function showWaiting(bool $reasoning = false, ?string $why = null): void
-    {
-    }
+    public function showWaiting(bool $reasoning = false, ?string $why = null): void {}
 
-    public function showRunning(string $toolName, float $seconds): void
-    {
-    }
+    public function showRunning(string $toolName, float $seconds): void {}
 
     public function showToolCall(string $toolName, array $args = [], ?string $callId = null): void
     {
         $this->say('↳ ' . Lanes::prefix() . ToolDescriptions::title($toolName, $args));
     }
 
-    public function showToolResult(string $toolName, string $result, bool $isError = false, ?string $callId = null): void
-    {
-    }
+    public function showToolResult(string $toolName, string $result, bool $isError = false, ?string $callId = null): void {}
 
     public function showInfo(string $message): void
     {

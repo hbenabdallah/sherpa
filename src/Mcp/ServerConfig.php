@@ -73,7 +73,7 @@ final class ServerConfig
         // one for the user would work right up until it picked the other one.
         if ($command !== '' && $url !== '') {
             throw new McpException(
-                "MCP server \"{$name}\": both 'command' and 'url' declared; pick one."
+                "MCP server \"{$name}\": both 'command' and 'url' declared; pick one.",
             );
         }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tool;
 
+use RuntimeException;
 use Symfony\Component\Process\Process;
 
 /**
@@ -185,7 +186,7 @@ final class BackgroundJobs
     /** @return array{command: string, process: Process, started: float, container: ?string, inContainer: callable(string): list<string>, group: bool, stopped: bool} */
     private function job(int $id): array
     {
-        return $this->jobs[$id] ?? throw new \RuntimeException("no job {$id}: /jobs lists them, and ids are given when a job starts.");
+        return $this->jobs[$id] ?? throw new RuntimeException("no job {$id}: /jobs lists them, and ids are given when a job starts.");
     }
 
     public function __destruct()

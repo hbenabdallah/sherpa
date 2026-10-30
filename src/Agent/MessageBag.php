@@ -12,6 +12,7 @@ class MessageBag
         foreach ($this->messages as $i => $msg) {
             if ($msg['role'] === 'system') {
                 $this->messages[$i]['content'] = $content;
+
                 return;
             }
         }
@@ -131,6 +132,7 @@ class MessageBag
             $content = $msg['content'] ?? '';
             $lines[] = "[{$role}] {$content}";
         }
+
         return implode("\n\n", $lines);
     }
 }

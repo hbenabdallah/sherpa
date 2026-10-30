@@ -17,7 +17,8 @@ class MemoryRecallTool
     public function __construct(private readonly MemoryStore $store) {}
 
     public function __invoke(
-        #[Param('Optional words to search for, in any order (leave empty for all recent facts)')] ?string $search = null,
+        #[Param('Optional words to search for, in any order (leave empty for all recent facts)')]
+        ?string $search = null,
     ): string {
         $facts = $this->store->recall($search, limit: 20);
 

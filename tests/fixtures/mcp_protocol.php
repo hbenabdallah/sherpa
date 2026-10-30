@@ -1,4 +1,5 @@
 <?php
+
 /**
  * What the stand-in MCP server answers, whatever pipe or socket it is reached
  * through.

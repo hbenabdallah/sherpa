@@ -27,6 +27,7 @@ class SystemPromptBuilder
      * targeted lookup that replaces it.
      */
     private const MEMORY_BUDGET_MIN_CHARS = 1600;
+
     private const MEMORY_BUDGET_MAX_CHARS = 24000;
 
     public function __construct(

@@ -2,7 +2,9 @@
 
 namespace Boutique\Routing;
 
-#[\Attribute(\Attribute::TARGET_METHOD)]
+use Attribute;
+
+#[Attribute(Attribute::TARGET_METHOD)]
 final class Route
 {
     public function __construct(

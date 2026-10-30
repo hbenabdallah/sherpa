@@ -16,6 +16,8 @@ use App\Tool\Edit\ProposedEdit;
 use App\Tool\ShellExecTool;
 use App\TUI\ChatPane;
 use App\TUI\Terminal;
+use stdClass;
+use Throwable;
 
 /**
  * A turn as an editor sees it: session/update notifications for the reply and
@@ -47,8 +49,11 @@ final class EditorFrontend implements AgentOutput, Approver
     private bool $notices = false;
 
     private string $messageId = '';
+
     private string $withheld = '';
+
     private bool $holding = false;
+
     private string $lastWait = '';
 
     /**
@@ -58,6 +63,7 @@ final class EditorFrontend implements AgentOutput, Approver
      * @var array<string, array{name: string, edit: ?ProposedEdit}>
      */
     private array $calls = [];
+
     private ?string $planCall = null;
 
     public function __construct(
@@ -177,9 +183,7 @@ final class EditorFrontend implements AgentOutput, Approver
     // ---- the tools --------------------------------------------------------------
 
     /** The editor shows the tool call as in progress already. */
-    public function showRunning(string $toolName, float $seconds): void
-    {
-    }
+    public function showRunning(string $toolName, float $seconds): void {}
 
     public function showToolCall(string $toolName, array $args = [], ?string $callId = null): void
     {
@@ -204,7 +208,7 @@ final class EditorFrontend implements AgentOutput, Approver
             'title'         => Lanes::prefix() . ToolDescriptions::title($toolName, $args),
             'kind'          => ToolDescriptions::kind($toolName),
             'status'        => 'pending',
-            'rawInput'      => $args === [] ? new \stdClass() : $args,
+            'rawInput'      => $args === [] ? new stdClass() : $args,
         ];
 
         $locations = $this->locations($args, $edit);
@@ -451,7 +455,7 @@ final class EditorFrontend implements AgentOutput, Approver
 
         try {
             $location = ['path' => $this->paths->resolve($path)];
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return [];
         }
 

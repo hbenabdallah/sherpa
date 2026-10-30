@@ -1,4 +1,5 @@
 <?php
+
 // The first-run question about the API, run on its own with its answers piped
 // in, as a person would type them. Used by first_run_test.php.
 //
@@ -79,9 +80,18 @@ $config = new MachineConfig();
 $config->setPath($dir . '/config.yaml');
 $models = new ModelResolver($config, 'x', 16384, 'api', '', 32768);
 $session = new ModelSession(
-    $platform, $models, new ModelSelector(new Terminal(), $editor, $platform),
-    new ContextBudget(), new InferenceSpeed(), new UsageMeter(), new ChatPane(new Terminal(), new MarkdownRenderer()), $editor,
-    new SystemPromptBuilder($memory, new SkillRegistry(), new StackDetector()), $context, new Toolbox([]), new SessionStore(),
+    $platform,
+    $models,
+    new ModelSelector(new Terminal(), $editor, $platform),
+    new ContextBudget(),
+    new InferenceSpeed(),
+    new UsageMeter(),
+    new ChatPane(new Terminal(), new MarkdownRenderer()),
+    $editor,
+    new SystemPromptBuilder($memory, new SkillRegistry(), new StackDetector()),
+    $context,
+    new Toolbox([]),
+    new SessionStore(),
 );
 
 $session->configureApiEndpoint();

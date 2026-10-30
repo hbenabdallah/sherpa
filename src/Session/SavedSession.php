@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Session;
 
 use App\Agent\PlanMode;
+use DateTimeImmutable;
 
 /**
  * One conversation as it was left: what was said, and what compaction had put
@@ -22,8 +23,8 @@ final class SavedSession
      */
     public function __construct(
         public readonly string $id,
-        public readonly \DateTimeImmutable $startedAt,
-        public readonly \DateTimeImmutable $updatedAt,
+        public readonly DateTimeImmutable $startedAt,
+        public readonly DateTimeImmutable $updatedAt,
         public readonly string $backend,
         public readonly string $model,
         public readonly string $title,

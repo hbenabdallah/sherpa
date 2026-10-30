@@ -1,4 +1,5 @@
 <?php
+
 // What a session consumes, what it costs, and the cap that stops it — now that
 // the default backend bills by the token.
 
@@ -38,8 +39,11 @@ check('a million tokens in costs the input price', near($price->of(1_000_000, 0)
 check('and out, the output price', near($price->of(0, 1_000_000), 4.0));
 
 $cachedPrice = new Price(input: 1.0, output: 4.0, cachedInput: 0.1);
-check('cached prompt tokens are billed at their own rate',
-    near($cachedPrice->of(1_000_000, 0, 400_000), 0.6 + 0.04), (string) $cachedPrice->of(1_000_000, 0, 400_000));
+check(
+    'cached prompt tokens are billed at their own rate',
+    near($cachedPrice->of(1_000_000, 0, 400_000), 0.6 + 0.04),
+    (string) $cachedPrice->of(1_000_000, 0, 400_000),
+);
 check('and at the input rate when the provider has none', near($price->of(1_000_000, 0, 400_000), 1.0));
 check('a cached count larger than the prompt cannot make it negative', $cachedPrice->of(10, 0, 999) >= 0.0);
 
@@ -49,9 +53,11 @@ check('nothing is shown before the first request', $meter->statusLabel() === nul
 
 $meter->record(['prompt' => 1200, 'completion' => 300]);
 $meter->record(['prompt' => 1500, 'completion' => 200, 'cached' => 1000]);
-check('requests and tokens add up',
+check(
+    'requests and tokens add up',
     $meter->requests() === 2 && $meter->prompt() === 2700 && $meter->completion() === 500 && $meter->total() === 3200,
-    json_encode([$meter->requests(), $meter->prompt(), $meter->completion()]));
+    json_encode([$meter->requests(), $meter->prompt(), $meter->completion()]),
+);
 check('cache hits are kept apart', $meter->cached() === 1000);
 check('with no price, no cost is claimed', $meter->cost() === null && $meter->costLabel() === null);
 check('the status bar shows the tokens alone', $meter->statusLabel() === '3.2k tokens', (string) $meter->statusLabel());
@@ -62,8 +68,11 @@ $meter->usePrice(new Price(input: 1.0, output: 4.0));
 $meter->record(['prompt' => 1_000_000, 'completion' => 0]);
 check('priced requests are costed', near($meter->cost() ?? 0.0, 1.0), (string) $meter->cost());
 check('and the earlier ones are counted as unpriced rather than guessed', $meter->unpriced() === 2);
-check('the summary says so',
-    str_contains($meter->summary(), '2 unpriced left out') && str_contains($meter->summary(), '3 requests'), $meter->summary());
+check(
+    'the summary says so',
+    str_contains($meter->summary(), '2 unpriced left out') && str_contains($meter->summary(), '3 requests'),
+    $meter->summary(),
+);
 
 $priced = new UsageMeter();
 $priced->usePrice(new Price(input: 0.5, output: 1.5, currency: '€'));
@@ -80,6 +89,7 @@ check('past it, the user is told', $capped->shouldWarn());
 check('once', !$capped->shouldWarn());
 
 $refused = null;
+
 try {
     $capped->assertRoom();
 } catch (TokenCapReached $e) {
@@ -88,6 +98,7 @@ try {
 check('below the cap a request goes through', $refused === null);
 
 $capped->record(['prompt' => 2_000, 'completion' => 0]);
+
 try {
     $capped->assertRoom();
 } catch (TokenCapReached $e) {
@@ -137,13 +148,17 @@ $switch = new SwitchablePlatform($ollama, $api, $sessionMeter);
 $switch->switchTo(Backend::Api);
 
 $switch->stream([]);
-check('a request through the switch is counted', $sessionMeter->requests() === 1 && $sessionMeter->total() === 1000,
-    json_encode([$sessionMeter->requests(), $sessionMeter->total()]));
+check(
+    'a request through the switch is counted',
+    $sessionMeter->requests() === 1 && $sessionMeter->total() === 1000,
+    json_encode([$sessionMeter->requests(), $sessionMeter->total()]),
+);
 check('with its cache hits, read from the provider', $sessionMeter->cached() === 600, (string) $sessionMeter->cached());
 
 $switch->stream([]);
 $switch->stream([]);
 $blocked = null;
+
 try {
     $switch->stream([]);
 } catch (TokenCapReached $e) {
@@ -155,8 +170,11 @@ check('before anything is sent — nothing billed, nothing half-done', $sent ===
 // Zero cached tokens is not news, and not a new key in every usage array.
 $plain = new OpenAiCompatiblePlatform(new MockHttpClient($sse(10, 2)), 'https://api.example.com/v1', 'm');
 $plain->stream([]);
-check('a usage with nothing cached keeps its two-key shape', $plain->lastUsage() === ['prompt' => 10, 'completion' => 2],
-    json_encode($plain->lastUsage()));
+check(
+    'a usage with nothing cached keeps its two-key shape',
+    $plain->lastUsage() === ['prompt' => 10, 'completion' => 2],
+    json_encode($plain->lastUsage()),
+);
 
 // ---- prices are declared per model, by the user ----------------------------
 $dir = sys_get_temp_dir() . '/sherpa-usage-' . bin2hex(random_bytes(4));
@@ -174,12 +192,16 @@ $config = new MachineConfig();
 $config->setPath($dir . '/config.yaml');
 
 $declared = $config->price('fournisseur/modele');
-check('a declared price is read',
+check(
+    'a declared price is read',
     $declared !== null && near($declared->input, 0.15) && near($declared->output, 0.6)
-    && near($declared->cachedInput ?? 0.0, 0.03) && $declared->currency === '€');
+    && near($declared->cachedInput ?? 0.0, 0.03) && $declared->currency === '€',
+);
 check('a model with no price has none', $config->price('autre') === null);
-check('half a price is no price: a wrong number shown with confidence is worse',
-    $config->price('a-moitie') === null);
+check(
+    'half a price is no price: a wrong number shown with confidence is worse',
+    $config->price('a-moitie') === null,
+);
 
 exec('rm -rf ' . escapeshellarg($dir));
 

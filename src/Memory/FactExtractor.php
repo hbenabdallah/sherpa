@@ -8,6 +8,7 @@ use App\Agent\PlanMode;
 use App\Agent\Tool\Provenance;
 use App\Platform\PlatformInterface;
 use App\Runtime\Interrupt;
+use Throwable;
 
 /**
  * Reads a finished conversation and keeps what is worth knowing next time: a
@@ -31,6 +32,7 @@ class FactExtractor
      * the floor of a share.
      */
     private const MIN_TRANSCRIPT_CHARS = 24000;
+
     private const MAX_TRANSCRIPT_CHARS = 120000;
 
     /** Share of the prompt window the transcript may occupy. */
@@ -38,7 +40,9 @@ class FactExtractor
 
     /** A fact is a note to self, not a document. */
     private const MAX_KEY_CHARS = 80;
+
     private const MAX_VALUE_CHARS = 400;
+
     private const MAX_FACTS = 12;
 
     public function __construct(
@@ -81,7 +85,7 @@ class FactExtractor
                 ['role' => 'system', 'content' => 'You pull lasting technical facts out of a conversation. You answer with a JSON array and nothing else.'],
                 ['role' => 'user', 'content' => $this->prompt($transcript)],
             ]);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return Extraction::failed($e->getMessage());
         }
 

@@ -9,8 +9,8 @@ use App\Agent\HistoryCompactor;
 use App\Agent\InferenceSpeed;
 use App\Agent\MessageBag;
 use App\Agent\PlanMode;
-use App\Agent\TodoList;
 use App\Agent\SystemPromptBuilder;
+use App\Agent\TodoList;
 use App\Agent\Tool\Permission;
 use App\Agent\Tool\Toolbox;
 use App\Mcp\McpRegistry;
@@ -33,6 +33,8 @@ use App\TUI\Clipboard;
 use App\TUI\LineEditor;
 use App\TUI\Terminal;
 use App\Usage\UsageMeter;
+use DateTimeImmutable;
+use RuntimeException;
 
 /**
  * Everything typed with a slash in front of it.
@@ -155,6 +157,7 @@ final class SlashCommands
     /exit               Leave Sherpa
 
 HELP . Terminal::RESET;
+
                 return true;
 
             case '/memory':
@@ -217,6 +220,7 @@ HELP . Terminal::RESET;
                     echo Terminal::GRAY . "  {$kept} tool output(s) taken out of the context, "
                         . "still readable with context_recall.\n" . Terminal::RESET;
                 }
+
                 return true;
 
             case '/remember':
@@ -234,6 +238,7 @@ HELP . Terminal::RESET;
                         \App\Memory\Recorded::Superseded => "✓ Corrected: {$kv[0]}\n",
                     } . Terminal::RESET;
                 }
+
                 return true;
 
             case '/forget':
@@ -244,18 +249,22 @@ HELP . Terminal::RESET;
                 } else {
                     echo Terminal::RED . "No such key: {$args}\n" . Terminal::RESET;
                 }
+
                 return true;
 
             case '/model':
                 $this->model->handleModel(trim($args), $bag, $project);
+
                 return true;
 
             case '/backend':
                 $this->model->handleBackend(trim($args), $bag, $project);
+
                 return true;
 
             case '/provider':
                 $this->model->handleProvider(trim($args), $bag, $project);
+
                 return true;
 
             case '/skills':
@@ -268,15 +277,18 @@ HELP . Terminal::RESET;
                         echo Terminal::YELLOW . "  • {$skill->name}: " . Terminal::RESET . $skill->description . "\n";
                     }
                 }
+
                 return true;
 
             case '/permissions':
                 $this->handlePermissions($args);
+
                 return true;
 
             case '/mcp':
                 ($this->mcpCommands ?? new McpCommands($this->mcp, $this->toolbox, $this->promptBuilder, $this->chat, new LineEditor()))
                     ->handle($args, $bag, $project);
+
                 return true;
 
             case '/plan':
@@ -294,10 +306,12 @@ HELP . Terminal::RESET;
                     $this->planMode->off();
                     echo Terminal::GREEN . '✓ Plan mode off.' . Terminal::RESET . Terminal::GRAY . " The model can change things again, asking as usual.\n" . Terminal::RESET;
                 }
+
                 return true;
 
             case '/jobs':
                 $this->showJobs($args);
+
                 return true;
 
             case '/todo':
@@ -306,10 +320,12 @@ HELP . Terminal::RESET;
                 } else {
                     $this->chat->showPlan('Plan (' . $this->todos->progress() . "):\n" . $this->todos->asText());
                 }
+
                 return true;
 
             case '/copy':
                 $this->copyLastReply($bag);
+
                 return true;
 
             case '/tools':
@@ -329,6 +345,7 @@ HELP . Terminal::RESET;
                         Terminal::GRAY . mb_substr($def->description, 0, 60) . Terminal::RESET,
                     );
                 }
+
                 return true;
 
             case '/context':
@@ -399,6 +416,7 @@ HELP . Terminal::RESET;
                 }
 
                 $this->showConsumption();
+
                 return true;
 
             case '/reset':
@@ -414,18 +432,22 @@ HELP . Terminal::RESET;
                 $this->sessions->startNew();
                 echo Terminal::GREEN . "✓ History cleared." . Terminal::RESET
                     . Terminal::GRAY . " The previous conversation is still resumable with /resume.\n" . Terminal::RESET;
+
                 return true;
 
             case '/docs':
                 $this->docs(trim($args));
+
                 return true;
 
             case '/sessions':
                 $this->listSessions();
+
                 return true;
 
             case '/resume':
                 $this->resume(trim($args), $bag, $project);
+
                 return true;
 
             case '/project':
@@ -456,6 +478,7 @@ HELP . Terminal::RESET;
                     echo Terminal::GRAY . "  Not saved yet: it will be, at your first message.\n" . Terminal::RESET;
                 }
                 echo Terminal::GRAY . "  /project edit to change its name or Docker · /project forget to drop it\n" . Terminal::RESET;
+
                 return true;
 
             case '/compact':
@@ -476,11 +499,13 @@ HELP . Terminal::RESET;
                         Terminal::RESET,
                     );
                 }
+
                 return true;
         }
 
         return false;
     }
+
     /**
      * List and withdraw the standing per-project grants: one that takes editing
      * YAML to undo is one that never gets undone.
@@ -545,6 +570,7 @@ HELP . Terminal::RESET;
             echo Terminal::GRAY . "\n  /permissions revoke <tool|command> · /permissions clear\n" . Terminal::RESET;
         }
     }
+
     /** What this session used and cost — the compactor's requests included. */
     private function showConsumption(): void
     {
@@ -572,6 +598,7 @@ HELP . Terminal::RESET;
             ? sprintf('%s tokens (%d %% used)', UsageMeter::number($cap), (int) round($this->usage->total() / $cap * 100))
             : 'none (SHERPA_MAX_SESSION_TOKENS)');
     }
+
     /**
      * /docs: what the documentation index holds; /docs reindex to read it all
      * again; /docs <question> to see exactly what the model would be given —
@@ -668,7 +695,7 @@ HELP . Terminal::RESET;
         if (preg_match('/^stop\s+(\d+)$/', trim($args), $m) === 1) {
             try {
                 $this->chat->showInfo(ucfirst($this->jobs->stop((int) $m[1])));
-            } catch (\RuntimeException $e) {
+            } catch (RuntimeException $e) {
                 $this->chat->showError($e->getMessage());
             }
 
@@ -888,7 +915,7 @@ HELP . Terminal::RESET;
     {
         return "\n\n# Resumed conversation\n"
             . 'This conversation was started on ' . $session->startedAt->format('Y-m-d H:i')
-            . ' and resumed on ' . (new \DateTimeImmutable())->format('Y-m-d H:i') . ".\n"
+            . ' and resumed on ' . (new DateTimeImmutable())->format('Y-m-d H:i') . ".\n"
             . "The project's files may have changed since: read a file again before relying on\n"
             . "what you read of it, and always before changing it.";
     }

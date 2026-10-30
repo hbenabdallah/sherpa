@@ -1,4 +1,5 @@
 <?php
+
 // Verification that the DI graph gives the overlay the SAME tool instances the
 // command configures. ConfirmOverlay previews resolve paths via the tools, so if
 // these were separate instances the overlay would render against an unset
@@ -110,10 +111,14 @@ check('and the compactor fills that very one', $compactorStore === $commandStore
 
 // Same class of failure, one layer down: these are optional constructor
 // arguments, so a wiring miss is a silent null rather than a boot error.
-check('the compactor was handed the measured speed',
-    (new ReflectionProperty(App\Agent\HistoryCompactor::class, 'speed'))->getValue($compactor) !== null);
-check('and the interrupt, so Ctrl+C reaches a summarisation',
-    (new ReflectionProperty(App\Agent\HistoryCompactor::class, 'interrupt'))->getValue($compactor) !== null);
+check(
+    'the compactor was handed the measured speed',
+    (new ReflectionProperty(App\Agent\HistoryCompactor::class, 'speed'))->getValue($compactor) !== null,
+);
+check(
+    'and the interrupt, so Ctrl+C reaches a summarisation',
+    (new ReflectionProperty(App\Agent\HistoryCompactor::class, 'interrupt'))->getValue($compactor) !== null,
+);
 
 // ---- one number, two consumers ---------------------------------------------
 // The reply cap the backend enforces and the room ContextBudget withholds for
@@ -130,13 +135,18 @@ $reserved = (new ReflectionProperty(App\Agent\ContextBudget::class, 'reservedFor
 // reservation for whichever of them is in force.
 foreach (['Ollama' => $ollama, 'API' => $api] as $label => $backend) {
     $capped = (new ReflectionProperty($backend::class, 'maxTokens'))->getValue($backend);
-    check("the {$label} reply cap and the budget reservation are the same number",
-        $capped === $reserved, "cap {$capped} vs reserve {$reserved}");
+    check(
+        "the {$label} reply cap and the budget reservation are the same number",
+        $capped === $reserved,
+        "cap {$capped} vs reserve {$reserved}",
+    );
 }
 
 // On unless said otherwise: it is how project memory fills up.
-check('the command extracts facts at the end of a session by default',
-    (new ReflectionProperty($command::class, 'extractFacts'))->getValue($command) === true);
+check(
+    'the command extracts facts at the end of a session by default',
+    (new ReflectionProperty($command::class, 'extractFacts'))->getValue($command) === true,
+);
 
 // Resolved when the command is built, so a fresh container sees the change.
 putenv('SHERPA_FACT_EXTRACTION=off');
@@ -147,26 +157,34 @@ $quietCommand = $quiet->getContainer()->get('console.command_loader')->get('sher
 if ($quietCommand instanceof Symfony\Component\Console\Command\LazyCommand) {
     $quietCommand = $quietCommand->getCommand();
 }
-check('and SHERPA_FACT_EXTRACTION=off turns it off',
-    (new ReflectionProperty($quietCommand::class, 'extractFacts'))->getValue($quietCommand) === false);
+check(
+    'and SHERPA_FACT_EXTRACTION=off turns it off',
+    (new ReflectionProperty($quietCommand::class, 'extractFacts'))->getValue($quietCommand) === false,
+);
 putenv('SHERPA_FACT_EXTRACTION');
 unset($_SERVER['SHERPA_FACT_EXTRACTION'], $_ENV['SHERPA_FACT_EXTRACTION']);
 
 // The meter the command shows must be the one the switch feeds: two
 // instances would display a session that never made a request.
-check('the command shows the usage the platform records',
+check(
+    'the command shows the usage the platform records',
     (new ReflectionProperty(App\Platform\SwitchablePlatform::class, 'meter'))->getValue($platform)
-        === (new ReflectionProperty($command::class, 'usage'))->getValue($command));
+        === (new ReflectionProperty($command::class, 'usage'))->getValue($command),
+);
 
 // The same silent failure the Ollama wiring guards against: a nullable
 // interrupt left null makes Ctrl+C inert during a request.
-check('the API backend can be interrupted too',
-    (new ReflectionProperty(App\Platform\OpenAiCompatiblePlatform::class, 'interrupt'))->getValue($api) !== null);
+check(
+    'the API backend can be interrupted too',
+    (new ReflectionProperty(App\Platform\OpenAiCompatiblePlatform::class, 'interrupt'))->getValue($api) !== null,
+);
 
 // Same class of silent failure as the stores above: optional arguments.
-check('the grep tool can count its own hits and misses',
+check(
+    'the grep tool can count its own hits and misses',
     (new ReflectionProperty(App\Tool\ProjectGrepTool::class, 'store'))
-        ->getValue($container->get(App\Tool\ProjectGrepTool::class)) !== null);
+        ->getValue($container->get(App\Tool\ProjectGrepTool::class)) !== null,
+);
 
 $loop = (new ReflectionProperty($command::class, 'agentLoop'))->getValue($command);
 $trace = (new ReflectionProperty(App\Agent\AgentLoop::class, 'trace'))->getValue($loop);
@@ -175,10 +193,14 @@ check('and the trace can record it', $trace !== null
     && (new ReflectionProperty(App\Agent\SearchTrace::class, 'store'))->getValue($trace) !== null);
 
 $builder = (new ReflectionProperty($command::class, 'promptBuilder'))->getValue($command);
-check('the prompt builder can see what has been worked on lately',
-    (new ReflectionProperty(App\Agent\SystemPromptBuilder::class, 'activity'))->getValue($builder) !== null);
-check('and how the project runs its tests',
-    (new ReflectionProperty(App\Agent\SystemPromptBuilder::class, 'tests'))->getValue($builder) !== null);
+check(
+    'the prompt builder can see what has been worked on lately',
+    (new ReflectionProperty(App\Agent\SystemPromptBuilder::class, 'activity'))->getValue($builder) !== null,
+);
+check(
+    'and how the project runs its tests',
+    (new ReflectionProperty(App\Agent\SystemPromptBuilder::class, 'tests'))->getValue($builder) !== null,
+);
 
 // The command binds the project onto ProjectPermissions; the broker is what
 // reads it back. Two instances and every standing grant silently evaporates —
@@ -244,20 +266,24 @@ if ($compiled !== []) {
     $again->boot();
     check('and a fresh one is compiled in its place', is_dir($prodCache));
 
-// The checkout is /app inside Docker and its real path on the host, and both
-// write to one var/cache. A container compiled on one side is full of paths
-// the other cannot open, so the two must not share a directory.
-$elsewhere = new class('prod', false) extends Kernel {
-    public function getProjectDir(): string
-    {
-        return '/un/autre/chemin/vers/sherpa';
-    }
-};
-check('the same checkout seen from another path compiles its own container',
-    $elsewhere->getCacheDir() !== $prodCache && str_contains($elsewhere->getCacheDir(), '/var/cache/prod-'),
-    $elsewhere->getCacheDir());
-    check('which still builds the command',
-        $again->getContainer()->get('console.command_loader')->get('sherpa') !== null);
+    // The checkout is /app inside Docker and its real path on the host, and both
+    // write to one var/cache. A container compiled on one side is full of paths
+    // the other cannot open, so the two must not share a directory.
+    $elsewhere = new class ('prod', false) extends Kernel {
+        public function getProjectDir(): string
+        {
+            return '/un/autre/chemin/vers/sherpa';
+        }
+    };
+    check(
+        'the same checkout seen from another path compiles its own container',
+        $elsewhere->getCacheDir() !== $prodCache && str_contains($elsewhere->getCacheDir(), '/var/cache/prod-'),
+        $elsewhere->getCacheDir(),
+    );
+    check(
+        'which still builds the command',
+        $again->getContainer()->get('console.command_loader')->get('sherpa') !== null,
+    );
 
     touch(dirname(__DIR__) . '/src/Kernel.php');
 }

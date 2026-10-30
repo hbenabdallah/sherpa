@@ -3,7 +3,10 @@
 namespace App\Platform;
 
 use App\Runtime\Interrupt;
+use RuntimeException;
+use stdClass;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Throwable;
 
 class OllamaPlatform implements PlatformInterface, EmbeddingBackend
 {
@@ -122,7 +125,7 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
 
             foreach ($message['tool_calls'] ?? [] as $j => $call) {
                 if (($call['function']['arguments'] ?? null) === []) {
-                    $messages[$i]['tool_calls'][$j]['function']['arguments'] = new \stdClass();
+                    $messages[$i]['tool_calls'][$j]['function']['arguments'] = new stdClass();
                 }
             }
         }
@@ -361,7 +364,7 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
             }
 
             $data = $response->toArray(throw: false);
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return null;
         }
 
@@ -456,8 +459,8 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
                 ]);
                 $status = $response->getStatusCode();
                 $body = $response->getContent(throw: false);
-            } catch (\Throwable $e) {
-                throw new \RuntimeException("Embeddings: Ollama unreachable ({$e->getMessage()}).", previous: $e);
+            } catch (Throwable $e) {
+                throw new RuntimeException("Embeddings: Ollama unreachable ({$e->getMessage()}).", previous: $e);
             }
 
             if ($status === 404) {
@@ -466,7 +469,7 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
 
             $rows = json_decode($body, true)['embeddings'] ?? null;
             if ($status >= 400 || !is_array($rows) || count($rows) !== count($batch)) {
-                throw new \RuntimeException("Embeddings: unexpected answer from Ollama for \"{$model}\" (HTTP {$status}).");
+                throw new RuntimeException("Embeddings: unexpected answer from Ollama for \"{$model}\" (HTTP {$status}).");
             }
 
             foreach ($rows as $row) {
@@ -492,8 +495,9 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
     {
         try {
             $response = $this->client->request('GET', $this->baseUrl . '/api/tags', ['timeout' => self::PROBE_TIMEOUT]);
+
             return $response->getStatusCode() === 200;
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return false;
         }
     }
@@ -510,7 +514,7 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
         try {
             $response = $this->client->request('GET', $this->baseUrl . '/api/tags', ['timeout' => self::PROBE_TIMEOUT]);
             $data = $response->toArray();
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return [];
         }
 
@@ -566,7 +570,7 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
             }
 
             $data = $response->toArray(throw: false);
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return null;
         }
 

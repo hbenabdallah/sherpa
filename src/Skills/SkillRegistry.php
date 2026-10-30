@@ -8,7 +8,9 @@ class SkillRegistry
     private array $skills = [];
 
     private string $globalDir;
+
     private ?string $projectDir = null;
+
     private ?string $projectRoot = null;
 
     public function __construct()
@@ -73,8 +75,10 @@ class SkillRegistry
             if ($line === '' || str_starts_with($line, '#')) {
                 continue;
             }
+
             return $line;
         }
+
         return '';
     }
 
@@ -88,6 +92,7 @@ class SkillRegistry
         foreach ($this->skills as $name => $skill) {
             $lines[] = "- {$name} : {$skill->description}";
         }
+
         return implode("\n", $lines);
     }
 

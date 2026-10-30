@@ -21,6 +21,7 @@ final class InferenceSpeed
 
     /** Tokens per second, prompt-evaluation (prefill) and generation (decode). */
     private ?float $prefill = null;
+
     private ?float $decode = null;
 
     private int $samples = 0;

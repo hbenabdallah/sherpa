@@ -1,4 +1,5 @@
 <?php
+
 // Conversations kept on disk: what is written, where, when, and what comes
 // back. Until these existed, closing the terminal was the end of a session —
 // every question asked, every file read, every half-finished change.
@@ -41,8 +42,10 @@ $system = ['role' => 'system', 'content' => 'SYSTEM PROMPT'];
 $files = fn() => glob($store->directory() . '/*.json') ?: [];
 
 // ---- nothing to keep, nothing written --------------------------------------
-check('a conversation nobody spoke in is not saved',
-    $store->save([$system], [], 'api', 'm') === false && $files() === []);
+check(
+    'a conversation nobody spoke in is not saved',
+    $store->save([$system], [], 'api', 'm') === false && $files() === [],
+);
 
 // ---- the first save --------------------------------------------------------
 $conversation = [
@@ -56,21 +59,33 @@ $conversation = [
 ];
 
 check('a conversation is saved', $store->save($conversation, [], 'api', 'fournisseur/modele'));
-check('as one file, in the project\'s own directory',
+check(
+    'as one file, in the project\'s own directory',
     count($files()) === 1 && str_contains($files()[0], '/projects/' . $project->slug . '/sessions/'),
-    implode(', ', $files()));
-check('readable by its owner only — it holds the code it read',
-    (fileperms($files()[0]) & 0777) === 0600, sprintf('%o', fileperms($files()[0]) & 0777));
+    implode(', ', $files()),
+);
+check(
+    'readable by its owner only — it holds the code it read',
+    (fileperms($files()[0]) & 0777) === 0600,
+    sprintf('%o', fileperms($files()[0]) & 0777),
+);
 
 $saved = $store->all()[0] ?? null;
-check('the system message is left out: it is rebuilt, never lost',
-    $saved !== null && !in_array('system', array_column($saved->messages, 'role'), true));
-check('everything else comes back as it was, tool calls and their ids included',
+check(
+    'the system message is left out: it is rebuilt, never lost',
+    $saved !== null && !in_array('system', array_column($saved->messages, 'role'), true),
+);
+check(
+    'everything else comes back as it was, tool calls and their ids included',
     ($saved?->messages[1]['tool_calls'][0]['id'] ?? null) === 'call00001'
     && ($saved?->messages[2]['tool_call_id'] ?? null) === 'call00001',
-    json_encode($saved?->messages));
-check('its title is the first question, on one line',
-    $saved?->title === 'Ajoute un index sur la colonne email de User', (string) $saved?->title);
+    json_encode($saved?->messages),
+);
+check(
+    'its title is the first question, on one line',
+    $saved?->title === 'Ajoute un index sur la colonne email de User',
+    (string) $saved?->title,
+);
 check('and it records the model it was held with', $saved?->model === 'fournisseur/modele');
 
 // ---- after every turn, the same file ---------------------------------------
@@ -79,17 +94,24 @@ $conversation[] = ['role' => 'user', 'content' => 'Et un test ?'];
 sleep(1);
 $store->save($conversation, [], 'api', 'fournisseur/modele');
 
-check('the next turn is written into the same conversation, not a new one',
-    count($files()) === 1 && $store->currentId() === $firstId);
-check('and its last activity moves forward',
-    ($store->all()[0]->updatedAt ?? null) > $saved?->updatedAt);
+check(
+    'the next turn is written into the same conversation, not a new one',
+    count($files()) === 1 && $store->currentId() === $firstId,
+);
+check(
+    'and its last activity moves forward',
+    ($store->all()[0]->updatedAt ?? null) > $saved?->updatedAt,
+);
 
 // Compacting the history folds the first question into a summary, and the
 // first user message left is a later one. The list keeps the first name.
 $store->save([$system, ['role' => 'assistant', 'content' => "[Summary of the earlier turns]\nan index was added"],
     ['role' => 'user', 'content' => 'Et un test ?']], [], 'api', 'fournisseur/modele');
-check('a compacted conversation keeps the name it was listed under',
-    ($store->all()[0]->title ?? '') === 'Ajoute un index sur la colonne email de User', (string) ($store->all()[0]->title ?? ''));
+check(
+    'a compacted conversation keeps the name it was listed under',
+    ($store->all()[0]->title ?? '') === 'Ajoute un index sur la colonne email de User',
+    (string) ($store->all()[0]->title ?? ''),
+);
 
 // ---- a new conversation ----------------------------------------------------
 $store->startNew();
@@ -97,25 +119,38 @@ check('starting over writes nothing by itself', count($files()) === 1);
 
 $store->save([$system, ['role' => 'user', 'content' => 'Where is VAT calculated?']], [], 'api', 'm');
 check('the next save is a second conversation, beside the first', count($files()) === 2);
-check('the most recently active comes first',
-    ($store->all()[0]->title ?? '') === 'Where is VAT calculated?', json_encode(array_map(fn($s) => $s->title, $store->all())));
-check('and "the previous one" is never the one already open',
-    $store->latest()?->id === $firstId, (string) $store->latest()?->id);
+check(
+    'the most recently active comes first',
+    ($store->all()[0]->title ?? '') === 'Where is VAT calculated?',
+    json_encode(array_map(fn($s) => $s->title, $store->all())),
+);
+check(
+    'and "the previous one" is never the one already open',
+    $store->latest()?->id === $firstId,
+    (string) $store->latest()?->id,
+);
 
 // ---- what comes back, and what does not -----------------------------------
 check('a session loads by its id', $store->load($firstId)?->id === $firstId);
-check('an id shaped like a path is refused before it gets near one',
-    $store->load('../../projects') === null && $store->load('20260101-000000-abcd/../../x') === null);
+check(
+    'an id shaped like a path is refused before it gets near one',
+    $store->load('../../projects') === null && $store->load('20260101-000000-abcd/../../x') === null,
+);
 
 file_put_contents($store->directory() . '/20260101-000000-dead.json', '{ truncated');
-check('a damaged file is skipped, and costs no other session',
-    count($store->all()) === 2, (string) count($store->all()));
+check(
+    'a damaged file is skipped, and costs no other session',
+    count($store->all()) === 2,
+    (string) count($store->all()),
+);
 unlink($store->directory() . '/20260101-000000-dead.json');
 
 // The id inside a file names what pruning removes: one that is not the file's
 // own name is not a session of this store.
-file_put_contents($store->directory() . '/20260101-000000-beef.json',
-    json_encode(['id' => '../victime', 'messages' => [['role' => 'user', 'content' => 'x']]]));
+file_put_contents(
+    $store->directory() . '/20260101-000000-beef.json',
+    json_encode(['id' => '../victime', 'messages' => [['role' => 'user', 'content' => 'x']]]),
+);
 check('a file whose id is not its own name is skipped', $store->load('20260101-000000-beef') === null && count($store->all()) === 2, (string) count($store->all()));
 unlink($store->directory() . '/20260101-000000-beef.json');
 
@@ -124,10 +159,15 @@ for ($i = 0; $i < SessionStore::KEEP + 3; $i++) {
     $store->startNew();
     $store->save([$system, ['role' => 'user', 'content' => "question {$i}"]], [], 'api', 'm');
 }
-check('a project keeps its ' . SessionStore::KEEP . ' most recent conversations',
-    count($files()) === SessionStore::KEEP, (string) count($files()));
-check('and the one being written is never among those removed',
-    $store->load((string) $store->currentId()) !== null);
+check(
+    'a project keeps its ' . SessionStore::KEEP . ' most recent conversations',
+    count($files()) === SessionStore::KEEP,
+    (string) count($files()),
+);
+check(
+    'and the one being written is never among those removed',
+    $store->load((string) $store->currentId()) !== null,
+);
 
 // ---- a conversation started in plan mode -----------------------------------
 // The request reaches the model behind plan mode's reminder, and the reminder
@@ -137,11 +177,17 @@ $planned->on();
 $store->startNew();
 $store->save([$system, ['role' => 'user', 'content' => $planned->frame('Migrer les factures vers Stripe')]], [], 'api', 'm');
 $plannedSession = $store->load((string) $store->currentId());
-check('a conversation started in plan mode is titled by its request, not the reminder',
-    $plannedSession?->title === 'Migrer les factures vers Stripe', (string) $plannedSession?->title);
+check(
+    'a conversation started in plan mode is titled by its request, not the reminder',
+    $plannedSession?->title === 'Migrer les factures vers Stripe',
+    (string) $plannedSession?->title,
+);
 check('and its last question reads as asked', $plannedSession?->lastQuestion() === 'Migrer les factures vers Stripe', (string) $plannedSession?->lastQuestion());
-check('while the model, on resume, still gets what it was sent',
-    str_starts_with((string) ($plannedSession?->messages[0]['content'] ?? ''), '[Plan mode'), (string) ($plannedSession?->messages[0]['content'] ?? ''));
+check(
+    'while the model, on resume, still gets what it was sent',
+    str_starts_with((string) ($plannedSession?->messages[0]['content'] ?? ''), '[Plan mode'),
+    (string) ($plannedSession?->messages[0]['content'] ?? ''),
+);
 
 // ---- two terminals on one conversation -------------------------------------
 // Both resumed it and both wrote its file after every turn: whichever wrote
@@ -161,12 +207,17 @@ $second->save([...$shared, ['role' => 'user', 'content' => 'dit dans le second t
 usleep(10_000);
 $first->save([...$shared, ['role' => 'user', 'content' => 'dit dans le premier']], [], 'api', 'm');
 $kept = $first->load($sharedId);
-check('a conversation written meanwhile by another terminal is not overwritten',
-    str_contains(json_encode($kept?->messages, JSON_UNESCAPED_UNICODE), 'dit dans le second terminal'), json_encode($kept?->messages, JSON_UNESCAPED_UNICODE));
-check('this terminal carries on in a file of its own, under the same title',
+check(
+    'a conversation written meanwhile by another terminal is not overwritten',
+    str_contains(json_encode($kept?->messages, JSON_UNESCAPED_UNICODE), 'dit dans le second terminal'),
+    json_encode($kept?->messages, JSON_UNESCAPED_UNICODE),
+);
+check(
+    'this terminal carries on in a file of its own, under the same title',
     $first->currentId() !== $sharedId && $first->load((string) $first->currentId())?->title === 'Conversation partagée'
     && str_contains(json_encode($first->load((string) $first->currentId())?->messages, JSON_UNESCAPED_UNICODE), 'dit dans le premier'),
-    (string) $first->currentId());
+    (string) $first->currentId(),
+);
 $before = $first->currentId();
 $first->save([...$shared, ['role' => 'user', 'content' => 'dit dans le premier'], ['role' => 'user', 'content' => 'encore']], [], 'api', 'm');
 check('and keeps writing there afterwards', $first->currentId() === $before);
@@ -187,11 +238,17 @@ $restored->import($exported);
 
 // The stubs in a resumed history say context_recall(id: N). Renumbered, the
 // model would be handed somebody else's excerpt for the one it asked for.
-check('restored excerpts keep their ids, so the stubs still point at them',
-    str_contains((string) $restored->get($b, 2000), 'vatFor'), (string) $restored->get($b, 2000));
+check(
+    'restored excerpts keep their ids, so the stubs still point at them',
+    str_contains((string) $restored->get($b, 2000), 'vatFor'),
+    (string) $restored->get($b, 2000),
+);
 check('and whatever the store held before is gone', $restored->count() === 2, (string) $restored->count());
-check('they are searchable again, not merely present',
-    str_contains($restored->search('Invoice', 2000), 'subtotal'), $restored->search('Invoice', 2000));
+check(
+    'they are searchable again, not merely present',
+    str_contains($restored->search('Invoice', 2000), 'subtotal'),
+    $restored->search('Invoice', 2000),
+);
 
 $next = $restored->keep('file_read', 'nouvel extrait');
 check('a new excerpt after a resume takes an id no stub already uses', $next > $b, "{$next} vs {$b}");

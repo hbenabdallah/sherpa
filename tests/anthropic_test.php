@@ -1,4 +1,5 @@
 <?php
+
 // Anthropic's Messages API, spoken natively: the request shape, the event
 // stream, prompt caching and thinking blocks. Nothing reaches a network.
 
@@ -112,34 +113,52 @@ $history = [
     ['role' => 'system', 'content' => 'You are Sherpa.'],
     ['role' => 'user', 'content' => 'What does the README say?'],
 ];
-$message = $platform->stream($history, $tools, function (string $t) use (&$tokens) { $tokens[] = $t; }, function (bool $r) use (&$waited) { $waited[] = $r; });
+$message = $platform->stream($history, $tools, function (string $t) use (&$tokens) {
+    $tokens[] = $t;
+}, function (bool $r) use (&$waited) {
+    $waited[] = $r;
+});
 
 $request = $sent[0];
 check('the request goes to /v1/messages', $request['url'] === 'https://api.anthropic.com/v1/messages', $request['url']);
-check('with the key as x-api-key and the API version',
+check(
+    'with the key as x-api-key and the API version',
     ($request['headers']['x-api-key'] ?? '') === 'sk-ant-test' && ($request['headers']['anthropic-version'] ?? '') === '2023-06-01',
-    json_encode($request['headers']));
+    json_encode($request['headers']),
+);
 check('and no bearer token', !isset($request['headers']['authorization']), json_encode($request['headers']));
 check('no temperature: current models refuse sampling parameters', !array_key_exists('temperature', $request['body']), json_encode($request['body']));
 check('room for thinking in max_tokens', ($request['body']['max_tokens'] ?? 0) >= 16000, (string) ($request['body']['max_tokens'] ?? ''));
-check('the system prompt is its own field, marked for the cache',
+check(
+    'the system prompt is its own field, marked for the cache',
     ($request['body']['system'][0]['text'] ?? '') === 'You are Sherpa.' && ($request['body']['system'][0]['cache_control']['type'] ?? '') === 'ephemeral',
-    json_encode($request['body']['system'] ?? null));
+    json_encode($request['body']['system'] ?? null),
+);
 check('and a moving breakpoint caches the conversation', ($request['body']['cache_control']['type'] ?? '') === 'ephemeral');
-check('the first message is the user\'s', ($request['body']['messages'][0]['role'] ?? '') === 'user' && count($request['body']['messages']) === 1,
-    json_encode($request['body']['messages']));
+check(
+    'the first message is the user\'s',
+    ($request['body']['messages'][0]['role'] ?? '') === 'user' && count($request['body']['messages']) === 1,
+    json_encode($request['body']['messages']),
+);
 check('tools carry an input_schema', ($request['body']['tools'][0]['input_schema']['required'] ?? null) === ['path'], json_encode($request['body']['tools'][0] ?? null));
-check('and a tool without parameters an empty object, not a list',
-    str_contains($request['raw'], '"name":"list_dir","description":"List","input_schema":{"type":"object","properties":{}}'), $request['raw']);
+check(
+    'and a tool without parameters an empty object, not a list',
+    str_contains($request['raw'], '"name":"list_dir","description":"List","input_schema":{"type":"object","properties":{}}'),
+    $request['raw'],
+);
 
 check('text streams as it comes', implode('', $tokens) === 'Reading it.' && count($tokens) > 1, json_encode($tokens));
 check('thinking counts as generation, not silence', in_array(true, $waited, true), json_encode($waited));
-check('the tool call is assembled from its fragments',
+check(
+    'the tool call is assembled from its fragments',
     ($message['tool_calls'][0]['id'] ?? '') === 'toolu_01' && ($message['tool_calls'][0]['function']['arguments'] ?? null) === ['path' => 'README.md'],
-    json_encode($message));
-check('the thinking block is kept, signature and all',
+    json_encode($message),
+);
+check(
+    'the thinking block is kept, signature and all',
     ($message[AnthropicWire::THINKING][0]['signature'] ?? '') === 'SIG-1' && ($message[AnthropicWire::THINKING][0]['thinking'] ?? '') === 'The user wants the README.',
-    json_encode($message));
+    json_encode($message),
+);
 
 $usage = $platform->lastUsage();
 check('the prompt size counts what was cached and written', ($usage['prompt'] ?? 0) === 3420, json_encode($usage));
@@ -156,13 +175,21 @@ $platform2 = anthropic([reply(['thinking' => 'Got it.', 'signature' => 'SIG-2', 
 $platform2->stream($history, $tools, fn() => null);
 $turns = $sent2[0]['body']['messages'];
 
-check('the assistant turn goes back as blocks: thinking, text, tool_use',
-    array_column($turns[1]['content'] ?? [], 'type') === ['thinking', 'text', 'tool_use'], json_encode($turns[1] ?? null));
-check('the thinking block unchanged', ($turns[1]['content'][0] ?? null) === ['type' => 'thinking', 'thinking' => 'The user wants the README.', 'signature' => 'SIG-1'],
-    json_encode($turns[1]['content'][0] ?? null));
-check('the tool result is a block in a user turn, tied to its call',
+check(
+    'the assistant turn goes back as blocks: thinking, text, tool_use',
+    array_column($turns[1]['content'] ?? [], 'type') === ['thinking', 'text', 'tool_use'],
+    json_encode($turns[1] ?? null),
+);
+check(
+    'the thinking block unchanged',
+    ($turns[1]['content'][0] ?? null) === ['type' => 'thinking', 'thinking' => 'The user wants the README.', 'signature' => 'SIG-1'],
+    json_encode($turns[1]['content'][0] ?? null),
+);
+check(
+    'the tool result is a block in a user turn, tied to its call',
     ($turns[2]['role'] ?? '') === 'user' && ($turns[2]['content'][0]['type'] ?? '') === 'tool_result' && ($turns[2]['content'][0]['tool_use_id'] ?? '') === 'toolu_01',
-    json_encode($turns[2] ?? null));
+    json_encode($turns[2] ?? null),
+);
 
 // Several results answer several calls: one user turn, results first.
 $shaped = AnthropicWire::payload('m', [
@@ -176,12 +203,16 @@ $shaped = AnthropicWire::payload('m', [
     ['role' => 'user', 'content' => 'and then?'],
     ['role' => 'system', 'content' => 'Be brief.'],
 ], [], 1000)['messages'];
-check('parallel results share one user turn, with the next message after them',
+check(
+    'parallel results share one user turn, with the next message after them',
     count($shaped) === 3 && array_column($shaped[2]['content'], 'type') === ['tool_result', 'tool_result', 'text', 'text'],
-    json_encode($shaped));
-check('arguments sent as a JSON string are decoded, and none become an object',
+    json_encode($shaped),
+);
+check(
+    'arguments sent as a JSON string are decoded, and none become an object',
     ($shaped[1]['content'][1]['input'] ?? null) === ['k' => 1] && json_encode($shaped[1]['content'][0]['input']) === '{}',
-    json_encode($shaped[1]));
+    json_encode($shaped[1]),
+);
 check('an empty result is still a result', ($shaped[2]['content'][1]['content'] ?? '') === '(no output)');
 check('a later system message is said in a user turn', ($shaped[2]['content'][3]['text'] ?? '') === 'Be brief.', json_encode($shaped[2]));
 
@@ -190,8 +221,11 @@ $summarised = AnthropicWire::payload('m', [
     ['role' => 'assistant', 'content' => "[Summary of the earlier turns]\nwe fixed the bug"],
     ['role' => 'user', 'content' => 'next'],
 ], [], 1000)['messages'];
-check('a history opening on a summary still opens on a user turn',
-    ($summarised[0]['role'] ?? '') === 'user' && ($summarised[1]['role'] ?? '') === 'assistant', json_encode($summarised));
+check(
+    'a history opening on a summary still opens on a user turn',
+    ($summarised[0]['role'] ?? '') === 'user' && ($summarised[1]['role'] ?? '') === 'assistant',
+    json_encode($summarised),
+);
 
 // ---- a rewritten history loses its old thinking ----------------------------
 
@@ -244,12 +278,15 @@ $recovered = $stale->stream([
     ['role' => 'assistant', 'content' => 'hello', AnthropicWire::THINKING => [['type' => 'thinking', 'thinking' => 'x', 'signature' => 'STALE']]],
     ['role' => 'user', 'content' => 'again'],
 ], [], fn() => null);
-check('a stale thinking block is dropped and the request sent again',
+check(
+    'a stale thinking block is dropped and the request sent again',
     count($sent4) === 2 && str_contains(json_encode($sent4[0]['body']), 'STALE') && !str_contains(json_encode($sent4[1]['body']), 'STALE'),
-    json_encode(array_column($sent4, 'body')));
+    json_encode(array_column($sent4, 'body')),
+);
 check('and the reply comes through', $recovered['content'] === 'recovered', json_encode($recovered));
 
 $threw = null;
+
 try {
     anthropic([new MockResponse('{"type":"error","error":{"type":"invalid_request_error","message":"max_tokens: too large"}}', ['http_code' => 400])])
         ->stream([['role' => 'user', 'content' => 'x']]);
@@ -261,6 +298,7 @@ check('any other 400 is reported with Anthropic\'s own message', $threw !== null
 // ---- the stream says otherwise ---------------------------------------------
 
 $threw = null;
+
 try {
     anthropic([new MockResponse([
         ev(['type' => 'message_start', 'message' => ['usage' => ['input_tokens' => 5, 'output_tokens' => 0]]]),
@@ -291,10 +329,14 @@ $listing = anthropic([new MockResponse(json_encode(['data' => [
 $models = $listing->catalogue();
 check('the model list asks for every page at once', str_contains($sent5[0]['url'] ?? '', '/models?limit=1000'), $sent5[0]['url'] ?? '');
 check('and sends the Anthropic headers there too', ($sent5[0]['headers']['x-api-key'] ?? '') === 'sk-ant-test', json_encode($sent5[0]['headers'] ?? []));
-check('each model comes with its context window', ($models[1]->name ?? '') === 'claude-sonnet-5' && ($models[1]->contextLength ?? 0) === 1000000,
-    json_encode(array_map(fn($m) => [$m->name, $m->contextLength], $models)));
+check(
+    'each model comes with its context window',
+    ($models[1]->name ?? '') === 'claude-sonnet-5' && ($models[1]->contextLength ?? 0) === 1000000,
+    json_encode(array_map(fn($m) => [$m->name, $m->contextLength], $models)),
+);
 
 $threw = false;
+
 try {
     anthropic([])->embed(['word'], 'any');
 } catch (UnknownEmbeddingModel) {

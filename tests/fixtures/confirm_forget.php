@@ -1,4 +1,5 @@
 <?php
+
 // Answers ProjectQuestions::confirmForget() from stdin and prints the verdict,
 // so the one question before an irreversible delete can be tested without a
 // terminal. Usage: php confirm_forget.php
@@ -13,9 +14,14 @@ use App\Project\StackDetector;
 use App\TUI\LineEditor;
 
 $project = new Project(
-    slug: 'essai', name: 'Essai', path: '/tmp', memoryDb: '/tmp/memory.db',
-    docker: new DockerConfig(enabled: false), stack: '',
-    createdAt: new DateTimeImmutable(), lastUsedAt: new DateTimeImmutable(),
+    slug: 'essai',
+    name: 'Essai',
+    path: '/tmp',
+    memoryDb: '/tmp/memory.db',
+    docker: new DockerConfig(enabled: false),
+    stack: '',
+    createdAt: new DateTimeImmutable(),
+    lastUsedAt: new DateTimeImmutable(),
 );
 
 ob_start();

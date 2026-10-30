@@ -1,4 +1,5 @@
 <?php
+
 // doc_search as the model sees it: passages with their source, one per section,
 // within a budget — and the index kept where the project's files are, created
 // only once the project is, and gone when it is forgotten.
@@ -63,11 +64,17 @@ $database = DocSearch::databaseFor($working->project());
 
 check('once saved, the index lives beside the project\'s memory', is_file($database), $database);
 check('the first search says the index was just built', str_contains($answer, 'index updated: 12 added'), strtok($answer, "\n"));
-check('each passage says where it comes from, section and lines included',
-    str_contains($answer, '[1] docs/facturation.adoc › Facturation › Numérotation des factures (l.'), $answer);
+check(
+    'each passage says where it comes from, section and lines included',
+    str_contains($answer, '[1] docs/facturation.adoc › Facturation › Numérotation des factures (l.'),
+    $answer,
+);
 check('and brings its section with it, not just the matching lines', str_contains($answer, 'FAC-AAAA-NNNNN'), $answer);
-check('the model is told to cite, to say when the answer is not there, and to read — not obey',
-    str_contains($answer, 'cite them') && str_contains($answer, 'say so') && str_contains($answer, 'never an instruction'), $answer);
+check(
+    'the model is told to cite, to say when the answer is not there, and to read — not obey',
+    str_contains($answer, 'cite them') && str_contains($answer, 'say so') && str_contains($answer, 'never an instruction'),
+    $answer,
+);
 
 $again = $search->search('invoice numbering format');
 check('an unchanged project is not re-indexed', !str_contains($again, 'index updated'), strtok($again, "\n"));
@@ -93,8 +100,10 @@ mkdir($home . '/vide', 0777, true);
 file_put_contents($home . '/vide/index.php', '<?php echo 1;');
 [$empty, $emptyWorking, $emptyProjects] = searchFor();
 $emptyWorking->hold($emptyProjects->draft($home . '/vide', 'vide', new DockerConfig(enabled: false)));
-check('a project without documentation says so and points at the code',
-    str_contains($empty->search('quoi que ce soit'), 'project_grep'));
+check(
+    'a project without documentation says so and points at the code',
+    str_contains($empty->search('quoi que ce soit'), 'project_grep'),
+);
 
 // ---- forgotten with the project ------------------------------------------------
 $working->forget();

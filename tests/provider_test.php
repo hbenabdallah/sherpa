@@ -1,4 +1,5 @@
 <?php
+
 // Several API providers on one machine: recorded once, switched between at
 // will. Each names the variable its key is in, and the one thing that must
 // never happen is a provider receiving another one's key.
@@ -40,8 +41,10 @@ function configAt(string $path): MachineConfig
 // ---- names, suggested from the address ---------------------------------------
 check('api.groq.com is "groq"', ProviderName::fromUrl('https://api.groq.com/openai/v1') === 'groq');
 check('api.openai.com is "openai"', ProviderName::fromUrl('https://api.openai.com/v1') === 'openai');
-check('a Google address is named after its domain',
-    ProviderName::fromUrl('https://generativelanguage.googleapis.com/v1beta/openai') === 'googleapis');
+check(
+    'a Google address is named after its domain',
+    ProviderName::fromUrl('https://generativelanguage.googleapis.com/v1beta/openai') === 'googleapis',
+);
 check('a local server is "localhost"', ProviderName::fromUrl('http://localhost:8000/v1') === 'localhost');
 check('no address is "default"', ProviderName::fromUrl(null) === 'default');
 check('a typed name is lowered', ProviderName::normalize(' Groq ') === 'groq');
@@ -52,27 +55,39 @@ check('the key variable follows the name', ProviderName::keyVariable('my-groq') 
 file_put_contents($dir . '/flat.yaml', "backend: api\napi:\n  url: 'https://api.cloudflare.com/client/v4/accounts/x/ai/v1'\n"
     . "  model: '@cf/zai/glm'\n  context: 32768\n  embedding_model: '@cf/baai/bge-m3'\n");
 $flat = configAt($dir . '/flat.yaml');
-check('a flat api section reads as one provider, named after its address',
-    array_keys($flat->providers()) === ['cloudflare'] && $flat->activeProvider() === 'cloudflare', json_encode($flat->providers()));
-check('with its model, address and embedding model intact',
+check(
+    'a flat api section reads as one provider, named after its address',
+    array_keys($flat->providers()) === ['cloudflare'] && $flat->activeProvider() === 'cloudflare',
+    json_encode($flat->providers()),
+);
+check(
+    'with its model, address and embedding model intact',
     $flat->read(Backend::Api)?->model === '@cf/zai/glm' && $flat->apiUrl() === 'https://api.cloudflare.com/client/v4/accounts/x/ai/v1'
-    && $flat->embeddingModel(Backend::Api) === '@cf/baai/bge-m3');
+    && $flat->embeddingModel(Backend::Api) === '@cf/baai/bge-m3',
+);
 check('and no key variable: it uses SHERPA_API_KEY', $flat->apiKeyVariable() === null);
 
 $flat->addProvider('groq', 'https://api.groq.com/openai/v1', 'GROQ_API_KEY');
 $written = Yaml::parseFile($dir . '/flat.yaml');
-check('the next write moves it into the new shape',
-    ($written['api']['providers']['cloudflare']['model'] ?? null) === '@cf/zai/glm' && !isset($written['api']['url']), json_encode($written));
+check(
+    'the next write moves it into the new shape',
+    ($written['api']['providers']['cloudflare']['model'] ?? null) === '@cf/zai/glm' && !isset($written['api']['url']),
+    json_encode($written),
+);
 check('adding a provider does not switch to it', $flat->activeProvider() === 'cloudflare');
-check('the new one names its key variable, never a key',
-    ($written['api']['providers']['groq']['key_env'] ?? null) === 'GROQ_API_KEY' && !str_contains((string) file_get_contents($dir . '/flat.yaml'), 'gsk_'));
+check(
+    'the new one names its key variable, never a key',
+    ($written['api']['providers']['groq']['key_env'] ?? null) === 'GROQ_API_KEY' && !str_contains((string) file_get_contents($dir . '/flat.yaml'), 'gsk_'),
+);
 
 // ---- each provider keeps its own choices --------------------------------------
 $flat->useProvider('groq');
 check('a provider named for this run is the one in force', $flat->activeProvider() === 'groq' && $flat->providerChosenForRun());
 check('a new provider has no model yet', $flat->read(Backend::Api) === null);
-check('its address and key variable are its own',
-    $flat->apiUrl() === 'https://api.groq.com/openai/v1' && $flat->apiKeyVariable() === 'GROQ_API_KEY');
+check(
+    'its address and key variable are its own',
+    $flat->apiUrl() === 'https://api.groq.com/openai/v1' && $flat->apiKeyVariable() === 'GROQ_API_KEY',
+);
 check('and it has settled no embedding model', !$flat->hasEmbeddingChoice(Backend::Api));
 
 $flat->save(new ModelProfile('openai/gpt-oss-120b', 65536, '', Backend::Api), asDefault: false);
@@ -96,14 +111,18 @@ $two->addProvider('one', 'https://api.one.test/v1', null);
 $two->addProvider('two', 'https://api.two.test/v1', 'SHERPA_TEST_TWO_KEY');
 $resolver = new ModelResolver($two, 'env:7b', 32768);
 
-check('SHERPA_API_URL still wins over the machine\'s provider',
-    $resolver->apiUrl('https://env.test/v1') === 'https://env.test/v1');
+check(
+    'SHERPA_API_URL still wins over the machine\'s provider',
+    $resolver->apiUrl('https://env.test/v1') === 'https://env.test/v1',
+);
 check('and an address that is no provider\'s uses SHERPA_API_KEY', $resolver->apiKey('https://env.test/v1') === null);
 check('a provider without a key variable uses SHERPA_API_KEY', $resolver->apiKey('https://api.one.test/v1') === null);
 
 $resolver->useProvider('two');
-check('a provider named for the run wins over SHERPA_API_URL',
-    $resolver->apiUrl('https://env.test/v1') === 'https://api.two.test/v1');
+check(
+    'a provider named for the run wins over SHERPA_API_URL',
+    $resolver->apiUrl('https://env.test/v1') === 'https://api.two.test/v1',
+);
 putenv('SHERPA_TEST_TWO_KEY=k-two');
 check('its key comes from its own variable', $resolver->apiKey('https://api.two.test/v1') === 'k-two');
 putenv('SHERPA_TEST_TWO_KEY');
@@ -144,29 +163,48 @@ function keysSentTo(array $requests, string $host): array
 }
 
 $list = provider(twoProviders($dir . '/list.yaml'), '');
-check('/provider lists them, the one in force marked',
-    str_contains($list['shown'] ?? '', '● one') && str_contains($list['shown'] ?? '', 'two/model'), json_encode($list));
+check(
+    '/provider lists them, the one in force marked',
+    str_contains($list['shown'] ?? '', '● one') && str_contains($list['shown'] ?? '', 'two/model'),
+    json_encode($list),
+);
 check('and says which key variable is missing', str_contains($list['shown'] ?? '', 'TWO_API_KEY (not set)'), $list['shown'] ?? '');
 
 $switched = provider(twoProviders($dir . '/switch.yaml'), 'two', "y\n", ['TWO_API_KEY' => 'k-two']);
-check('/provider two moves the session there',
-    ($switched['endpoint'] ?? null) === 'https://api.two.test/v1' && ($switched['model'] ?? null) === 'two/model', json_encode($switched));
-check('with its own key, and only that one', keysSentTo($switched['requests'] ?? [], 'api.two.test') === ['Bearer k-two'],
-    json_encode($switched['requests'] ?? []));
-check('kept for the machine, it becomes the machine\'s provider',
-    (Yaml::parseFile($dir . '/switch.yaml')['api']['provider'] ?? null) === 'two');
+check(
+    '/provider two moves the session there',
+    ($switched['endpoint'] ?? null) === 'https://api.two.test/v1' && ($switched['model'] ?? null) === 'two/model',
+    json_encode($switched),
+);
+check(
+    'with its own key, and only that one',
+    keysSentTo($switched['requests'] ?? [], 'api.two.test') === ['Bearer k-two'],
+    json_encode($switched['requests'] ?? []),
+);
+check(
+    'kept for the machine, it becomes the machine\'s provider',
+    (Yaml::parseFile($dir . '/switch.yaml')['api']['provider'] ?? null) === 'two',
+);
 
 $notKept = provider(twoProviders($dir . '/session.yaml'), 'two', "n\n", ['TWO_API_KEY' => 'k-two']);
-check('not kept, it holds for the session only',
+check(
+    'not kept, it holds for the session only',
     ($notKept['endpoint'] ?? null) === 'https://api.two.test/v1' && (Yaml::parseFile($dir . '/session.yaml')['api']['provider'] ?? null) === 'one',
-    json_encode($notKept));
+    json_encode($notKept),
+);
 
 $noKey = provider(twoProviders($dir . '/nokey.yaml'), 'two', "y\n");
-check('a provider whose variable is unset never gets SHERPA_API_KEY instead',
-    keysSentTo($noKey['requests'] ?? [], 'api.two.test') === [''], json_encode($noKey['requests'] ?? []));
+check(
+    'a provider whose variable is unset never gets SHERPA_API_KEY instead',
+    keysSentTo($noKey['requests'] ?? [], 'api.two.test') === [''],
+    json_encode($noKey['requests'] ?? []),
+);
 check('the refusal names the variable', str_contains($noKey['shown'] ?? '', 'TWO_API_KEY, not set'), $noKey['shown'] ?? '');
-check('and the session stays where it was, with its key',
-    ($noKey['endpoint'] ?? null) === 'https://api.one.test/v1' && ($noKey['model'] ?? null) === 'one/model', json_encode($noKey));
+check(
+    'and the session stays where it was, with its key',
+    ($noKey['endpoint'] ?? null) === 'https://api.one.test/v1' && ($noKey['model'] ?? null) === 'one/model',
+    json_encode($noKey),
+);
 
 $unknown = provider(twoProviders($dir . '/unknown.yaml'), 'three');
 check('an unknown name lists the known ones', str_contains($unknown['shown'] ?? '', 'Known: one, two'), $unknown['shown'] ?? '');
@@ -176,26 +214,38 @@ check('the one in force says so', str_contains($same['shown'] ?? '', 'Already on
 
 $added = provider(twoProviders($dir . '/add.yaml'), 'add', "https://api.groq.com/openai/v1/chat/completions\n\nk-groq\n");
 $groq = Yaml::parseFile($dir . '/add.yaml')['api']['providers']['groq'] ?? null;
-check('/provider add records the address as pasted, cut back to its base, under the suggested name',
-    ($groq['url'] ?? null) === 'https://api.groq.com/openai/v1', json_encode($added));
-check('it tries the key before keeping it',
+check(
+    '/provider add records the address as pasted, cut back to its base, under the suggested name',
+    ($groq['url'] ?? null) === 'https://api.groq.com/openai/v1',
+    json_encode($added),
+);
+check(
+    'it tries the key before keeping it',
     str_contains($added['shown'] ?? '', 'accepts the key') && keysSentTo($added['requests'] ?? [], 'api.groq.com') === ['Bearer k-groq'],
-    json_encode($added));
+    json_encode($added),
+);
 check('the key is not in config.yaml', !str_contains((string) file_get_contents($dir . '/add.yaml'), 'k-groq'));
-check('but in keys.yaml, under the provider\'s name',
-    (Yaml::parseFile($dir . '/keys.yaml')['groq'] ?? null) === 'k-groq');
+check(
+    'but in keys.yaml, under the provider\'s name',
+    (Yaml::parseFile($dir . '/keys.yaml')['groq'] ?? null) === 'k-groq',
+);
 check('which only its owner can read', (fileperms($dir . '/keys.yaml') & 0777) === 0600, decoct(fileperms($dir . '/keys.yaml') & 0777));
 // Straight on to it: no model yet, so the list opens — which a pipe cannot
 // answer, and the session stays where it was.
-check('and it moves to it at once, which needs a model chosen',
-    str_contains($added['shown'] ?? '', 'Still on') && ($added['endpoint'] ?? null) === 'https://api.one.test/v1', $added['shown'] ?? '');
+check(
+    'and it moves to it at once, which needs a model chosen',
+    str_contains($added['shown'] ?? '', 'Still on') && ($added['endpoint'] ?? null) === 'https://api.one.test/v1',
+    $added['shown'] ?? '',
+);
 @unlink($dir . '/keys.yaml');
 
 $withModel = twoProviders($dir . '/addmodel.yaml');
 $refused = provider($withModel, 'add', "https://api.three.test/v1\nthree\n\nc\n");
-check('a key refused can be abandoned, and nothing is recorded',
+check(
+    'a key refused can be abandoned, and nothing is recorded',
     str_contains($refused['shown'] ?? '', 'refuses to go without one') && !isset(Yaml::parseFile($withModel)['api']['providers']['three']),
-    $refused['shown'] ?? '');
+    $refused['shown'] ?? '',
+);
 
 // A key saved for a provider is used from then on, from any session.
 file_put_contents($dir . '/keys.yaml', "two: k-saved\n");
@@ -206,13 +256,18 @@ $fromVar = provider(twoProviders($dir . '/var.yaml'), 'two', "n\n", ['TWO_API_KE
 check('the provider\'s own variable, set, wins over it', keysSentTo($fromVar['requests'] ?? [], 'api.two.test') === ['Bearer k-var']);
 
 $rekeyed = provider(twoProviders($dir . '/rekey.yaml'), 'key two', "k-new\n");
-check('/provider key replaces a key after trying it',
+check(
+    '/provider key replaces a key after trying it',
     str_contains($rekeyed['shown'] ?? '', 'Key of two saved') && (Yaml::parseFile($dir . '/keys.yaml')['two'] ?? null) === 'k-new',
-    $rekeyed['shown'] ?? '');
+    $rekeyed['shown'] ?? '',
+);
 file_put_contents($dir . '/keys.yaml', "two: ''\n");
 $none = provider(twoProviders($dir . '/none.yaml'), 'two', "n\n");
-check('a provider saved as wanting no key never gets SHERPA_API_KEY',
-    keysSentTo($none['requests'] ?? [], 'api.two.test') === [''], json_encode($none['requests'] ?? []));
+check(
+    'a provider saved as wanting no key never gets SHERPA_API_KEY',
+    keysSentTo($none['requests'] ?? [], 'api.two.test') === [''],
+    json_encode($none['requests'] ?? []),
+);
 @unlink($dir . '/keys.yaml');
 
 file_put_contents($dir . '/keys.yaml', "two: k-two\none: k-one\n");
@@ -256,8 +311,11 @@ check('nor a config.yaml, by the next change', !$safe->addProvider('four', 'http
 mkdir($dir . '/typo');
 file_put_contents($dir . '/typo/keys.yaml', "two: [unclosed\n");
 $told = provider(twoProviders($dir . '/typo/config.yaml'), 'key two', "k-new\n");
-check('and the user is told why the key could not be saved',
-    str_contains($told['shown'] ?? '', 'no longer parses as YAML'), json_encode($told));
+check(
+    'and the user is told why the key could not be saved',
+    str_contains($told['shown'] ?? '', 'no longer parses as YAML'),
+    json_encode($told),
+);
 
 // ---- embeddings from another provider ------------------------------------------
 // A chat provider with no embedding model (Anthropic, Groq) searched the
@@ -300,11 +358,15 @@ $file['embeddings'] = ['provider' => 'ollama', 'model' => 'nomic-embed-text'];
 file_put_contents($dir . '/emb/config.yaml', Yaml::dump($file, 4, 2));
 $sent = [];
 $embeddings->embed(['trois']);
-check('ollama as the provider: vectors from the local Ollama, with no key',
-    ($sent[0]['url'] ?? '') === 'http://ollama.test/api/embed' && ($sent[0]['model'] ?? '') === 'nomic-embed-text' && ($sent[0]['auth'] ?? '') === '', json_encode($sent));
+check(
+    'ollama as the provider: vectors from the local Ollama, with no key',
+    ($sent[0]['url'] ?? '') === 'http://ollama.test/api/embed' && ($sent[0]['model'] ?? '') === 'nomic-embed-text' && ($sent[0]['auth'] ?? '') === '',
+    json_encode($sent),
+);
 
 $file['embeddings'] = ['provider' => 'absent', 'model' => 'm'];
 file_put_contents($dir . '/emb/config.yaml', Yaml::dump($file, 4, 2));
+
 try {
     $embeddings->embed(['quatre']);
     $why = '';

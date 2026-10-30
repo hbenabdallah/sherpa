@@ -16,8 +16,11 @@ namespace App\Rag;
 final class Chunker
 {
     public const TARGET = 1400;
+
     public const MAX = 2800;
+
     public const OVERLAP = 170;
+
     public const PARENT_MAX = 6000;
 
     /** @return list<Chunk> */

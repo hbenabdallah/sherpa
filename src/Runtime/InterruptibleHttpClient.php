@@ -35,6 +35,7 @@ final class InterruptibleHttpClient implements HttpClientInterface
 
         // stream() ends at its first silence: asked again until the headers.
         $interrupted = false;
+
         try {
             for ($waiting = true; $waiting && !$interrupted;) {
                 $waiting = false;

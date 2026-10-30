@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Minimal test runner — no PHPUnit dependency yet.
  *

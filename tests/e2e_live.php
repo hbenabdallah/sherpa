@@ -1,4 +1,5 @@
 <?php
+
 /**
  * End-to-end check against a LIVE Ollama model.
  *
@@ -97,7 +98,7 @@ $bag = new MessageBag();
 $bag->system(
     "You are a PHP development agent. The project is at {$project}. " .
     'ALWAYS use the file_read tool to read a file before answering. ' .
-    'Never guess the contents.'
+    'Never guess the contents.',
 );
 $bag->user('Read the file src/Widget.php and give me the exact name of the class defined in it.');
 

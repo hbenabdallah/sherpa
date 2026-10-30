@@ -8,7 +8,14 @@ use App\Agent\Tool\Param;
 use App\Agent\Tool\Permission;
 use App\Project\PathSuggestions;
 use App\Project\ProjectPathResolver;
+use FilesystemIterator;
+use RecursiveCallbackFilterIterator;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
+use RuntimeException;
+use SplFileInfo;
 use Symfony\Component\Process\Process;
+use Throwable;
 
 #[AsTool(
     name: 'file_find',
@@ -22,8 +29,11 @@ class FileFindTool
 
     /** Floors and ceiling on paths listed, scaled with the window like list_dir's lines. */
     private const MIN_PATHS = 100;
+
     private const MAX_PATHS = 1000;
+
     private const SHARE = 0.04;
+
     private const CHARS_PER_PATH = 50;
 
     public function __construct(
@@ -32,18 +42,20 @@ class FileFindTool
     ) {}
 
     public function __invoke(
-        #[Param('Glob pattern: * within a directory, ** across directories, ?, {a,b}, [abc]. Without a "/", it matches file names anywhere')] string $pattern,
-        #[Param('Directory to search in, relative to the project root (optional, defaults to the root)')] ?string $path = null,
+        #[Param('Glob pattern: * within a directory, ** across directories, ?, {a,b}, [abc]. Without a "/", it matches file names anywhere')]
+        string $pattern,
+        #[Param('Directory to search in, relative to the project root (optional, defaults to the root)')]
+        ?string $path = null,
     ): string {
         $pattern = trim($pattern);
         if ($pattern === '') {
-            throw new \RuntimeException('an empty pattern finds nothing: give one, like "*Test.php" or "src/**/*.php"');
+            throw new RuntimeException('an empty pattern finds nothing: give one, like "*Test.php" or "src/**/*.php"');
         }
 
         $root = $this->paths->root();
         $base = $path === null || trim($path) === '' || trim($path) === '.' ? $root : $this->paths->resolve($path);
         if (!is_dir($base)) {
-            throw new \RuntimeException("directory not found: {$path}" . PathSuggestions::hint($root, (string) $path, directory: true));
+            throw new RuntimeException("directory not found: {$path}" . PathSuggestions::hint($root, (string) $path, directory: true));
         }
 
         $regex = self::toRegex(str_contains($pattern, '/') ? ltrim($pattern, '/') : '**/' . $pattern);
@@ -135,16 +147,16 @@ class FileFindTool
                     fn(string $p) => $p !== '' && is_file("{$base}/{$p}"),
                 ));
             }
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // No git: the disk it is.
         }
 
         $files = [];
-        $directories = new \RecursiveCallbackFilterIterator(
-            new \RecursiveDirectoryIterator($base, \FilesystemIterator::SKIP_DOTS),
-            static fn(\SplFileInfo $file) => !($file->isDir() && in_array($file->getFilename(), self::SKIPPED, true)),
+        $directories = new RecursiveCallbackFilterIterator(
+            new RecursiveDirectoryIterator($base, FilesystemIterator::SKIP_DOTS),
+            static fn(SplFileInfo $file) => !($file->isDir() && in_array($file->getFilename(), self::SKIPPED, true)),
         );
-        foreach (new \RecursiveIteratorIterator($directories) as $file) {
+        foreach (new RecursiveIteratorIterator($directories) as $file) {
             if ($file->isFile()) {
                 $files[] = substr($file->getPathname(), strlen($base) + 1);
             }

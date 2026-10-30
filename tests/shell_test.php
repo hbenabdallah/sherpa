@@ -1,12 +1,13 @@
 <?php
+
 // shell_exec: the tool that runs arbitrary commands, and the one with no test
 // until now.
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
+use App\Project\DockerConfig;
 use App\Project\PathOutsideProjectException;
 use App\Project\ProjectPathResolver;
-use App\Project\DockerConfig;
 use App\Tool\ContainerInspector;
 use App\Tool\ShellExecTool;
 
@@ -43,11 +44,21 @@ check('a relative cwd is resolved inside the project', trim($tool('pwd', 'src/De
 // The command can of course escape once running — that is what the confirmation
 // is for — but the model may not silently start it somewhere else.
 $threw = false;
-try { $tool('pwd', '../../../etc'); } catch (PathOutsideProjectException) { $threw = true; }
+
+try {
+    $tool('pwd', '../../../etc');
+} catch (PathOutsideProjectException) {
+    $threw = true;
+}
 check('a working directory outside the project is refused', $threw);
 
 $threw = false;
-try { $tool('pwd', '/etc'); } catch (PathOutsideProjectException) { $threw = true; }
+
+try {
+    $tool('pwd', '/etc');
+} catch (PathOutsideProjectException) {
+    $threw = true;
+}
 check('an absolute path outside the project is refused too', $threw);
 
 // ---- what the model is told ------------------------------------------------

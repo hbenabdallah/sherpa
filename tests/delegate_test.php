@@ -1,4 +1,5 @@
 <?php
+
 // delegate: a sub-agent that reads in its own context and reports back —
 // against a scripted model, on a small project on disk.
 
@@ -63,7 +64,10 @@ final class Scripted implements PlatformInterface
 
     public function __construct(private array $replies, private ?Interrupt $cancel = null) {}
 
-    public function concurrency(): int { return count($this->concurrency) > 1 ? array_shift($this->concurrency) : $this->concurrency[0]; }
+    public function concurrency(): int
+    {
+        return count($this->concurrency) > 1 ? array_shift($this->concurrency) : $this->concurrency[0];
+    }
 
     public function stream(array $messages, array $tools = [], ?callable $onToken = null, ?callable $onWait = null): array
     {
@@ -79,16 +83,53 @@ final class Scripted implements PlatformInterface
 
         return $reply;
     }
-    public function lastUsage(): ?array { return null; }
-    public function lastTimings(): ?array { return null; }
-    public function residency(): ?ModelResidency { return null; }
-    public function modelName(): string { return 'scripted'; }
-    public function contextWindow(): int { return 32768; }
-    public function catalogue(): array { return []; }
-    public function describeModel(string $model): ?ModelInfo { return null; }
+
+    public function lastUsage(): ?array
+    {
+        return null;
+    }
+
+    public function lastTimings(): ?array
+    {
+        return null;
+    }
+
+    public function residency(): ?ModelResidency
+    {
+        return null;
+    }
+
+    public function modelName(): string
+    {
+        return 'scripted';
+    }
+
+    public function contextWindow(): int
+    {
+        return 32768;
+    }
+
+    public function catalogue(): array
+    {
+        return [];
+    }
+
+    public function describeModel(string $model): ?ModelInfo
+    {
+        return null;
+    }
+
     public function useModel(string $model, int $contextWindow): void {}
-    public function name(): string { return 'scripted'; }
-    public function isAvailable(): bool { return true; }
+
+    public function name(): string
+    {
+        return 'scripted';
+    }
+
+    public function isAvailable(): bool
+    {
+        return true;
+    }
 }
 
 $root = sys_get_temp_dir() . '/sherpa-delegate-' . bin2hex(random_bytes(4));
@@ -127,18 +168,28 @@ $screen = Terminal::plain(ob_get_clean());
 
 check('the sub-agent searches, and its report comes back', str_contains($report, 'src/Billing/Invoice.php:4'), $report);
 check('the report says it is one, and how many steps it took', str_starts_with($report, 'Sub-agent report (2 steps)'), $report);
-check('its search really ran on the project',
-    str_contains(json_encode($model->seen[1]['messages']), 'Invoice.php:4'), json_encode(end($model->seen[1]['messages'])));
-check('it starts from the task alone, not the conversation that asked',
-    count($model->seen[0]['messages']) === 2 && $model->seen[0]['messages'][1]['content'] === 'Where is the invoice subtotal computed?');
+check(
+    'its search really ran on the project',
+    str_contains(json_encode($model->seen[1]['messages']), 'Invoice.php:4'),
+    json_encode(end($model->seen[1]['messages'])),
+);
+check(
+    'it starts from the task alone, not the conversation that asked',
+    count($model->seen[0]['messages']) === 2 && $model->seen[0]['messages'][1]['content'] === 'Where is the invoice subtotal computed?',
+);
 check('it is told it can only read', str_contains($model->seen[0]['messages'][0]['content'], 'You can only read'));
 
 $tools = $model->seen[0]['tools'];
 sort($tools);
-check('it is given the tools that read, and only those',
-    $tools === ['doc_search', 'file_find', 'file_read', 'list_dir', 'memory_recall', 'project_grep'], json_encode($tools));
-check('nothing that writes, runs, leaves the machine or delegates again',
-    array_intersect($tools, ['file_write', 'file_patch', 'shell_exec', 'web_fetch', 'delegate', 'todo_write']) === []);
+check(
+    'it is given the tools that read, and only those',
+    $tools === ['doc_search', 'file_find', 'file_read', 'list_dir', 'memory_recall', 'project_grep'],
+    json_encode($tools),
+);
+check(
+    'nothing that writes, runs, leaves the machine or delegates again',
+    array_intersect($tools, ['file_write', 'file_patch', 'shell_exec', 'web_fetch', 'delegate', 'todo_write']) === [],
+);
 
 check('on screen, one short line per tool it uses', str_contains($screen, '↳ project_grep subtotal'), $screen);
 check('and not its reply, which is for the agent that asked', !str_contains($screen, 'returns 0'), $screen);
@@ -153,7 +204,12 @@ ob_end_clean();
 check('an interrupted sub-agent says so', str_contains($report, 'interrupted'), $report);
 
 $threw = false;
-try { delegate($model, $paths, $memory)('  '); } catch (RuntimeException) { $threw = true; }
+
+try {
+    delegate($model, $paths, $memory)('  ');
+} catch (RuntimeException) {
+    $threw = true;
+}
 check('an empty task is refused', $threw);
 
 // ---- the tool itself ------------------------------------------------------------
@@ -168,7 +224,11 @@ $sse = fn() => new MockResponse([
     "data: " . json_encode(['type' => 'content_block_delta', 'index' => 0, 'delta' => ['type' => 'text_delta', 'text' => 'ok']]) . "\n\n",
     "data: " . json_encode(['type' => 'message_delta', 'delta' => ['stop_reason' => 'end_turn'], 'usage' => ['output_tokens' => 1]]) . "\n\n",
 ], ['response_headers' => ['content-type' => 'text/event-stream']]);
-$claude = new OpenAiCompatiblePlatform(new MockHttpClient(function ($m, $u, $o) use (&$sent, $sse) { $sent[] = $o['body']; return $sse(); }), 'https://api.anthropic.com/v1', 'claude-sonnet-5', 'k');
+$claude = new OpenAiCompatiblePlatform(new MockHttpClient(function ($m, $u, $o) use (&$sent, $sse) {
+    $sent[] = $o['body'];
+
+    return $sse();
+}), 'https://api.anthropic.com/v1', 'claude-sonnet-5', 'k');
 $main = [
     ['role' => 'system', 'content' => 'MAIN'],
     ['role' => 'user', 'content' => 'q'],
@@ -199,17 +259,58 @@ final class Counted implements PlatformInterface
 
         return $reply;
     }
-    public function concurrency(): int { return $this->inner->concurrency(); }
-    public function lastUsage(): ?array { return $this->inner->lastUsage(); }
-    public function lastTimings(): ?array { return $this->inner->lastTimings(); }
-    public function residency(): ?ModelResidency { return null; }
-    public function modelName(): string { return 'm'; }
-    public function contextWindow(): int { return 32768; }
-    public function catalogue(): array { return []; }
-    public function describeModel(string $model): ?ModelInfo { return null; }
+
+    public function concurrency(): int
+    {
+        return $this->inner->concurrency();
+    }
+
+    public function lastUsage(): ?array
+    {
+        return $this->inner->lastUsage();
+    }
+
+    public function lastTimings(): ?array
+    {
+        return $this->inner->lastTimings();
+    }
+
+    public function residency(): ?ModelResidency
+    {
+        return null;
+    }
+
+    public function modelName(): string
+    {
+        return 'm';
+    }
+
+    public function contextWindow(): int
+    {
+        return 32768;
+    }
+
+    public function catalogue(): array
+    {
+        return [];
+    }
+
+    public function describeModel(string $model): ?ModelInfo
+    {
+        return null;
+    }
+
     public function useModel(string $model, int $contextWindow): void {}
-    public function name(): string { return 'counted'; }
-    public function isAvailable(): bool { return true; }
+
+    public function name(): string
+    {
+        return 'counted';
+    }
+
+    public function isAvailable(): bool
+    {
+        return true;
+    }
 }
 
 $port = 20000 + (getmypid() + 7) % 10000;
@@ -223,7 +324,8 @@ $sub = new Counted(new OpenAiCompatiblePlatform(Symfony\Component\HttpClient\Htt
 $asks = fn(array $tasks) => new Scripted([
     ['role' => 'assistant', 'content' => '', 'tool_calls' => array_map(
         fn(string $task, int $i) => ['id' => "d{$i}", 'function' => ['name' => 'delegate', 'arguments' => ['task' => $task]]],
-        $tasks, array_keys($tasks),
+        $tasks,
+        array_keys($tasks),
     )],
     ['role' => 'assistant', 'content' => 'all read'],
 ]);
@@ -253,24 +355,34 @@ $took = microtime(true) - $started;
 
 $reports = array_values(array_filter($bag->all(), fn(array $m) => $m['role'] === 'tool'));
 check('three sub-agents of a second each take about a second, not three', $took < 1.6, sprintf('%.1f s', $took));
-check('each report comes back to its own call, in the order asked',
+check(
+    'each report comes back to its own call, in the order asked',
     array_column($reports, 'tool_call_id') === ['d0', 'd1', 'd2']
     && str_contains($reports[0]['content'], 'report on alpha')
     && str_contains($reports[1]['content'], 'report on beta-beta')
     && str_contains($reports[2]['content'], 'report on gamma-gamma-gamma'),
-    json_encode($reports));
+    json_encode($reports),
+);
 check('the turn goes on once all are back', $result->content === 'all read', $result->content);
 $prompts = array_map(fn($u) => $u['prompt'] ?? null, $sub->usages);
 sort($prompts);
 check("each request's token count is its own, not another's finishing beside it", $prompts === [5, 9, 17], json_encode($sub->usages));
-check('the three calls are shown before any result, numbered in the order asked',
-    preg_match('/Tool: \\[1\\] delegate.*Tool: \\[2\\] delegate.*Tool: \\[3\\] delegate/s', substr($screen, 0, (int) strpos($screen, '✓'))) === 1, $screen);
+check(
+    'the three calls are shown before any result, numbered in the order asked',
+    preg_match('/Tool: \\[1\\] delegate.*Tool: \\[2\\] delegate.*Tool: \\[3\\] delegate/s', substr($screen, 0, (int) strpos($screen, '✓'))) === 1,
+    $screen,
+);
 
 // Their lines carry the same number: they interleave, and would be anyone's.
 $pane = new SubagentPane(new Terminal(), new MarkdownRenderer());
 $lines = '';
 foreach ([1, 2] as $n) {
-    $fiber = new Fiber(function () use ($pane) { ob_start(); $pane->showToolCall('project_grep', ['pattern' => 'subtotal']); return ob_get_clean(); });
+    $fiber = new Fiber(function () use ($pane) {
+        ob_start();
+        $pane->showToolCall('project_grep', ['pattern' => 'subtotal']);
+
+        return ob_get_clean();
+    });
     App\Agent\Lanes::assign($fiber, $n);
     $fiber->start();
     $lines .= Terminal::plain((string) $fiber->getReturn());
@@ -332,9 +444,11 @@ ob_start();
 $result = mainLoop($cancelling, delegate($sub, $paths, $memory, $interrupt), $interrupt)->run($bag);
 ob_end_clean();
 $reports = array_values(array_filter($bag->all(), fn(array $m) => $m['role'] === 'tool'));
-check('Ctrl+C stops every sub-agent running together',
+check(
+    'Ctrl+C stops every sub-agent running together',
     $result->interrupted && count($reports) === 2 && str_contains($reports[0]['content'], 'interrupted') && str_contains($reports[1]['content'], 'interrupted'),
-    json_encode($reports));
+    json_encode($reports),
+);
 
 proc_terminate($server);
 exec('rm -rf ' . escapeshellarg($root));

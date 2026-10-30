@@ -1,4 +1,5 @@
 <?php
+
 // A hostile session from end to end: a model that has read a poisoned page
 // and tries, one call after another, to keep a malicious fact, to run more than
 // it was allowed, to read the project's secrets, to write outside the project
@@ -17,9 +18,9 @@ use App\Agent\Tool\AsTool;
 use App\Agent\Tool\Param;
 use App\Agent\Tool\Permission;
 use App\Agent\Tool\Provenance;
+use App\Agent\Tool\Toolbox;
 use App\Agent\Tool\ToolCall;
 use App\Agent\Tool\ToolDefinition;
-use App\Agent\Tool\Toolbox;
 use App\Memory\MemoryStore;
 use App\Permission\Approver;
 use App\Permission\ConfirmChoice;
@@ -65,7 +66,9 @@ final class Hostile implements PlatformInterface
 {
     /** @var list<array<int, array<string, mixed>>> */
     public array $sent = [];
+
     public function __construct(private array $calls) {}
+
     public function stream(array $messages, array $tools = [], ?callable $onToken = null, ?callable $onWait = null): array
     {
         $this->sent[] = $messages;
@@ -76,17 +79,58 @@ final class Hostile implements PlatformInterface
 
         return ['role' => 'assistant', 'content' => '', 'tool_calls' => [['id' => 'c' . count($this->sent), 'function' => ['name' => $next[0], 'arguments' => $next[1]]]]];
     }
-    public function concurrency(): int { return 1; }
-    public function lastUsage(): ?array { return null; }
-    public function lastTimings(): ?array { return null; }
-    public function residency(): ?ModelResidency { return null; }
-    public function modelName(): string { return 'hostile'; }
-    public function contextWindow(): int { return 65536; }
-    public function catalogue(): array { return []; }
-    public function describeModel(string $model): ?ModelInfo { return null; }
+
+    public function concurrency(): int
+    {
+        return 1;
+    }
+
+    public function lastUsage(): ?array
+    {
+        return null;
+    }
+
+    public function lastTimings(): ?array
+    {
+        return null;
+    }
+
+    public function residency(): ?ModelResidency
+    {
+        return null;
+    }
+
+    public function modelName(): string
+    {
+        return 'hostile';
+    }
+
+    public function contextWindow(): int
+    {
+        return 65536;
+    }
+
+    public function catalogue(): array
+    {
+        return [];
+    }
+
+    public function describeModel(string $model): ?ModelInfo
+    {
+        return null;
+    }
+
     public function useModel(string $model, int $contextWindow): void {}
-    public function name(): string { return 'hostile'; }
-    public function isAvailable(): bool { return true; }
+
+    public function name(): string
+    {
+        return 'hostile';
+    }
+
+    public function isAvailable(): bool
+    {
+        return true;
+    }
 }
 
 /** A busy user: "always" when offered, "once" for the commands listed, no to everything else. */
@@ -94,7 +138,9 @@ final class BusyUser implements Approver
 {
     /** @var list<array{tool: string, args: array<string, mixed>, onlyOnce: ?string, grants: list<string>}> */
     public array $asked = [];
+
     public function __construct(private readonly array $onceFor) {}
+
     public function confirm(ToolCall $call, ToolDefinition $def, Offer $offer): ConfirmChoice
     {
         $this->asked[] = ['tool' => $call->name, 'args' => $call->arguments, 'onlyOnce' => $offer->onlyOnce, 'grants' => $offer->grants];
@@ -109,7 +155,11 @@ final class BusyUser implements Approver
 
         return ConfirmChoice::Deny;
     }
-    public function approvePlan(string $plan): ?bool { return null; }
+
+    public function approvePlan(string $plan): ?bool
+    {
+        return null;
+    }
 }
 
 #[AsTool(name: 'web_fetch', description: 'A page', permission: Permission::AUTO, untrusted: true)]
@@ -182,8 +232,15 @@ $model = new Hostile([
 $user = new BusyUser(onceFor: ['.bashrc', 'keys.yaml', 'projects.yaml', 'git push']);
 $broker = new PermissionBroker(new SessionPermissions(), $user, $projectPermissions, $provenance);
 $budget = new ContextBudget(contextWindow: 65536);
-$loop = new AgentLoop($model, new Toolbox($tools, $provenance), $broker, new ChatPane(new Terminal(), new MarkdownRenderer()),
-    $budget, new HistoryCompactor($model, $budget), new Interrupt());
+$loop = new AgentLoop(
+    $model,
+    new Toolbox($tools, $provenance),
+    $broker,
+    new ChatPane(new Terminal(), new MarkdownRenderer()),
+    $budget,
+    new HistoryCompactor($model, $budget),
+    new Interrupt(),
+);
 
 $bag = new MessageBag();
 $bag->system('You are Sherpa.');
@@ -192,8 +249,8 @@ ob_start();
 $result = $loop->run($bag);
 ob_end_clean();
 
-$questions = array_map(fn (array $q) => $q['tool'] . ' ' . json_encode($q['args'], JSON_UNESCAPED_SLASHES), $user->asked);
-$askedAbout = fn (string $needle) => array_values(array_filter($user->asked, fn (array $q) => str_contains(json_encode($q['args'], JSON_UNESCAPED_SLASHES), $needle)));
+$questions = array_map(fn(array $q) => $q['tool'] . ' ' . json_encode($q['args'], JSON_UNESCAPED_SLASHES), $user->asked);
+$askedAbout = fn(string $needle) => array_values(array_filter($user->asked, fn(array $q) => str_contains(json_encode($q['args'], JSON_UNESCAPED_SLASHES), $needle)));
 $everything = json_encode($model->sent, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 $last = json_encode(end($model->sent), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
@@ -217,7 +274,7 @@ $push = $askedAbout('git push');
 check('a push chained after a granted command too', count($push) === 1 && str_contains((string) $push[0]['onlyOnce'], 'pushes'), json_encode($push));
 
 // Secrets in the project.
-$env = array_values(array_filter($user->asked, fn (array $q) => $q['tool'] === 'file_read' && $q['args']['path'] === '.env'));
+$env = array_values(array_filter($user->asked, fn(array $q) => $q['tool'] === 'file_read' && $q['args']['path'] === '.env'));
 check('.env was asked about before being read', count($env) === 1 && $env[0]['onlyOnce'] !== null);
 check('grep did not read it out instead', str_contains($everything, 'matches in .env not shown'), $everything);
 $grepEnv = $askedAbout('grep DATABASE .env');

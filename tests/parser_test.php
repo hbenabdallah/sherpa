@@ -1,4 +1,5 @@
 <?php
+
 // Verification of TextToolCallParser: recovering tool calls a model emitted as
 // prose, without firing on models that merely talk about JSON.
 
@@ -108,16 +109,31 @@ $live = "Je vais utiliser la commande `list_dir` pour obtenir une vue d'ensemble
 check('bare arguments are taken for the tool the text names', ['list_dir'], $names($p->parse($live, $allKnown, $signatures)));
 check('with their values', [['path' => '', 'depth' => 2]], $args($p->parse($live, $allKnown, $signatures)));
 
-check('not when no tool is named in the text', [],
-    $names($p->parse("Here is the config:\n```json\n{\"path\": \"src\"}\n```", $allKnown, $signatures)));
-check('not when the keys fit no named tool', [],
-    $names($p->parse("With list_dir I found:\n```json\n{\"files\": 3}\n```", $allKnown, $signatures)));
-check('not when two named tools fit the same keys', [],
-    $names($p->parse("Either list_dir or file_read:\n{\"path\": \"src\"}", $allKnown, $signatures)));
-check('not when a required argument is missing', [],
-    $names($p->parse("Next, project_grep:\n{\"path\": \"src\"}", $allKnown, $signatures)));
-check('a named call still wins over bare arguments', ['file_read'],
-    $names($p->parse("list_dir {\"path\": \"a\"} then {\"name\":\"file_read\",\"arguments\":{\"path\":\"b\"}}", $allKnown, $signatures)));
+check(
+    'not when no tool is named in the text',
+    [],
+    $names($p->parse("Here is the config:\n```json\n{\"path\": \"src\"}\n```", $allKnown, $signatures)),
+);
+check(
+    'not when the keys fit no named tool',
+    [],
+    $names($p->parse("With list_dir I found:\n```json\n{\"files\": 3}\n```", $allKnown, $signatures)),
+);
+check(
+    'not when two named tools fit the same keys',
+    [],
+    $names($p->parse("Either list_dir or file_read:\n{\"path\": \"src\"}", $allKnown, $signatures)),
+);
+check(
+    'not when a required argument is missing',
+    [],
+    $names($p->parse("Next, project_grep:\n{\"path\": \"src\"}", $allKnown, $signatures)),
+);
+check(
+    'a named call still wins over bare arguments',
+    ['file_read'],
+    $names($p->parse("list_dir {\"path\": \"a\"} then {\"name\":\"file_read\",\"arguments\":{\"path\":\"b\"}}", $allKnown, $signatures)),
+);
 
 printf("\n%d passed, %d failed\n", $pass, $fail);
 exit($fail === 0 ? 0 : 1);

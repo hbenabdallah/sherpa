@@ -1,4 +1,5 @@
 <?php
+
 // Runs one /provider command against scripted providers, answering its
 // questions from stdin, and prints what happened as JSON — so adding and
 // switching providers can be tested without a terminal.
@@ -76,16 +77,28 @@ $editor = new LineEditor();
 $context = new ContextStore();
 $context->open();
 $session = new ModelSession(
-    $platform, $models, new ModelSelector(new Terminal(), $editor, $platform),
-    new ContextBudget(contextWindow: 32768), new InferenceSpeed(), new UsageMeter(),
-    new ChatPane(new Terminal(), new MarkdownRenderer()), $editor,
+    $platform,
+    $models,
+    new ModelSelector(new Terminal(), $editor, $platform),
+    new ContextBudget(contextWindow: 32768),
+    new InferenceSpeed(),
+    new UsageMeter(),
+    new ChatPane(new Terminal(), new MarkdownRenderer()),
+    $editor,
     new SystemPromptBuilder($memory, new SkillRegistry(), new StackDetector()),
-    $context, new Toolbox([]), new SessionStore(),
+    $context,
+    new Toolbox([]),
+    new SessionStore(),
 );
 $project = new Project(
-    slug: 'essai', name: 'Essai', path: $dir, memoryDb: $dir . '/memory.db',
-    docker: new DockerConfig(enabled: false), stack: '',
-    createdAt: new DateTimeImmutable(), lastUsedAt: new DateTimeImmutable(),
+    slug: 'essai',
+    name: 'Essai',
+    path: $dir,
+    memoryDb: $dir . '/memory.db',
+    docker: new DockerConfig(enabled: false),
+    stack: '',
+    createdAt: new DateTimeImmutable(),
+    lastUsedAt: new DateTimeImmutable(),
 );
 
 // As at boot: the machine's provider, its address and its key.

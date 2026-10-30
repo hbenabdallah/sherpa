@@ -5,6 +5,7 @@ namespace App\TUI;
 class MarkdownRenderer
 {
     private bool $inCodeBlock = false;
+
     private string $codeLang = '';
 
     /**
@@ -246,8 +247,10 @@ class MarkdownRenderer
         $line = trim(Terminal::plain($line, singleLine: true));
         $line = preg_replace('/^\||\|$/', '', $line) ?? $line;
 
-        return array_map(fn(string $cell) => self::plainCell(trim(str_replace('\\|', '|', $cell))),
-            preg_split('/(?<!\\\\)\|/', $line) ?: []);
+        return array_map(
+            fn(string $cell) => self::plainCell(trim(str_replace('\\|', '|', $cell))),
+            preg_split('/(?<!\\\\)\|/', $line) ?: [],
+        );
     }
 
     /** Markdown inside a cell, reduced to its text: widths are counted on what shows. */
@@ -320,12 +323,14 @@ class MarkdownRenderer
                 $this->inCodeBlock = true;
                 $this->codeLang = $m[1] ?? '';
                 $lang = $this->codeLang ? " {$this->codeLang}" : '';
+
                 return Terminal::BG_DARK . Terminal::GRAY . "┌── code{$lang} " . Terminal::RESET;
-            } else {
-                $this->inCodeBlock = false;
-                $this->codeLang = '';
-                return Terminal::BG_DARK . Terminal::GRAY . "└────────" . Terminal::RESET;
             }
+            $this->inCodeBlock = false;
+            $this->codeLang = '';
+
+            return Terminal::BG_DARK . Terminal::GRAY . "└────────" . Terminal::RESET;
+
         }
 
         if ($this->inCodeBlock) {
@@ -351,18 +356,21 @@ class MarkdownRenderer
         // Blockquote
         if (str_starts_with(ltrim($line), '> ')) {
             $content = substr(ltrim($line), 2);
+
             return Terminal::GRAY . '▌ ' . Terminal::ITALIC . $this->renderInline($content) . Terminal::RESET;
         }
 
         // Unordered list
         if (preg_match('/^(\s*)[*\-+]\s+(.+)/', $line, $m)) {
             $indent = str_repeat(' ', strlen($m[1]));
+
             return $indent . Terminal::YELLOW . '•' . Terminal::RESET . ' ' . $this->renderInline($m[2]);
         }
 
         // Ordered list
         if (preg_match('/^(\s*)(\d+)\.\s+(.+)/', $line, $m)) {
             $indent = str_repeat(' ', strlen($m[1]));
+
             return $indent . Terminal::YELLOW . $m[2] . '.' . Terminal::RESET . ' ' . $this->renderInline($m[3]);
         }
 

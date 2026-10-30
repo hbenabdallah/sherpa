@@ -2,7 +2,8 @@
 
 namespace App\Permission;
 
-enum ConfirmChoice {
+enum ConfirmChoice
+{
     case Once;
     case Session;
     case Project;

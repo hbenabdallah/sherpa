@@ -1,4 +1,5 @@
 <?php
+
 // What a provider says about its limits, read from its headers and shown at
 // the bottom of the conversation — and nothing when it says nothing.
 
@@ -33,9 +34,11 @@ $openai = RateLimits::fromHeaders([
     'x-ratelimit-remaining-tokens'   => ['6000'],
     'x-ratelimit-reset-tokens'       => ['6m0s'],
 ]);
-check('OpenAI-style headers are read, window by window',
+check(
+    'OpenAI-style headers are read, window by window',
     ($openai?->windows['requests']['remaining'] ?? null) === 499 && ($openai?->windows['tokens']['limit'] ?? null) === 30000,
-    json_encode($openai?->windows));
+    json_encode($openai?->windows),
+);
 check('the tightest window is the one shown', $openai?->tightest() === ['name' => 'tokens', 'percentLeft' => 20], json_encode($openai?->tightest()));
 check('with its reset, as the provider wrote it', ($openai?->windows['tokens']['reset'] ?? null) === '6m0s');
 
@@ -51,17 +54,22 @@ $mistral = RateLimits::fromHeaders([
     'x-ratelimit-limit-tokens-month'     => ['1000000000'],
     'x-ratelimit-remaining-tokens-month' => ['870000000'],
     'x-ratelimit-limit-tokens-minute'    => ['500000'],
-    'x-ratelimit-remaining-tokens-minute'=> ['499000'],
+    'x-ratelimit-remaining-tokens-minute' => ['499000'],
 ]);
-check('a monthly quota is named as one', isset($mistral?->windows['tokens/month']) && $mistral?->tightest()['name'] === 'tokens/month',
-    json_encode($mistral?->windows));
+check(
+    'a monthly quota is named as one',
+    isset($mistral?->windows['tokens/month']) && $mistral?->tightest()['name'] === 'tokens/month',
+    json_encode($mistral?->windows),
+);
 
 $ietf = RateLimits::fromHeaders(['RateLimit-Limit' => ['100, 100;w=60'], 'RateLimit-Remaining' => ['40']]);
 check('the IETF draft form, header case and all', $ietf?->tightest() === ['name' => 'requests', 'percentLeft' => 40], json_encode($ietf?->windows));
 
 check('a provider that sends none gets no figure', RateLimits::fromHeaders(['content-type' => ['text/event-stream']]) === null);
-check('nor does a limit of zero, or a missing remainder',
-    RateLimits::fromHeaders(['x-ratelimit-limit-tokens' => ['0'], 'x-ratelimit-remaining-tokens' => ['0'], 'x-ratelimit-limit-requests' => ['9']]) === null);
+check(
+    'nor does a limit of zero, or a missing remainder',
+    RateLimits::fromHeaders(['x-ratelimit-limit-tokens' => ['0'], 'x-ratelimit-remaining-tokens' => ['0'], 'x-ratelimit-limit-requests' => ['9']]) === null,
+);
 
 // ---- caught from a real reply -----------------------------------------------
 $responses = [
@@ -82,8 +90,16 @@ $platform->useEndpoint('https://other.example.com/v1');
 check("and another provider starts from nothing: its limits are not the last one's", $platform->rateLimits() === null);
 
 // ---- at the bottom of the conversation --------------------------------------
-$project = new Project(slug: 'p', name: 'p', path: '/tmp', memoryDb: '/tmp/m.db', docker: new DockerConfig(enabled: false),
-    stack: '', createdAt: new DateTimeImmutable(), lastUsedAt: new DateTimeImmutable());
+$project = new Project(
+    slug: 'p',
+    name: 'p',
+    path: '/tmp',
+    memoryDb: '/tmp/m.db',
+    docker: new DockerConfig(enabled: false),
+    stack: '',
+    createdAt: new DateTimeImmutable(),
+    lastUsedAt: new DateTimeImmutable(),
+);
 $bar = (new ReflectionClass(StatusBar::class))->newInstanceWithoutConstructor();
 $shown = function (?RateLimits $limits) use ($bar, $project): string {
     ob_start();

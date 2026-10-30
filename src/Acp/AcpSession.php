@@ -4,6 +4,7 @@ namespace App\Acp;
 
 use App\Agent\MessageBag;
 use App\Config\ModelProfile;
+use DateTimeImmutable;
 
 /**
  * One conversation an editor holds open. The services behind a turn hold one
@@ -12,7 +13,7 @@ use App\Config\ModelProfile;
  */
 final class AcpSession
 {
-    /** @var array{0: ?string, 1: ?\DateTimeImmutable, 2: ?string, 3: ?int} where its file is written */
+    /** @var array{0: ?string, 1: ?DateTimeImmutable, 2: ?string, 3: ?int} where its file is written */
     public array $cursor = [null, null, null, null];
 
     /** @var list<array{id: int, tool: string, content: string, created_at: string}> */

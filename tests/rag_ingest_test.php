@@ -1,4 +1,5 @@
 <?php
+
 // Ingestion: documents read with their structure, cut along their own seams.
 // Most retrieval failures start here — a heading lost, a table flattened, a
 // passage cut mid-sentence — long before any search runs.
@@ -64,8 +65,10 @@ check('headings nest as a path', in_array('Orders › Refunds', $headings($doc),
 check('a "#" inside a code block is not a heading', !in_array('Orders › this is a shell comment, not a heading', $headings($doc), true)
     && str_contains($doc->sections[1]->text ?? '', 'make refund'), json_encode($headings($doc), JSON_UNESCAPED_UNICODE));
 check('an underlined heading is a heading, at level one', in_array('Installation', $headings($doc), true), json_encode($headings($doc), JSON_UNESCAPED_UNICODE));
-check('a heading with nothing under it is not a section, but stays in the path below',
-    !in_array('Orders', $headings($doc), true));
+check(
+    'a heading with nothing under it is not a section, but stays in the path below',
+    !in_array('Orders', $headings($doc), true),
+);
 
 $delivery = array_values(array_filter($doc->sections, fn($s) => ($s->headings[1] ?? '') === 'Delivery'))[0] ?? null;
 check('a table is kept as written', str_contains($delivery?->text ?? '', '| Paris | 2 days |'), $delivery?->text ?? '');
@@ -87,8 +90,11 @@ $doc = (new HtmlParser())->parse('site/tarifs.html', $html);
 check('an HTML title is read', $doc->title === 'Prices', $doc->title);
 $france = array_values(array_filter($doc->sections, fn($s) => ($s->headings[1] ?? '') === 'France'))[0] ?? null;
 check('HTML headings nest the same way', $france !== null, json_encode($headings($doc), JSON_UNESCAPED_UNICODE));
-check('a table becomes a Markdown table, row by row, not a stream of cells',
-    str_contains($france?->text ?? '', "| City | Time |\n| --- | --- |\n| Paris | 2 days |"), $france?->text ?? '');
+check(
+    'a table becomes a Markdown table, row by row, not a stream of cells',
+    str_contains($france?->text ?? '', "| City | Time |\n| --- | --- |\n| Paris | 2 days |"),
+    $france?->text ?? '',
+);
 check('list items stay list items', str_contains($france?->text ?? '', '- Tracking included'));
 $all = implode("\n", array_map(fn($s) => $s->text, $doc->sections));
 check('navigation, scripts and footers are dropped', !str_contains($all, 'Home') && !str_contains($all, 'fake') && !str_contains($all, '2026'), $all);
@@ -127,11 +133,15 @@ check('a long section is cut into several chunks', count($chunks) > 2, (string) 
 check('no chunk goes past the ceiling', max(array_map(fn($c) => mb_strlen($c->text), $chunks)) <= Chunker::MAX);
 // A chunk starts either at a paragraph, or with the sentences it repeats
 // from the end of the one before — never in the middle of a sentence.
-check('chunks start at a paragraph or a sentence, never mid-sentence',
+check(
+    'chunks start at a paragraph or a sentence, never mid-sentence',
     array_filter($chunks, fn($c) => !preg_match('/^(Paragraph \d+\.|A sentence|\| Column)/', $c->text)) === [],
-    implode(' // ', array_map(fn($c) => mb_substr($c->text, 0, 30), $chunks)));
-check('a table is never split between two chunks',
-    array_filter($chunks, fn($c) => str_contains($c->text, '| Column') && !str_contains($c->text, '| b | 2 |')) === []);
+    implode(' // ', array_map(fn($c) => mb_substr($c->text, 0, 30), $chunks)),
+);
+check(
+    'a table is never split between two chunks',
+    array_filter($chunks, fn($c) => str_contains($c->text, '| Column') && !str_contains($c->text, '| b | 2 |')) === [],
+);
 // Paragraphs here are longer than the overlap: carrying whole paragraphs
 // would carry nothing. The start of each chunk must repeat the end of the last.
 $overlaps = true;
@@ -141,12 +151,19 @@ for ($i = 1, $n = count($chunks); $i < $n; $i++) {
         $overlaps = false;
     }
 }
-check('each chunk begins with the end of the one before, even when paragraphs are longer than the overlap',
-    $overlaps, mb_substr($chunks[1]->text, 0, 80) . ' … vs … ' . mb_substr($chunks[0]->text, -80));
-check('and the repeated part stays within the overlap',
-    mb_strlen(explode("\n\n", $chunks[1]->text)[0]) <= Chunker::OVERLAP);
-check('each chunk is shown with more than itself — its parent',
-    mb_strlen($chunks[1]->parent) > mb_strlen($chunks[1]->text) && mb_strlen($chunks[1]->parent) <= Chunker::PARENT_MAX + 200);
+check(
+    'each chunk begins with the end of the one before, even when paragraphs are longer than the overlap',
+    $overlaps,
+    mb_substr($chunks[1]->text, 0, 80) . ' … vs … ' . mb_substr($chunks[0]->text, -80),
+);
+check(
+    'and the repeated part stays within the overlap',
+    mb_strlen(explode("\n\n", $chunks[1]->text)[0]) <= Chunker::OVERLAP,
+);
+check(
+    'each chunk is shown with more than itself — its parent',
+    mb_strlen($chunks[1]->parent) > mb_strlen($chunks[1]->text) && mb_strlen($chunks[1]->parent) <= Chunker::PARENT_MAX + 200,
+);
 check('line ranges grow with the chunks', $chunks[1]->startLine > $chunks[0]->startLine && $chunks[1]->endLine > $chunks[0]->endLine);
 
 // A fenced block with blank lines inside is still one block.
@@ -156,19 +173,27 @@ check('a code block with blank lines inside stays whole', count($chunker->chunk(
 // ---- what counts as documentation ------------------------------------------
 $tree = sys_get_temp_dir() . '/sherpa-docsource-' . bin2hex(random_bytes(4));
 foreach (['README.md', 'docs/guide.html', 'docs/notes.txt', 'src/Payment/README.md', 'public/robots.txt',
-          'public/index.html', 'templates/mail.html', 'requirements.txt', 'vendor/lib/README.md',
-          'tests/fixtures/faux/README.md', 'app/assets/aide.txt'] as $file) {
+    'public/index.html', 'templates/mail.html', 'requirements.txt', 'vendor/lib/README.md',
+    'tests/fixtures/faux/README.md', 'app/assets/aide.txt'] as $file) {
     @mkdir(dirname($tree . '/' . $file), 0777, true);
     file_put_contents($tree . '/' . $file, "# x\n\ntexte\n");
 }
 $listed = (new App\Rag\DocSource())->files($tree);
-check('documentation is found wherever it is written',
-    array_diff(['README.md', 'docs/guide.html', 'docs/notes.txt', 'src/Payment/README.md'], $listed) === [], json_encode($listed));
-check('but not files that only look like text: robots.txt, requirements.txt',
-    !in_array('public/robots.txt', $listed, true) && !in_array('requirements.txt', $listed, true), json_encode($listed));
-check('nor pages and text that belong to the application — public/, templates/, app/',
+check(
+    'documentation is found wherever it is written',
+    array_diff(['README.md', 'docs/guide.html', 'docs/notes.txt', 'src/Payment/README.md'], $listed) === [],
+    json_encode($listed),
+);
+check(
+    'but not files that only look like text: robots.txt, requirements.txt',
+    !in_array('public/robots.txt', $listed, true) && !in_array('requirements.txt', $listed, true),
+    json_encode($listed),
+);
+check(
+    'nor pages and text that belong to the application — public/, templates/, app/',
     !in_array('public/index.html', $listed, true) && !in_array('templates/mail.html', $listed, true) && !in_array('app/assets/aide.txt', $listed, true),
-    json_encode($listed));
+    json_encode($listed),
+);
 check('nor other people\'s documents, nor test fixtures', !in_array('vendor/lib/README.md', $listed, true) && !in_array('tests/fixtures/faux/README.md', $listed, true));
 
 // A symlink named like documentation is indexed for what it points to: a

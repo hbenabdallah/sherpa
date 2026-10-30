@@ -7,38 +7,37 @@ use App\Agent\ContextBudget;
 use App\Agent\HistoryCompactor;
 use App\Agent\InferenceSpeed;
 use App\Agent\MessageBag;
+use App\Agent\PlanMode;
 use App\Agent\SystemPromptBuilder;
-use App\Agent\Tool\Permission;
 use App\Agent\Tool\Toolbox;
 use App\Config\Backend;
 use App\Config\ModelResolver;
 use App\Config\ProviderName;
+use App\Mcp\McpException;
 use App\Mcp\McpRegistry;
+use App\Mcp\PromptArguments;
 use App\Memory\ContextStore;
 use App\Memory\FactExtractor;
 use App\Permission\ProjectPermissions;
 use App\Permission\SessionPermissions;
 use App\Platform\SwitchablePlatform;
-use App\Project\Project;
 use App\Project\DockerConfig;
 use App\Project\DockerWrapper;
+use App\Project\Project;
 use App\Project\ProjectQuestions;
 use App\Project\ProjectStore;
 use App\Project\WorkingProject;
 use App\Runtime\Interrupt;
 use App\Session\SessionStore;
-use App\Mcp\McpException;
-use App\Mcp\PromptArguments;
 use App\Skills\Skill;
 use App\Skills\SkillRegistry;
 use App\Tool\BackgroundJobs;
 use App\Tool\Sandbox;
-use App\Agent\PlanMode;
 use App\TUI\ChatPane;
 use App\TUI\LineEditor;
+use App\TUI\Scrollback;
 use App\TUI\StatusBar;
 use App\TUI\Terminal;
-use App\TUI\Scrollback;
 use App\Update\UpdateNotice;
 use App\Usage\TokenCapReached;
 use App\Usage\UsageMeter;
@@ -47,6 +46,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
+use Throwable;
 
 #[AsCommand(name: 'sherpa', description: 'Sherpa — a development agent in your terminal')]
 class SherpaCommand extends Command
@@ -226,6 +226,7 @@ class SherpaCommand extends Command
         );
         if ($profile === null) {
             echo Terminal::GRAY . "Goodbye.\n" . Terminal::RESET;
+
             return Command::SUCCESS;
         }
 
@@ -358,7 +359,7 @@ class SherpaCommand extends Command
                 $this->chat->showInfo(
                     'The projects configuration changed on disk. '
                     . 'This session keeps what it read at startup — '
-                    . 'restart Sherpa to pick up a changed path, container or stack.'
+                    . 'restart Sherpa to pick up a changed path, container or stack.',
                 );
             }
 
@@ -436,14 +437,14 @@ class SherpaCommand extends Command
                 } elseif ($result->repeatedError !== null) {
                     $this->chat->showError(
                         "Every call came back with the same error; turn stopped:\n  {$result->repeatedError}\n"
-                        . 'It is likely something only you can fix. Once it is, ask again.'
+                        . 'It is likely something only you can fix. Once it is, ask again.',
                     );
                 } elseif ($result->repliedBeforeStop) {
                     $this->chat->showInfo('The model kept repeating a tool call after its reply; turn stopped there.');
                 } elseif ($result->repetitionDetected) {
                     $this->chat->showError(
                         'The model kept repeating the same tool call without getting anywhere; turn stopped. '
-                        . 'Rephrase, or give it what it is missing.'
+                        . 'Rephrase, or give it what it is missing.',
                     );
                 } elseif ($result->maxIterationsReached) {
                     $this->chat->showError('Iteration limit reached.');
@@ -451,7 +452,7 @@ class SherpaCommand extends Command
             } catch (TokenCapReached $e) {
                 // Not a failure of anything: the limit the user set, doing its job.
                 $this->chat->showInfo($e->getMessage());
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 $this->chat->showError('Error: ' . $e->getMessage());
             } finally {
                 $this->terminal->endQuietInput();
@@ -493,6 +494,7 @@ class SherpaCommand extends Command
         if ($this->extractFacts && !$forgotten) {
             $this->chat->showInfo('Extracting the lasting facts... (Ctrl+C to skip)');
             $this->interrupt->beginTurn();
+
             try {
                 $this->chat->showInfo($this->factExtractor->extract($bag)->summary());
             } finally {
@@ -508,6 +510,7 @@ class SherpaCommand extends Command
         }
 
         echo Terminal::GRAY . "\nSession over. Good luck!\n" . Terminal::RESET;
+
         return Command::SUCCESS;
     }
 
@@ -524,7 +527,7 @@ class SherpaCommand extends Command
         $this->warnedAboutSessions = true;
         $this->chat->showError(
             'Cannot save the conversation in ' . ($this->sessions->directory() ?? '?')
-            . ': it will not be resumable.'
+            . ': it will not be resumable.',
         );
     }
 
@@ -580,7 +583,7 @@ class SherpaCommand extends Command
             // only surprising on a machine bought for the other one.
             $this->chat->showInfo(
                 'The model runs entirely on the processor. '
-                . 'Expected with no graphics card; otherwise it could not be loaded onto it.'
+                . 'Expected with no graphics card; otherwise it could not be loaded onto it.',
             );
 
             return;
@@ -642,7 +645,6 @@ class SherpaCommand extends Command
         );
     }
 
-
     /** Whether $name is one of Sherpa's own commands, which a skill of that name does not shadow. */
     private function isCommand(string $name): bool
     {
@@ -678,5 +680,4 @@ class SherpaCommand extends Command
     {
         return $this->lineEditor->prompt('❯ ', Terminal::BOLD . Terminal::GREEN);
     }
-
 }

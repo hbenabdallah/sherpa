@@ -8,6 +8,8 @@ use App\Rag\Embedding\Vectors;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\ParameterType;
+use LogicException;
+use Throwable;
 
 /**
  * Where a project's documentation is kept, searchable: SQLite, one database per
@@ -21,6 +23,7 @@ final class DocIndex
     private const SCHEMA = 2;
 
     private ?Connection $conn = null;
+
     private bool $fullText = false;
 
     /**
@@ -69,7 +72,7 @@ final class DocIndex
                 'INSERT OR REPLACE INTO documents (path, hash, size, mtime, title, type, chunks, indexed_at)
                  VALUES (:p, :h, :s, :m, :t, :ty, :n, :at)',
                 ['p' => $path, 'h' => $hash, 's' => $size, 'm' => $mtime, 't' => $document->title,
-                 'ty' => $document->type, 'n' => count($chunks), 'at' => date(DATE_ATOM)],
+                    'ty' => $document->type, 'n' => count($chunks), 'at' => date(DATE_ATOM)],
             );
 
             foreach ($chunks as $chunk) {
@@ -77,14 +80,15 @@ final class DocIndex
                     'INSERT INTO chunks (path, position, title, headings, context, text, parent, start_line, end_line)
                      VALUES (:p, :pos, :t, :h, :c, :x, :pa, :s, :e)',
                     ['p' => $path, 'pos' => $chunk->position, 't' => $chunk->title,
-                     'h' => json_encode($chunk->headings, JSON_UNESCAPED_UNICODE), 'c' => $chunk->context(),
-                     'x' => $chunk->text, 'pa' => $chunk->parent, 's' => $chunk->startLine, 'e' => $chunk->endLine],
+                        'h' => json_encode($chunk->headings, JSON_UNESCAPED_UNICODE), 'c' => $chunk->context(),
+                        'x' => $chunk->text, 'pa' => $chunk->parent, 's' => $chunk->startLine, 'e' => $chunk->endLine],
                 );
             }
 
             $db->commit();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $db->rollBack();
+
             throw $e;
         }
     }
@@ -226,7 +230,7 @@ final class DocIndex
                     ['q' => $expression, 'limit' => $limit],
                     ['limit' => ParameterType::INTEGER],
                 );
-            } catch (\Throwable) {
+            } catch (Throwable) {
                 // A malformed expression degrades to the fallback below.
                 $rows = [];
             }
@@ -288,7 +292,7 @@ final class DocIndex
 
     private function db(): Connection
     {
-        return $this->conn ?? throw new \LogicException('Index de documentation non ouvert.');
+        return $this->conn ?? throw new LogicException('Index de documentation non ouvert.');
     }
 
     private function migrate(): void
@@ -348,7 +352,7 @@ final class DocIndex
                 END
             SQL);
             $this->fullText = true;
-        } catch (\Throwable) {
+        } catch (Throwable) {
             $this->fullText = false;
         }
 

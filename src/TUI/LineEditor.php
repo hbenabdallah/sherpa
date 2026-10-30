@@ -6,6 +6,7 @@ use App\TUI\Input\KeyReader;
 use App\TUI\Input\LineBuffer;
 use App\TUI\Input\LineView;
 use App\TUI\Input\SlashMenu;
+use Closure;
 
 /**
  * The input line: libreadline where the extension exists, an editor written
@@ -31,6 +32,7 @@ class LineEditor
      * every backspace — the very drift this class exists to remove.
      */
     private const INVIS_START = "\x01";
+
     private const INVIS_END   = "\x02";
 
     private const MAX_HISTORY = 500;
@@ -68,9 +70,9 @@ class LineEditor
     /**
      * The commands and skills "/" lists.
      *
-     * @param \Closure(): list<array{name: string, hint: string, description: string}> $entries
+     * @param Closure(): list<array{name: string, hint: string, description: string}> $entries
      */
-    public function useCompletions(\Closure $entries): void
+    public function useCompletions(Closure $entries): void
     {
         $this->menu = new SlashMenu($entries);
     }
@@ -150,6 +152,7 @@ class LineEditor
 
         $saved = trim((string) shell_exec('stty -g 2>/dev/null'));
         exec('stty -echo icanon 2>/dev/null');
+
         try {
             $line = fgets(STDIN);
         } finally {
@@ -378,19 +381,23 @@ class LineEditor
                 case "\e[A":
                 case "\eOA":
                     $menu->up();
+
                     return null;
 
                 case "\e[B":
                 case "\eOB":
                     $menu->down();
+
                     return null;
 
                 case "\t":
                     $buffer->set(SlashMenu::completion($entry));
+
                     return null;
 
                 case "\e":
                     $menu->dismiss();
+
                     return null;
 
                 case "\r":
@@ -403,6 +410,7 @@ class LineEditor
                         return LineBuffer::SUBMIT;
                     }
                     $buffer->set(SlashMenu::completion($entry));
+
                     return null;
             }
         }

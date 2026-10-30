@@ -2,13 +2,16 @@
 
 namespace App\Project;
 
+use DateTimeImmutable;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\String\UnicodeString;
 use Symfony\Component\Yaml\Yaml;
+use Throwable;
 
 class ProjectStore
 {
     private string $configFile;
+
     /** @var array<string, Project> */
     private array $projects = [];
 
@@ -220,8 +223,8 @@ class ProjectStore
             memoryDb: Project::defaultMemoryDb($slug),
             docker: $docker,
             stack: $this->detector->detect($path)->summary(),
-            createdAt: new \DateTimeImmutable(),
-            lastUsedAt: new \DateTimeImmutable(),
+            createdAt: new DateTimeImmutable(),
+            lastUsedAt: new DateTimeImmutable(),
         );
     }
 
@@ -318,13 +321,13 @@ class ProjectStore
 
         try {
             (new Filesystem())->remove($own);
-        } catch (\Throwable) {
+        } catch (Throwable) {
         }
     }
 
     public function touch(Project $project): void
     {
-        $project->lastUsedAt = new \DateTimeImmutable();
+        $project->lastUsedAt = new DateTimeImmutable();
 
         // The stack was detected once, when the project was added, and never
         // looked at again — so adding a framework left Sherpa describing the

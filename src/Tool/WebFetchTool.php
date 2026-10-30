@@ -9,6 +9,7 @@ use App\Agent\Tool\Permission;
 use App\Rag\Parser\HtmlParser;
 use App\Runtime\Interrupt;
 use App\Runtime\InterruptibleHttpClient;
+use RuntimeException;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -30,10 +31,12 @@ class WebFetchTool
 
     /** Share of the window one read may take, with a floor and a ceiling. */
     private const SHARE = 0.25;
+
     private const MIN_CHARS = 8_000;
 
     /** How often a page arriving slowly is let go of, to hear Ctrl+C. */
     private const POLL_SECONDS = 0.1;
+
     private const MAX_CHARS = 60_000;
 
     /** @var array<string, array{type: string, text: string}> pages read this session, for reading on without fetching again */
@@ -53,13 +56,15 @@ class WebFetchTool
     }
 
     public function __invoke(
-        #[Param('The address, http:// or https://')] string $url,
-        #[Param('Where to start reading, in characters, when a previous read said there was more (optional)')] ?int $offset = null,
+        #[Param('The address, http:// or https://')]
+        string $url,
+        #[Param('Where to start reading, in characters, when a previous read said there was more (optional)')]
+        ?int $offset = null,
     ): string {
         $url = trim($url);
         $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
         if (!in_array($scheme, ['http', 'https'], true) || (string) parse_url($url, PHP_URL_HOST) === '') {
-            throw new \RuntimeException("not a web address: {$url}. Only http:// and https:// are fetched.");
+            throw new RuntimeException("not a web address: {$url}. Only http:// and https:// are fetched.");
         }
 
         $page = $this->pages[$url] ??= $this->fetch($url);
@@ -109,13 +114,13 @@ class WebFetchTool
 
                 $next = self::absolute($location, $url);
                 if ($hops + 1 > self::MAX_REDIRECTS) {
-                    throw new \RuntimeException("{$url}: too many redirects, stopped after " . self::MAX_REDIRECTS . '.');
+                    throw new RuntimeException("{$url}: too many redirects, stopped after " . self::MAX_REDIRECTS . '.');
                 }
                 if (!in_array(strtolower((string) parse_url($next, PHP_URL_SCHEME)), ['http', 'https'], true)) {
-                    throw new \RuntimeException("{$url} redirects to {$next}: not a web address, not followed.");
+                    throw new RuntimeException("{$url} redirects to {$next}: not a web address, not followed.");
                 }
                 if ($public && self::isLocal($next)) {
-                    throw new \RuntimeException("{$url} redirects to {$next}, a local or private address: not followed. Ask the user if that address is wanted.");
+                    throw new RuntimeException("{$url} redirects to {$next}, a local or private address: not followed. Ask the user if that address is wanted.");
                 }
                 $url = $next;
             }
@@ -129,7 +134,7 @@ class WebFetchTool
                         if ($this->interrupt?->requested()) {
                             $response->cancel();
 
-                            throw new \RuntimeException("{$url}: interrupted by the user.");
+                            throw new RuntimeException("{$url}: interrupted by the user.");
                         }
                         $more = true;
                         break;
@@ -145,11 +150,11 @@ class WebFetchTool
             $type = strtolower(trim(explode(';', $response->getHeaders(false)['content-type'][0] ?? 'text/plain')[0]));
             $charset = preg_match('/charset=([\w-]+)/i', $response->getHeaders(false)['content-type'][0] ?? '', $m) === 1 ? $m[1] : null;
         } catch (\Symfony\Contracts\HttpClient\Exception\ExceptionInterface $e) {
-            throw new \RuntimeException("could not fetch {$url}: {$e->getMessage()}");
+            throw new RuntimeException("could not fetch {$url}: {$e->getMessage()}");
         }
 
         if ($status >= 400) {
-            throw new \RuntimeException("{$url} answered HTTP {$status}.");
+            throw new RuntimeException("{$url} answered HTTP {$status}.");
         }
 
         if ($charset !== null && strtolower($charset) !== 'utf-8' && function_exists('mb_convert_encoding')) {
@@ -160,7 +165,7 @@ class WebFetchTool
             str_contains($type, 'html')                                   => $this->fromHtml($body),
             str_contains($type, 'json')                                   => self::fromJson($body),
             str_starts_with($type, 'text/') || str_contains($type, 'xml') => trim($body),
-            default => throw new \RuntimeException("{$url} is {$type}, not text: nothing to read."),
+            default => throw new RuntimeException("{$url} is {$type}, not text: nothing to read."),
         }];
     }
 
@@ -200,7 +205,7 @@ class WebFetchTool
             return $origin . $location;
         }
 
-        return $origin . rtrim(dirname($parts['path'] ?? '/') , '/') . '/' . $location;
+        return $origin . rtrim(dirname($parts['path'] ?? '/'), '/') . '/' . $location;
     }
 
     /** Sections as Markdown: the heading, then its text. */

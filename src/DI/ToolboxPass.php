@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\DI;
 
 use App\Agent\Tool\AsTool;
+use ReflectionClass;
+use ReflectionException;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 
@@ -20,8 +22,8 @@ class ToolboxPass implements CompilerPassInterface
             }
 
             try {
-                $ref = new \ReflectionClass($class);
-            } catch (\ReflectionException) {
+                $ref = new ReflectionClass($class);
+            } catch (ReflectionException) {
                 continue;
             }
 

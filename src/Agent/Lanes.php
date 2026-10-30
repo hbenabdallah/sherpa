@@ -2,6 +2,9 @@
 
 namespace App\Agent;
 
+use Fiber;
+use WeakMap;
+
 /**
  * Which of the sub-agents running together the current code works for,
  * numbered from 1 in the order they were asked for: their lines on screen
@@ -10,20 +13,20 @@ namespace App\Agent;
  */
 final class Lanes
 {
-    /** @var \WeakMap<\Fiber<mixed, mixed, mixed, mixed>, int>|null */
-    private static ?\WeakMap $numbers = null;
+    /** @var WeakMap<Fiber<mixed, mixed, mixed, mixed>, int>|null */
+    private static ?WeakMap $numbers = null;
 
-    /** @param \Fiber<mixed, mixed, mixed, mixed> $fiber */
-    public static function assign(\Fiber $fiber, int $number): void
+    /** @param Fiber<mixed, mixed, mixed, mixed> $fiber */
+    public static function assign(Fiber $fiber, int $number): void
     {
-        self::$numbers ??= new \WeakMap();
+        self::$numbers ??= new WeakMap();
         self::$numbers[$fiber] = $number;
     }
 
     /** The number of the sub-agent the current code works for, or null outside one running beside others. */
     public static function number(): ?int
     {
-        $fiber = \Fiber::getCurrent();
+        $fiber = Fiber::getCurrent();
 
         return $fiber === null ? null : self::$numbers[$fiber] ?? null;
     }

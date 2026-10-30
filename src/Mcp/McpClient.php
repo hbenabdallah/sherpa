@@ -4,6 +4,7 @@ namespace App\Mcp;
 
 use App\Runtime\Interrupt;
 use App\Runtime\InterruptibleHttpClient;
+use Closure;
 use Mcp\Client as Sdk;
 use Mcp\Client\Transport\TransportInterface;
 use Mcp\Exception\ExceptionInterface as SdkException;
@@ -18,6 +19,7 @@ use Mcp\Schema\Enum\ProtocolVersion;
 use Nyholm\Psr7\Factory\Psr17Factory;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Component\HttpClient\Psr18Client;
+use Throwable;
 
 /**
  * The MCP side of the conversation: handshake, tools, resources, prompts.
@@ -40,11 +42,15 @@ final class McpClient
 
     /** A server that pages forever does not get to page forever. */
     private const MAX_TOOLS = 500;
+
     private const MAX_RESOURCES = 500;
+
     private const MAX_PROMPTS = 200;
 
     private ?Sdk $client = null;
+
     private ?TransportInterface $transport = null;
+
     private readonly ServerLog $log;
 
     /**
@@ -207,7 +213,7 @@ final class McpClient
         do {
             try {
                 $page = $this->request(fn(Sdk $client) => $client->listResourceTemplates($cursor));
-            } catch (\Throwable) {
+            } catch (Throwable) {
                 // Unknown method, or a template the SDK refuses to parse:
                 // either way there is nothing usable to offer.
                 return $templates;
@@ -357,11 +363,11 @@ final class McpClient
      *
      * @template T
      *
-     * @param \Closure(Sdk): T $request
+     * @param Closure(Sdk): T $request
      *
      * @return T
      */
-    private function request(\Closure $request): mixed
+    private function request(Closure $request): mixed
     {
         try {
             return $request($this->client);
@@ -382,7 +388,7 @@ final class McpClient
     {
         if ($this->which($this->config->command) === null) {
             throw new McpException(
-                "MCP server “{$this->config->name}”: command not found: {$this->config->command}"
+                "MCP server “{$this->config->name}”: command not found: {$this->config->command}",
             );
         }
 

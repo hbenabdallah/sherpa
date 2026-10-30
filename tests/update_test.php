@@ -1,4 +1,5 @@
 <?php
+
 // A new release, told and installed. Before, a release reached nobody who did
 // not go and look, and updating meant finding install.sh again. Every request
 // to GitHub here is a fake; the executable replaced is a file of this test's.
@@ -66,10 +67,14 @@ check('GitHub is asked at most once a day', $asked === 1, (string) $asked);
 $notice->message($now + 90_000);
 check('and again the next day', $asked === 2, (string) $asked);
 
-check('nothing is said when this is the latest',
-    (new UpdateNotice(latestIs('v1.0.1'), $root . '/same.json', '1.0.1'))->message($now) === null);
-check('nor when this is newer than the latest, a release not yet tagged',
-    (new UpdateNotice(latestIs('v1.0.1'), $root . '/ahead.json', '1.0.2'))->message($now) === null);
+check(
+    'nothing is said when this is the latest',
+    (new UpdateNotice(latestIs('v1.0.1'), $root . '/same.json', '1.0.1'))->message($now) === null,
+);
+check(
+    'nor when this is newer than the latest, a release not yet tagged',
+    (new UpdateNotice(latestIs('v1.0.1'), $root . '/ahead.json', '1.0.2'))->message($now) === null,
+);
 
 $asked = 0;
 $checkout = new UpdateNotice(latestIs('v9.9.9', $asked), $root . '/dev.json', 'dev (v1.0.1-3-gabc)');
@@ -83,8 +88,10 @@ check('offline, it says nothing, and does not wait on GitHub at every start', $o
 
 putenv('SHERPA_UPDATE_CHECK=off');
 $asked = 0;
-check('SHERPA_UPDATE_CHECK=off turns it off, request included',
-    (new UpdateNotice(latestIs('v1.0.2', $asked), $root . '/off.json', '1.0.1'))->message($now) === null && $asked === 0);
+check(
+    'SHERPA_UPDATE_CHECK=off turns it off, request included',
+    (new UpdateNotice(latestIs('v1.0.2', $asked), $root . '/off.json', '1.0.1'))->message($now) === null && $asked === 0,
+);
 putenv('SHERPA_UPDATE_CHECK');
 
 // ---- installing ---------------------------------------------------------------
@@ -113,8 +120,11 @@ $client = serving([$base => $binary, $base . '.sha256' => $sum], $requested);
 clearstatcache();
 check('the release takes the executable\'s place', file_get_contents($target) === $binary);
 check('executable', (fileperms($target) & 0777) === 0755, decoct(fileperms($target) & 0777));
-check('fetched from the release, checksum beside it, then its notes',
-    $requested === [$base, $base . '.sha256', Releases::URL . '/download/v1.0.2/release-notes.md'], json_encode($requested));
+check(
+    'fetched from the release, checksum beside it, then its notes',
+    $requested === [$base, $base . '.sha256', Releases::URL . '/download/v1.0.2/release-notes.md'],
+    json_encode($requested),
+);
 check('and nothing is left beside it', glob(dirname($target) . '/.sherpa-update-*') === []);
 
 // What is said afterwards is prepared before: once the file is replaced, this
@@ -155,8 +165,11 @@ file_put_contents($root . '/locked/sherpa', "old\n");
 chmod($root . '/locked', 0555);
 $locked = refused(serving([$base => $binary, $base . '.sha256' => $sum]), $root . '/locked/sherpa');
 chmod($root . '/locked', 0755);
-check('a directory it cannot write in is said before anything is downloaded',
-    posix_getuid() === 0 || str_contains((string) $locked, 'cannot write in'), (string) $locked);
+check(
+    'a directory it cannot write in is said before anything is downloaded',
+    posix_getuid() === 0 || str_contains((string) $locked, 'cannot write in'),
+    (string) $locked,
+);
 
 // ---- sherpa update ------------------------------------------------------------
 function update(array $args, ?string $executable, string $current, MockHttpClient $client): CommandTester
@@ -218,9 +231,12 @@ check('with GitHub out of reach, it says so and suggests naming a version', $run
 $repo = dirname(__DIR__);
 if (is_dir($repo . '/.git') && trim((string) shell_exec('git -C ' . escapeshellarg($repo) . ' tag -l v1.0.1 2>/dev/null')) === 'v1.0.1') {
     $notes = (string) shell_exec('cd ' . escapeshellarg($repo) . ' && sh bin/release-notes.sh v1.0.1 2>&1');
-    check('the notes of a release are its commits since the one before',
+    check(
+        'the notes of a release are its commits since the one before',
         str_contains($notes, 'What changed in Sherpa 1.0.1') && str_contains($notes, '- Say at start-up when a newer release is out')
-        && str_contains($notes, 'Since 1.0.0.'), $notes);
+        && str_contains($notes, 'Since 1.0.0.'),
+        $notes,
+    );
     check('and none from the release before', !str_contains($notes, 'Confine symlinks'), $notes);
 } else {
     check('the notes script (skipped: no git history with tags here)', true);
@@ -237,8 +253,10 @@ $session = $loader->get('sherpa');
 $session = $session instanceof Symfony\Component\Console\Command\LazyCommand ? $session->getCommand() : $session;
 check('and the session is handed the notice', (new ReflectionProperty($session, 'updates'))->getValue($session) instanceof UpdateNotice);
 foreach (['bin/sherpa', 'bin/sherpa-release.php'] as $entry) {
-    check("and {$entry} does not read it as the session's options",
-        preg_match("/in_array\\(\\\$_SERVER\\['argv'\\]\\[1\\] \\?\\? '', \\[[^]]*'update'/", (string) file_get_contents(dirname(__DIR__) . '/' . $entry)) === 1);
+    check(
+        "and {$entry} does not read it as the session's options",
+        preg_match("/in_array\\(\\\$_SERVER\\['argv'\\]\\[1\\] \\?\\? '', \\[[^]]*'update'/", (string) file_get_contents(dirname(__DIR__) . '/' . $entry)) === 1,
+    );
 }
 
 exec('rm -rf ' . escapeshellarg($root));

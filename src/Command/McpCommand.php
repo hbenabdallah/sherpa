@@ -124,6 +124,7 @@ final class McpCommand extends Command
 
         if (!$input->getOption('no-check')) {
             $client = McpClient::for($server, callTimeout: self::CHECK_TIMEOUT);
+
             try {
                 $tools = count($client->listTools());
             } catch (McpException $e) {

@@ -9,6 +9,7 @@ use App\Project\Project;
 use App\Project\WorkingProject;
 use App\Rag\Embedding\ChunkEmbedder;
 use App\Rag\Embedding\EmbeddingProvider;
+use Throwable;
 
 /**
  * The project's documentation, searched on the model's behalf. The index is
@@ -27,10 +28,13 @@ class DocSearch
 
     /** Share of the prompt window one search may take. */
     private const SHARE = 0.10;
+
     private const MIN_CHARS = 6000;
+
     private const MAX_CHARS = 24000;
 
     private ?string $openFor = null;
+
     private ?SyncReport $lastSync = null;
 
     public function __construct(
@@ -64,7 +68,7 @@ class DocSearch
         if ($this->embeddings !== null && $this->embeddings->model() !== '') {
             try {
                 $report->embedded = $this->embedder->embed($this->index, $this->embeddings);
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 $report->embeddingError = $e->getMessage();
             }
         }

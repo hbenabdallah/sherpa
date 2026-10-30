@@ -17,7 +17,8 @@ class DocSearchTool
     public function __construct(private readonly DocSearch $search) {}
 
     public function __invoke(
-        #[Param('What to look for, as a question or keywords')] string $query,
+        #[Param('What to look for, as a question or keywords')]
+        string $query,
     ): string {
         if (trim($query) === '') {
             return 'Give a question, or keywords to look for in the documentation.';

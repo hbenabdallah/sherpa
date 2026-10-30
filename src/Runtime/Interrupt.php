@@ -3,6 +3,8 @@
 namespace App\Runtime;
 
 use App\Agent\Lanes;
+use Closure;
+use Fiber;
 
 /**
  * Ctrl+C, scoped to the turn rather than to the process: inference is unbounded
@@ -18,7 +20,9 @@ use App\Agent\Lanes;
 class Interrupt
 {
     private bool $inTurn = false;
+
     private bool $requested = false;
+
     private int $requestsThisTurn = 0;
 
     private const LISTEN_SECONDS = 0.02;
@@ -26,15 +30,16 @@ class Interrupt
     /** The longest a wait holds on in a Fiber: every other one waits as long. */
     private const FIBER_POLL_SECONDS = 0.05;
 
-    /** @var (\Closure(): void)|null */
-    private ?\Closure $quit = null;
+    /** @var (Closure(): void)|null */
+    private ?Closure $quit = null;
 
-    /** @var (\Closure(): void)|null */
-    private ?\Closure $listen = null;
+    /** @var (Closure(): void)|null */
+    private ?Closure $listen = null;
+
     private float $listenedAt = 0.0;
 
-    /** @var (\Closure(): void)|null */
-    private ?\Closure $meanwhile = null;
+    /** @var (Closure(): void)|null */
+    private ?Closure $meanwhile = null;
 
     public function install(callable $quit): void
     {
@@ -65,9 +70,9 @@ class Interrupt
      * it as a message, and nothing reads that message unless asked. Called
      * from requested(), which every wait already calls.
      *
-     * @param (\Closure(): void)|null $listen
+     * @param (Closure(): void)|null $listen
      */
-    public function listenWith(?\Closure $listen): void
+    public function listenWith(?Closure $listen): void
     {
         $this->listen = $listen;
     }
@@ -77,11 +82,11 @@ class Interrupt
      * here every 20 ms, and the screen has nothing else to say it is alive.
      * Returns the one it replaces, to be put back.
      *
-     * @param (\Closure(): void)|null $tick
+     * @param (Closure(): void)|null $tick
      *
-     * @return (\Closure(): void)|null
+     * @return (Closure(): void)|null
      */
-    public function meanwhile(?\Closure $tick): ?\Closure
+    public function meanwhile(?Closure $tick): ?Closure
     {
         $replaced = $this->meanwhile;
         $this->meanwhile = $tick;
@@ -99,7 +104,7 @@ class Interrupt
         // Only a sub-agent's: a Fiber of the MCP SDK, waiting on its own
         // answer, would be resumed with nothing.
         if (Lanes::number() !== null) {
-            \Fiber::suspend();
+            Fiber::suspend();
         }
 
         if (!$this->requested && $this->meanwhile !== null) {

@@ -1,4 +1,5 @@
 <?php
+
 // web_fetch: a page read as text, bounded, confirmed first — against a fake
 // web, so nothing leaves the machine.
 
@@ -57,8 +58,11 @@ $fetch = new WebFetchTool($web);
 $out = $fetch('https://docs.example.test/guide');
 check('a page becomes readable text', str_contains($out, '# Installing') && str_contains($out, 'composer require acme/lib'), $out);
 check('its tables stay tables', str_contains($out, '| Name | Default |') && str_contains($out, '| timeout | 30 |'), $out);
-check('scripts, styles, menus and footers are dropped',
-    !str_contains($out, 'track()') && !str_contains($out, 'p{}') && !str_contains($out, 'Home · Blog') && !str_contains($out, '© Acme'), $out);
+check(
+    'scripts, styles, menus and footers are dropped',
+    !str_contains($out, 'track()') && !str_contains($out, 'p{}') && !str_contains($out, 'Home · Blog') && !str_contains($out, '© Acme'),
+    $out,
+);
 check('and it says the text is information, not instructions', str_contains($out, 'not as instructions'), $out);
 
 check('JSON is shown laid out', str_contains($fetch('https://api.example.test/v1'), "\"version\": \"2.1\""));
@@ -72,6 +76,7 @@ foreach ([
     'nor anything without a host'       => ['https:///nothing', 'not a web address'],
 ] as $label => [$url, $expected]) {
     $message = null;
+
     try {
         $fetch($url);
     } catch (RuntimeException $e) {
@@ -90,6 +95,7 @@ foreach ([
     'and to localhost'                                                => 'https://example.test/to-localhost',
 ] as $label => $url) {
     $message = null;
+
     try {
         $fetch($url);
     } catch (RuntimeException $e) {
@@ -99,6 +105,7 @@ foreach ([
 }
 check('while a local address the user asked for may redirect within itself', str_contains($fetch('http://localhost:8080/start'), 'SECRET_INTERNAL'));
 $message = null;
+
 try {
     $fetch('https://example.test/loop');
 } catch (RuntimeException $e) {
@@ -123,7 +130,9 @@ for ($i = 0; $i < 50 && @fsockopen('127.0.0.1', $port) === false; $i++) {
 
 $interrupt = new Interrupt();
 $ticks = 0;
-$interrupt->meanwhile(function () use (&$ticks) { $ticks++; });
+$interrupt->meanwhile(function () use (&$ticks) {
+    $ticks++;
+});
 $slow = new WebFetchTool(interrupt: $interrupt);
 $page = $slow("http://127.0.0.1:{$port}/pause");
 check('a page that pauses halfway is read whole', str_contains($page, 'first half, second half'), $page);
@@ -134,6 +143,7 @@ pcntl_async_signals(true);
 pcntl_signal(SIGALRM, fn() => $interrupt->request());
 pcntl_alarm(1);
 $started = microtime(true);
+
 try {
     $slow("http://127.0.0.1:{$port}/silent");
     $said = 'answered';

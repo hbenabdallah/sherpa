@@ -3,6 +3,7 @@
 namespace App\Mcp;
 
 use Psr\Log\AbstractLogger;
+use Stringable;
 
 /**
  * What a server said about itself while it was failing.
@@ -21,7 +22,9 @@ final class ServerLog extends AbstractLogger
 {
     /** How much of stderr to keep, and to quote: the end, where the reason is. */
     private const KEEP = 4000;
+
     private const QUOTED_LINES = 15;
+
     private const QUOTED_CHARS = 1500;
 
     private string $stderr = '';
@@ -29,7 +32,7 @@ final class ServerLog extends AbstractLogger
     /**
      * @param mixed[] $context
      */
-    public function log(mixed $level, \Stringable|string $message, array $context = []): void
+    public function log(mixed $level, Stringable|string $message, array $context = []): void
     {
         // The SDK's own wording for a drained stderr chunk. Matching on it is
         // brittle by nature, which is why nothing depends on it: a version that

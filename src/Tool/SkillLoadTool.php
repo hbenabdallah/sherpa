@@ -17,12 +17,14 @@ class SkillLoadTool
     public function __construct(private readonly SkillRegistry $registry) {}
 
     public function __invoke(
-        #[Param('Name of the skill to load (as shown in the skills index)')] string $name,
+        #[Param('Name of the skill to load (as shown in the skills index)')]
+        string $name,
     ): string {
         $skill = $this->registry->get($name);
 
         if ($skill === null) {
             $available = implode(', ', array_map(fn($s) => $s->name, $this->registry->all()));
+
             return "Skill '{$name}' not found. Available: {$available}";
         }
 

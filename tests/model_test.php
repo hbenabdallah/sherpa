@@ -1,4 +1,5 @@
 <?php
+
 // Verification of model selection: the precedence chain, what gets written down,
 // and the two things that must happen when the model changes under a session.
 require dirname(__DIR__) . '/vendor/autoload.php';
@@ -11,8 +12,8 @@ use App\Config\Backend;
 use App\Config\MachineConfig;
 use App\Config\ModelProfile;
 use App\Config\ModelResolver;
-use App\Platform\ModelInfo;
 use App\Memory\MemoryStore;
+use App\Platform\ModelInfo;
 use App\Platform\OllamaPlatform;
 use App\Project\DockerConfig;
 use App\Project\Project;
@@ -54,17 +55,21 @@ $config = configAt($dir . '/config.yaml');
 check('a choice is written', $config->save(new ModelProfile('qwen3-coder:30b', 65536)));
 
 $stored = $config->read();
-check('and read back intact',
+check(
+    'and read back intact',
     $stored?->model === 'qwen3-coder:30b' && $stored->contextWindow === 65536,
-    json_encode([$stored?->model, $stored?->contextWindow]));
+    json_encode([$stored?->model, $stored?->contextWindow]),
+);
 check('the file says where it came from', str_contains(file_get_contents($dir . '/config.yaml'), '/model'));
 
 // Hand-editing is expected: the file is a config, not a database.
 file_put_contents($dir . '/config.yaml', "model: llama3.1:8b\ncontext: 16384\n");
 $stored = $config->read();
-check('a hand-written file is honoured',
+check(
+    'a hand-written file is honoured',
     $stored?->model === 'llama3.1:8b' && $stored->contextWindow === 16384,
-    json_encode([$stored?->model, $stored?->contextWindow]));
+    json_encode([$stored?->model, $stored?->contextWindow]),
+);
 
 // ---- 3. A file that says nothing usable reads as "never chosen" ------------
 // Otherwise the setup screen never appears and the session runs against "".
@@ -84,9 +89,11 @@ check('no flags means no command-line profile', $resolver->fromCommandLine(null,
 
 // --ctx alone retunes what is already in force rather than dragging .env along.
 $retuned = $resolver->fromCommandLine(null, 4096);
-check('--ctx alone keeps the settled model',
+check(
+    '--ctx alone keeps the settled model',
     $retuned?->model === 'stored:7b' && $retuned->contextWindow === 4096,
-    json_encode([$retuned?->model, $retuned?->contextWindow]));
+    json_encode([$retuned?->model, $retuned?->contextWindow]),
+);
 
 $empty = new ModelResolver(configAt($dir . '/absent.yaml'), 'env:7b', 32768, 'ollama');
 check('with nothing stored, --ctx falls back to .env', $empty->fromCommandLine(null, 4096)?->model === 'env:7b');
@@ -96,21 +103,29 @@ check('with nothing stored, --ctx falls back to .env', $empty->fromCommandLine(n
 $fresh = new ModelResolver(configAt($dir . '/absent.yaml'), 'env:7b', 32768);
 check('with nothing said anywhere, the API is the backend', $fresh->backend() === Backend::Api);
 check('a flag wins over everything', $fresh->backend(Backend::Ollama) === Backend::Ollama);
-check('.env can say otherwise',
-    (new ModelResolver(configAt($dir . '/absent.yaml'), 'env:7b', 32768, 'ollama'))->backend() === Backend::Ollama);
-check('and an unreadable .env value falls back to the default',
-    (new ModelResolver(configAt($dir . '/absent.yaml'), 'env:7b', 32768, 'n-importe-quoi'))->backend() === Backend::Api);
+check(
+    '.env can say otherwise',
+    (new ModelResolver(configAt($dir . '/absent.yaml'), 'env:7b', 32768, 'ollama'))->backend() === Backend::Ollama,
+);
+check(
+    'and an unreadable .env value falls back to the default',
+    (new ModelResolver(configAt($dir . '/absent.yaml'), 'env:7b', 32768, 'n-importe-quoi'))->backend() === Backend::Api,
+);
 
 // No provider's model can be guessed, so an unconfigured API has none — and
 // the command explains what to set rather than sending a request to "".
 check('an API with no model configured falls back to none', $fresh->fallback()->model === '');
 $apiEnv = new ModelResolver(configAt($dir . '/absent.yaml'), 'env:7b', 32768, 'api', 'fournisseur/modele', 65536);
-check('.env names the API model and window',
+check(
+    '.env names the API model and window',
     $apiEnv->fallback()->model === 'fournisseur/modele' && $apiEnv->fallback()->contextWindow === 65536
-    && $apiEnv->fallback()->backend === Backend::Api);
+    && $apiEnv->fallback()->backend === Backend::Api,
+);
 check('while Ollama keeps its own', $apiEnv->fallback(Backend::Ollama)->model === 'env:7b');
-check('-m under -b belongs to that backend',
-    $apiEnv->fromCommandLine('llama3.1:8b', null, Backend::Ollama)?->backend === Backend::Ollama);
+check(
+    '-m under -b belongs to that backend',
+    $apiEnv->fromCommandLine('llama3.1:8b', null, Backend::Ollama)?->backend === Backend::Ollama,
+);
 
 // Each backend keeps its own model, so going back to one finds its choice.
 $both = configAt($dir . '/both.yaml');
@@ -118,20 +133,24 @@ $both->save(new ModelProfile('distant', 65536, '', Backend::Api));
 $both->save(new ModelProfile('local:7b', 16384, '', Backend::Ollama), asDefault: false);
 check('the default backend is the one saved as default', $both->backend() === Backend::Api);
 check('its model is what read() returns', $both->read()?->model === 'distant');
-check('and the other backend keeps its own model',
-    $both->read(Backend::Ollama)?->model === 'local:7b' && $both->read(Backend::Ollama)?->contextWindow === 16384);
+check(
+    'and the other backend keeps its own model',
+    $both->read(Backend::Ollama)?->model === 'local:7b' && $both->read(Backend::Ollama)?->contextWindow === 16384,
+);
 check('a choice made under -b is kept without becoming the default', $both->backend() === Backend::Api);
 
 $both->save(new ModelProfile('local:7b', 16384, '', Backend::Ollama));
 check('remembering it as the default does switch', $both->backend() === Backend::Ollama);
 check('without losing the API model', $both->read(Backend::Api)?->model === 'distant');
 
-check('a backend chosen but never given a model reads as never chosen',
+check(
+    'a backend chosen but never given a model reads as never chosen',
     (function () use ($dir) {
         file_put_contents($dir . '/half.yaml', "backend: api\nollama:\n  model: local:7b\n");
 
         return configAt($dir . '/half.yaml')->read() === null;
-    })());
+    })(),
+);
 
 // A file from before there was a choice: a bare model, which can only have
 // been an Ollama one. Reading it as the new default would point an existing
@@ -144,16 +163,21 @@ check('and it has no API model', $legacy->read(Backend::Api) === null);
 
 $legacy->save(new ModelProfile('distant', 32768, '', Backend::Api), asDefault: false);
 $migrated = Symfony\Component\Yaml\Yaml::parseFile($dir . '/legacy.yaml');
-check('saving folds the old shape into its section',
-    ($migrated['ollama']['model'] ?? null) === 'ancien:7b' && !isset($migrated['model']), json_encode($migrated));
+check(
+    'saving folds the old shape into its section',
+    ($migrated['ollama']['model'] ?? null) === 'ancien:7b' && !isset($migrated['model']),
+    json_encode($migrated),
+);
 check('keeps the machine on the backend it was using', $legacy->backend() === Backend::Ollama);
 check('and adds the new one beside it', $legacy->read(Backend::Api)?->model === 'distant');
 
 // ---- 4c. The API's address, asked for once and remembered ------------------
 // What gets pasted is rarely the base URL: it is a curl example's endpoint, or
 // it has a trailing slash, or no scheme. Each has one obvious reading.
-check('a pasted endpoint is cut back to the base URL',
-    ApiEndpoint::normalize('https://api.openai.com/v1/chat/completions') === 'https://api.openai.com/v1');
+check(
+    'a pasted endpoint is cut back to the base URL',
+    ApiEndpoint::normalize('https://api.openai.com/v1/chat/completions') === 'https://api.openai.com/v1',
+);
 check('a trailing slash is dropped', ApiEndpoint::normalize('https://api.mistral.ai/v1/') === 'https://api.mistral.ai/v1');
 // A key sent over plain http to a distant host is readable on the way; to a
 // server on this machine or the local network, http is the norm.
@@ -165,8 +189,10 @@ foreach (['http://localhost:8000/v1', 'http://127.0.0.1:1234/v1', 'http://[::1]:
     check("nor a server at home: {$local}", !ApiEndpoint::sendsInClear($local));
 }
 check('a missing scheme means https', ApiEndpoint::normalize('openrouter.ai/api/v1') === 'https://openrouter.ai/api/v1');
-check('except for a local server, which is plain http',
-    ApiEndpoint::normalize('localhost:8000/v1') === 'http://localhost:8000/v1');
+check(
+    'except for a local server, which is plain http',
+    ApiEndpoint::normalize('localhost:8000/v1') === 'http://localhost:8000/v1',
+);
 foreach (['', 'pas une adresse', 'ftp://example.com/v1', 'https://', 'http://exa mple.com'] as $bad) {
     check('not an http(s) address is refused: ' . json_encode($bad), ApiEndpoint::normalize($bad) === null);
 }
@@ -183,10 +209,14 @@ check('the file says the key is never written there', str_contains($written, "SH
 check('and holds no key', !preg_match('/key\s*:/i', $written), $written);
 
 $urlResolver = new ModelResolver($urlConfig, 'env:7b', 32768);
-check('the recorded address is used when the environment says nothing',
-    $urlResolver->apiUrl('') === 'https://api.example.com/v1');
-check('an address in the environment wins — it ships empty, so it was chosen',
-    $urlResolver->apiUrl('https://ailleurs.example/v1') === 'https://ailleurs.example/v1');
+check(
+    'the recorded address is used when the environment says nothing',
+    $urlResolver->apiUrl('') === 'https://api.example.com/v1',
+);
+check(
+    'an address in the environment wins — it ships empty, so it was chosen',
+    $urlResolver->apiUrl('https://ailleurs.example/v1') === 'https://ailleurs.example/v1',
+);
 check('and with neither there is none', (new ModelResolver(configAt($dir . '/absent.yaml'), 'env:7b', 32768))->apiUrl('') === null);
 
 // ---- 5. A suggested window never exceeds what the model has ----------------
@@ -217,8 +247,10 @@ check('the estimate calibrates', $budget->isCalibrated());
 $learned = $budget->charsPerToken();
 
 $budget->useModel('qwen2.5-coder:7b', 16384);
-check('retuning the window keeps the calibration',
-    $budget->isCalibrated() && $budget->charsPerToken() === $learned);
+check(
+    'retuning the window keeps the calibration',
+    $budget->isCalibrated() && $budget->charsPerToken() === $learned,
+);
 check('and the window actually moved', $budget->contextWindow() === 16384, (string) $budget->contextWindow());
 
 $budget->useModel('devstral-small-2:24b', 65536);
@@ -229,9 +261,9 @@ check('the new window is in force', $budget->contextWindow() === 65536, (string)
 // ---- 8. The catalogue, read off /api/tags in one request -------------------
 $tags = json_encode(['models' => [
     ['name' => 'qwen2.5-coder:7b', 'size' => 4700000000,
-     'details' => ['parameter_size' => '7.6B', 'context_length' => 32768], 'capabilities' => ['completion', 'tools']],
+        'details' => ['parameter_size' => '7.6B', 'context_length' => 32768], 'capabilities' => ['completion', 'tools']],
     ['name' => 'qwen3-coder:30b', 'size' => 18556700761,
-     'details' => ['parameter_size' => '30.5B', 'context_length' => 262144], 'capabilities' => ['completion', 'tools']],
+        'details' => ['parameter_size' => '30.5B', 'context_length' => 262144], 'capabilities' => ['completion', 'tools']],
     ['not-a-model' => true],
 ]]);
 
@@ -283,8 +315,10 @@ check('and moves to the chosen one', $platform->modelName() === 'arrivee:30b', $
 check('the window travels with it', $platform->contextWindow() === 65536, (string) $platform->contextWindow());
 
 $platform->useModel('', 0);
-check('an empty switch changes nothing',
-    $platform->modelName() === 'arrivee:30b' && $platform->contextWindow() === 65536);
+check(
+    'an empty switch changes nothing',
+    $platform->modelName() === 'arrivee:30b' && $platform->contextWindow() === 65536,
+);
 
 // ---- 11. What a model change does to the session --------------------------
 // The reset itself lives in SherpaCommand, behind a TTY. Its two invariants do
@@ -299,17 +333,22 @@ $bag->assistant('voici ce qu\'il fait');
 // The number shown to someone deciding whether to throw the conversation away.
 // The system message is rebuilt rather than lost, so counting it would
 // overstate the loss by one — every time, and in the one place it matters.
-check('the discarded count excludes the system message',
-    $bag->conversationSize() === 4, (string) $bag->conversationSize());
+check(
+    'the discarded count excludes the system message',
+    $bag->conversationSize() === 4,
+    (string) $bag->conversationSize(),
+);
 check('and it is not merely the message count', $bag->count() === 5, (string) $bag->count());
 
 $bag->replace([]);
 $bag->system('SYSTEM PROMPT REBUILT');
 
 check('after the reset only the system message remains', $bag->count() === 1, (string) $bag->count());
-check('and it is the rebuilt one',
+check(
+    'and it is the rebuilt one',
     ($bag->all()[0]['role'] ?? '') === 'system' && ($bag->all()[0]['content'] ?? '') === 'SYSTEM PROMPT REBUILT',
-    json_encode($bag->all()));
+    json_encode($bag->all()),
+);
 
 // This same number decides whether a confirmation is asked at all: zero means
 // the switch costs nothing, and a question there is friction on the very action
@@ -340,9 +379,14 @@ mkdir($dir . '/projet', 0777, true);
 file_put_contents($dir . '/projet/go.mod', "module x\n\ngo 1.23\n");
 
 $project = new Project(
-    slug: 'x', name: 'exemple', path: $dir . '/projet', memoryDb: '/dev/null',
-    docker: new DockerConfig(enabled: false), stack: '',
-    createdAt: new \DateTimeImmutable(), lastUsedAt: new \DateTimeImmutable(),
+    slug: 'x',
+    name: 'exemple',
+    path: $dir . '/projet',
+    memoryDb: '/dev/null',
+    docker: new DockerConfig(enabled: false),
+    stack: '',
+    createdAt: new \DateTimeImmutable(),
+    lastUsedAt: new \DateTimeImmutable(),
 );
 
 function promptFor(MemoryStore $memory, ?ContextBudget $budget): string
@@ -356,20 +400,31 @@ $small = promptFor($memory, new ContextBudget(contextWindow: 32768));
 $large = promptFor($memory, new ContextBudget(contextWindow: 262144));
 $none  = promptFor($memory, null);
 
-check('a big window carries more remembered facts', mb_strlen($large) > mb_strlen($small),
-    mb_strlen($large) . ' vs ' . mb_strlen($small));
-check('a small window is unchanged by the new rule', mb_strlen($small) === mb_strlen($none),
-    mb_strlen($small) . ' vs ' . mb_strlen($none));
+check(
+    'a big window carries more remembered facts',
+    mb_strlen($large) > mb_strlen($small),
+    mb_strlen($large) . ' vs ' . mb_strlen($small),
+);
+check(
+    'a small window is unchanged by the new rule',
+    mb_strlen($small) === mb_strlen($none),
+    mb_strlen($small) . ' vs ' . mb_strlen($none),
+);
 
 // The ceiling is what stops a quarter-million-token window from spending
 // thousands of tokens on facts nobody has asked for yet.
 $huge = promptFor($memory, new ContextBudget(contextWindow: 1048576));
-check('and the ceiling holds', mb_strlen($huge) === mb_strlen($large),
-    mb_strlen($huge) . ' vs ' . mb_strlen($large));
+check(
+    'and the ceiling holds',
+    mb_strlen($huge) === mb_strlen($large),
+    mb_strlen($huge) . ' vs ' . mb_strlen($large),
+);
 
 // Whatever the window, what does not fit is still named rather than dropped.
-check('the overflow index survives both ends',
-    str_contains($small, 'memory_recall') && str_contains($large, 'memory_recall'));
+check(
+    'the overflow index survives both ends',
+    str_contains($small, 'memory_recall') && str_contains($large, 'memory_recall'),
+);
 
 array_map('unlink', glob($dir . '/projet/*') ?: []);
 @rmdir($dir . '/projet');

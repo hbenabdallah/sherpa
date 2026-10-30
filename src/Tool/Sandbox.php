@@ -3,6 +3,7 @@
 namespace App\Tool;
 
 use Symfony\Component\Process\Process;
+use Throwable;
 
 /**
  * Where a command run on this machine may write: the project, the temporary
@@ -20,6 +21,7 @@ use Symfony\Component\Process\Process;
 class Sandbox
 {
     public const BUBBLEWRAP = 'bubblewrap';
+
     public const SANDBOX_EXEC = 'sandbox-exec';
 
     /**
@@ -131,9 +133,9 @@ class Sandbox
     /** A sandbox-exec profile: everything allowed, but writing, and reading the keys. */
     private function profile(string $root): string
     {
-        $quote = static fn (string $path): string => '"' . addcslashes($path, '"\\') . '"';
+        $quote = static fn(string $path): string => '"' . addcslashes($path, '"\\') . '"';
         $writable = array_map(
-            static fn (string $path): string => '(subpath ' . $quote($path) . ')',
+            static fn(string $path): string => '(subpath ' . $quote($path) . ')',
             [...$this->writable(), $root, '/private/var/folders'],
         );
 
@@ -141,7 +143,7 @@ class Sandbox
             . "(deny file-write*)\n"
             . '(allow file-write* ' . implode(' ', $writable)
             . ' (literal "/dev/null") (literal "/dev/zero") (regex #"^/dev/tty") (regex #"^/dev/fd/") (literal "/dev/stdout") (literal "/dev/stderr"))' . "\n"
-            . implode('', array_map(static fn (string $secret): string => '(deny file-read* (literal ' . $quote($secret) . "))\n", $this->secrets()))
+            . implode('', array_map(static fn(string $secret): string => '(deny file-read* (literal ' . $quote($secret) . "))\n", $this->secrets()))
             . ($this->strict() ? "(deny network*)\n(allow network* (local unix))\n" : '');
     }
 
@@ -182,9 +184,10 @@ class Sandbox
         // turned off, and bubblewrap then fails on every command.
         $this->detected = [$kind, null];
         $probe = new Process([...$this->prefix(sys_get_temp_dir()), 'true'], timeout: 10);
+
         try {
             $probe->run();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return $this->detected = [null, "{$program} cannot start here: " . $e->getMessage()];
         }
         if (!$probe->isSuccessful()) {

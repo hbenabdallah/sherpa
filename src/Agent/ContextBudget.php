@@ -31,7 +31,9 @@ final class ContextBudget
     private const IMAGE_TOKENS = 1600;
 
     private float $charsPerToken = self::INITIAL_CHARS_PER_TOKEN;
+
     private int $calibrations = 0;
+
     private ?int $lastMeasured = null;
 
     /**

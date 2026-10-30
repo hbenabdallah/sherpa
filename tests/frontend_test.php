@@ -1,4 +1,5 @@
 <?php
+
 // The seam between the agent and whoever it is in front of: the terminal by
 // default, an editor over ACP once the frontend is switched. Everything that
 // shows a turn or asks a question must go through the one switch, or an
@@ -6,14 +7,12 @@
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
-use App\Agent\AgentLoop;
 use App\Agent\AgentOutput;
 use App\Agent\Tool\ToolCall;
 use App\Agent\Tool\ToolDefinition;
 use App\Kernel;
 use App\Permission\Approver;
 use App\Permission\ConfirmChoice;
-use App\Permission\PermissionBroker;
 use App\Project\ProjectPathResolver;
 use App\Runtime\Frontend;
 use App\Runtime\Interrupt;
@@ -47,18 +46,64 @@ final class Recorder implements AgentOutput, Approver
 {
     /** @var list<string> */
     public array $seen = [];
-    public function beginAssistantMessage(): void { $this->seen[] = 'begin'; }
-    public function appendToken(string $token): void { $this->seen[] = "token:{$token}"; }
-    public function flushBuffer(bool $wasToolCall = false): void { $this->seen[] = 'flush'; }
+
+    public function beginAssistantMessage(): void
+    {
+        $this->seen[] = 'begin';
+    }
+
+    public function appendToken(string $token): void
+    {
+        $this->seen[] = "token:{$token}";
+    }
+
+    public function flushBuffer(bool $wasToolCall = false): void
+    {
+        $this->seen[] = 'flush';
+    }
+
     public function showWaiting(bool $reasoning = false, ?string $why = null): void {}
+
     public function showRunning(string $toolName, float $seconds): void {}
-    public function showToolCall(string $toolName, array $args = [], ?string $callId = null): void { $this->seen[] = "call:{$toolName}:{$callId}"; }
-    public function showToolResult(string $toolName, string $result, bool $isError = false, ?string $callId = null): void { $this->seen[] = "result:{$toolName}:{$callId}"; }
-    public function showInfo(string $message): void { $this->seen[] = "info:{$message}"; }
-    public function showError(string $message): void { $this->seen[] = "error:{$message}"; }
-    public function forSubagent(): AgentOutput { return $this; }
-    public function confirm(ToolCall $call, ToolDefinition $def, App\Permission\Offer $offer): ConfirmChoice { $this->seen[] = "confirm:{$call->id}"; return ConfirmChoice::Session; }
-    public function approvePlan(string $plan): ?bool { $this->seen[] = "plan:{$plan}"; return false; }
+
+    public function showToolCall(string $toolName, array $args = [], ?string $callId = null): void
+    {
+        $this->seen[] = "call:{$toolName}:{$callId}";
+    }
+
+    public function showToolResult(string $toolName, string $result, bool $isError = false, ?string $callId = null): void
+    {
+        $this->seen[] = "result:{$toolName}:{$callId}";
+    }
+
+    public function showInfo(string $message): void
+    {
+        $this->seen[] = "info:{$message}";
+    }
+
+    public function showError(string $message): void
+    {
+        $this->seen[] = "error:{$message}";
+    }
+
+    public function forSubagent(): AgentOutput
+    {
+        return $this;
+    }
+
+    public function confirm(ToolCall $call, ToolDefinition $def, App\Permission\Offer $offer): ConfirmChoice
+    {
+        $this->seen[] = "confirm:{$call->id}";
+
+        return ConfirmChoice::Session;
+    }
+
+    public function approvePlan(string $plan): ?bool
+    {
+        $this->seen[] = "plan:{$plan}";
+
+        return false;
+    }
 }
 
 // ---- one switch, everywhere --------------------------------------------------------
@@ -87,10 +132,12 @@ $shell = $container->get(ShellExecTool::class);
 check('shell_exec hears the interrupt', property($shell, 'interrupt') instanceof Interrupt);
 
 $files = property($container->get(App\Tool\FileReadTool::class), 'files');
-check('the file tools read and write through one shared place',
+check(
+    'the file tools read and write through one shared place',
     $files instanceof Files
     && property($container->get(FileWriteTool::class), 'files') === $files
-    && property($container->get(FilePatchTool::class), 'files') === $files);
+    && property($container->get(FilePatchTool::class), 'files') === $files,
+);
 $acp = (new Symfony\Bundle\FrameworkBundle\Console\Application($kernel))->find('acp');
 $acp = $acp instanceof Symfony\Component\Console\Command\LazyCommand ? $acp->getCommand() : $acp;
 check('the one `sherpa acp` points at the editor', property(property($acp, 'server'), 'files') === $files);
@@ -107,9 +154,11 @@ $frontend->showToolResult('file_read', 'x', false, 'c1');
 $frontend->showInfo('note');
 $choice = $frontend->confirm(new ToolCall('c2', 'shell_exec', []), new ToolDefinition('shell_exec', '', [], App\Agent\Tool\Permission::CONFIRM, $shell), new App\Permission\Offer());
 $approved = $frontend->approvePlan('the plan');
-check('once switched, everything reaches the new frontend, call ids included',
+check(
+    'once switched, everything reaches the new frontend, call ids included',
     $recorder->seen === ['begin', 'token:Hi', 'flush', 'call:file_read:c1', 'result:file_read:c1', 'info:note', 'confirm:c2', 'plan:the plan'],
-    json_encode($recorder->seen));
+    json_encode($recorder->seen),
+);
 check('and its answers come back', $choice === ConfirmChoice::Session && $approved === false);
 check('a sub-agent follows the switch', $frontend->forSubagent() === $recorder);
 
@@ -130,10 +179,14 @@ check('an overwrite: the file as it is, and as it will be', $over?->old === "<?p
 $patch = $preview->of(new ToolCall('c', 'file_patch', ['path' => 'Invoice.php', 'search' => 'return $price;', 'replace' => 'return $price * $qty;']));
 check('a patch: the whole file before and after', $patch?->new === "<?php\nreturn \$price * \$qty;\n" && $patch->old === "<?php\nreturn \$price;\n", json_encode($patch));
 
-check('a patch that will fail has no edit to show',
-    $preview->of(new ToolCall('c', 'file_patch', ['path' => 'Invoice.php', 'search' => 'nowhere', 'replace' => 'x'])) === null);
-check('nor a path outside the project',
-    $preview->of(new ToolCall('c', 'file_write', ['path' => '../outside.php', 'content' => 'x'])) === null);
+check(
+    'a patch that will fail has no edit to show',
+    $preview->of(new ToolCall('c', 'file_patch', ['path' => 'Invoice.php', 'search' => 'nowhere', 'replace' => 'x'])) === null,
+);
+check(
+    'nor a path outside the project',
+    $preview->of(new ToolCall('c', 'file_write', ['path' => '../outside.php', 'content' => 'x'])) === null,
+);
 check('nor a call that edits nothing', $preview->of(new ToolCall('c', 'file_read', ['path' => 'Invoice.php'])) === null);
 check('file_write is untouched by the preview', file_get_contents("{$project}/Invoice.php") === "<?php\nreturn \$price;\n" && !is_file("{$project}/New.php"));
 
@@ -147,7 +200,9 @@ check('a file that is not there reads as none', $shared->read("{$project}/Nope.p
 $writes = [];
 $shared->through(
     fn(string $path) => str_ends_with($path, 'Invoice.php') ? "<?php\n// in the tab\n" : null,
-    function (string $path, string $text) use (&$writes) { $writes[$path] = $text; },
+    function (string $path, string $text) use (&$writes) {
+        $writes[$path] = $text;
+    },
 );
 check('through an editor, its text', $shared->read("{$project}/Invoice.php") === "<?php\n// in the tab\n");
 check('and the disk for what it cannot give', $shared->read("{$project}/New.php") === null);

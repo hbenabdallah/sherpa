@@ -27,6 +27,7 @@ final class SearchTrace
     private const GROPING_THRESHOLD = 3;
 
     private int $searches = 0;
+
     private bool $settled = false;
 
     public function __construct(private readonly ?MemoryStore $store = null) {}

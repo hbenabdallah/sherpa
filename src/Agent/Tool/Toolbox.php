@@ -4,7 +4,12 @@ declare(strict_types=1);
 
 namespace App\Agent\Tool;
 
+use LogicException;
+use ReflectionClass;
+use ReflectionMethod;
+use ReflectionNamedType;
 use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
+use Throwable;
 
 class Toolbox
 {
@@ -12,7 +17,8 @@ class Toolbox
     private array $definitions = [];
 
     public function __construct(
-        #[AutowireIterator('agent.tool')] iterable $tools,
+        #[AutowireIterator('agent.tool')]
+        iterable $tools,
         // Told what came from outside, and marks it so; absent, nothing is marked.
         private readonly ?Provenance $provenance = null,
     ) {
@@ -24,11 +30,11 @@ class Toolbox
 
     private function buildDefinition(object $tool): ToolDefinition
     {
-        $ref = new \ReflectionClass($tool);
+        $ref = new ReflectionClass($tool);
         $attrs = $ref->getAttributes(AsTool::class);
 
         if (empty($attrs)) {
-            throw new \LogicException(sprintf('Tool %s must declare #[AsTool]', $ref->getName()));
+            throw new LogicException(sprintf('Tool %s must declare #[AsTool]', $ref->getName()));
         }
 
         /** @var AsTool $asTool */
@@ -45,14 +51,14 @@ class Toolbox
         );
     }
 
-    private function extractParameters(\ReflectionMethod $method): array
+    private function extractParameters(ReflectionMethod $method): array
     {
         $params = [];
 
         foreach ($method->getParameters() as $param) {
             $type = $param->getType();
-            $nullable = $type instanceof \ReflectionNamedType && $type->allowsNull();
-            $typeName = $type instanceof \ReflectionNamedType ? $type->getName() : 'string';
+            $nullable = $type instanceof ReflectionNamedType && $type->allowsNull();
+            $typeName = $type instanceof ReflectionNamedType ? $type->getName() : 'string';
 
             $jsonType = match (true) {
                 in_array($typeName, ['int', 'integer'])     => 'integer',
@@ -88,7 +94,7 @@ class Toolbox
     public function register(ToolDefinition $definition): void
     {
         if (isset($this->definitions[$definition->name])) {
-            throw new \LogicException("A tool named “{$definition->name}” is already registered.");
+            throw new LogicException("A tool named “{$definition->name}” is already registered.");
         }
 
         $this->definitions[$definition->name] = $definition;
@@ -198,7 +204,7 @@ class Toolbox
             }
 
             return new ToolResult($call->id, $content);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return new ToolResult($call->id, SecretMask::mask("Error: {$e->getMessage()}"), isError: true);
         }
     }

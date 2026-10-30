@@ -1,4 +1,5 @@
 <?php
+
 // `sherpa acp` end to end, as an editor drives it: the real command in a
 // subprocess, a scripted provider behind it, and this script in the editor's
 // seat — initialize, open a session, prompt, answer the permission questions,
@@ -37,9 +38,12 @@ final class Editor
 {
     /** @var resource */
     private $process;
+
     /** @var array<int, resource> */
     private array $pipes = [];
+
     private string $partial = '';
+
     private int $id = 100;
 
     /** @var list<string> what came out on stdout that was not a JSON-RPC message */
@@ -203,8 +207,10 @@ final class Editor
 }
 
 foreach (['bin/sherpa', 'bin/sherpa-release.php'] as $entry) {
-    check("{$entry} runs `sherpa acp` as its own command, not as the session's options",
-        preg_match("/in_array\\(\\\$_SERVER\\['argv'\\]\\[1\\] \\?\\? '', \\[[^]]*'acp'/", (string) file_get_contents(dirname(__DIR__) . '/' . $entry)) === 1);
+    check(
+        "{$entry} runs `sherpa acp` as its own command, not as the session's options",
+        preg_match("/in_array\\(\\\$_SERVER\\['argv'\\]\\[1\\] \\?\\? '', \\[[^]]*'acp'/", (string) file_get_contents(dirname(__DIR__) . '/' . $entry)) === 1,
+    );
 }
 
 $api = "http://127.0.0.1:{$port}/v1";
@@ -215,12 +221,16 @@ $init = $editor->call('initialize', ['protocolVersion' => 1, 'clientCapabilities
 $result = $init['result'] ?? [];
 check('initialize answers with protocol version 1', ($result['protocolVersion'] ?? null) === 1, json_encode($init));
 check('and says it is Sherpa', ($result['agentInfo']['name'] ?? '') === 'sherpa' && ($result['agentInfo']['version'] ?? '') !== '');
-check('and that it can load sessions and take embedded files',
-    ($result['agentCapabilities']['loadSession'] ?? false) === true && ($result['agentCapabilities']['promptCapabilities']['embeddedContext'] ?? false) === true);
+check(
+    'and that it can load sessions and take embedded files',
+    ($result['agentCapabilities']['loadSession'] ?? false) === true && ($result['agentCapabilities']['promptCapabilities']['embeddedContext'] ?? false) === true,
+);
 
 // ---- a session -------------------------------------------------------------------
-check('a session in the home directory is refused, with the reason',
-    str_contains((string) ($editor->call('session/new', ['cwd' => "{$work}/home", 'mcpServers' => []])['error']['message'] ?? ''), 'home directory'));
+check(
+    'a session in the home directory is refused, with the reason',
+    str_contains((string) ($editor->call('session/new', ['cwd' => "{$work}/home", 'mcpServers' => []])['error']['message'] ?? ''), 'home directory'),
+);
 
 $new = $editor->call('session/new', ['cwd' => $project, 'mcpServers' => []]);
 $session = (string) ($new['result']['sessionId'] ?? '');
@@ -233,8 +243,11 @@ check('a prompt ends its turn', ($reply['result']['stopReason'] ?? '') === 'end_
 $info = $editor->of('session_info_update', $from)[0]['params']['update'] ?? [];
 check('the conversation is named after its first request', ($info['title'] ?? '') === 'Say hello', json_encode($info));
 $said = $editor->text('agent_thought_chunk', $from);
-check('a new project says, at its first prompt, where its commands run, and how to change it',
-    str_contains($said, 'New project: its commands run on this machine') && str_contains($said, '/project edit'), $said);
+check(
+    'a new project says, at its first prompt, where its commands run, and how to change it',
+    str_contains($said, 'New project: its commands run on this machine') && str_contains($said, '/project edit'),
+    $said,
+);
 check('with the reply streamed as message chunks', $editor->text('agent_message_chunk', $from) === 'Hello from the fake model.', $editor->text('agent_message_chunk', $from));
 $chunks = $editor->of('agent_message_chunk', $from);
 check('one message id across its chunks', count($chunks) === 2 && $chunks[0]['params']['update']['messageId'] === $chunks[1]['params']['update']['messageId']);
@@ -263,15 +276,23 @@ $reply = $editor->call('session/prompt', ['sessionId' => $session, 'prompt' => [
 $question = $editor->asked[0] ?? [];
 $diff = $question['toolCall']['content'][0] ?? [];
 check('an edit asks first', count($editor->asked) === 1 && ($question['toolCall']['kind'] ?? '') === 'edit', json_encode($editor->asked));
-check('with the diff for the editor to draw: whole file before and after, absolute path',
+check(
+    'with the diff for the editor to draw: whole file before and after, absolute path',
     ($diff['type'] ?? '') === 'diff' && $diff['path'] === "{$project}/Invoice.php"
     && str_contains($diff['oldText'], 'return 0;') && str_contains($diff['newText'], 'return 42;') && !str_contains($diff['newText'], 'return 0;'),
-    json_encode($diff));
-check('and the four answers the terminal offers',
-    array_column($question['options'] ?? [], 'kind') === ['allow_once', 'allow_always', 'allow_always', 'reject_once'], json_encode($question['options'] ?? null));
+    json_encode($diff),
+);
+check(
+    'and the four answers the terminal offers',
+    array_column($question['options'] ?? [], 'kind') === ['allow_once', 'allow_always', 'allow_always', 'reject_once'],
+    json_encode($question['options'] ?? null),
+);
 $card = $editor->of('tool_call', $from)[0]['params']['update'] ?? [];
-check('the call is shown before it runs, titled, with the file it touches',
-    ($card['title'] ?? '') === 'Edit Invoice.php' && ($card['status'] ?? '') === 'pending' && ($card['locations'][0]['path'] ?? '') === "{$project}/Invoice.php", json_encode($card));
+check(
+    'the call is shown before it runs, titled, with the file it touches',
+    ($card['title'] ?? '') === 'Edit Invoice.php' && ($card['status'] ?? '') === 'pending' && ($card['locations'][0]['path'] ?? '') === "{$project}/Invoice.php",
+    json_encode($card),
+);
 check('the same id as the question', ($card['toolCallId'] ?? 'a') === ($question['toolCall']['toolCallId'] ?? 'b'));
 $done = $editor->of('tool_call_update', $from)[0]['params']['update'] ?? [];
 check('allowed, it runs: completed, with its diff', ($done['status'] ?? '') === 'completed' && ($done['content'][0]['type'] ?? '') === 'diff', json_encode($done));
@@ -309,13 +330,18 @@ check('another model chosen is the current one', ($model['currentValue'] ?? '') 
 $from = count($editor->updates);
 $editor->call('session/prompt', ['sessionId' => $session, 'prompt' => [['type' => 'text', 'text' => 'Which model are you?']]]);
 check('and the next turn runs on it', $editor->text('agent_message_chunk', $from) === 'Model: fake-other', $editor->text('agent_message_chunk', $from));
-check('a model the provider does not offer is refused',
-    ($editor->call('session/set_config_option', ['sessionId' => $session, 'configId' => 'model', 'value' => 'gpt-imaginary'])['error']['code'] ?? 0) === -32602);
+check(
+    'a model the provider does not offer is refused',
+    ($editor->call('session/set_config_option', ['sessionId' => $session, 'configId' => 'model', 'value' => 'gpt-imaginary'])['error']['code'] ?? 0) === -32602,
+);
 
 $third = $editor->call('session/new', ['cwd' => $project, 'mcpServers' => []]);
 $thirdId = (string) ($third['result']['sessionId'] ?? '');
-check('a session opened next starts on the model last chosen',
-    (array_column($third['result']['configOptions'] ?? [], null, 'id')['model']['currentValue'] ?? '') === 'fake-other', json_encode($third));
+check(
+    'a session opened next starts on the model last chosen',
+    (array_column($third['result']['configOptions'] ?? [], null, 'id')['model']['currentValue'] ?? '') === 'fake-other',
+    json_encode($third),
+);
 $editor->call('session/set_config_option', ['sessionId' => $thirdId, 'configId' => 'model', 'value' => 'fake-chat']);
 $from = count($editor->updates);
 $editor->call('session/prompt', ['sessionId' => $session, 'prompt' => [['type' => 'text', 'text' => 'Which model are you?']]]);
@@ -348,12 +374,17 @@ $editor->answer = static fn(array $question): ?string => 'allow-once';
 
 $from = count($editor->updates);
 $set = $editor->call('session/set_config_option', ['sessionId' => $thirdId, 'configId' => 'mode', 'value' => 'plan']);
-check('plan mode chosen as an option: the mode follows',
+check(
+    'plan mode chosen as an option: the mode follows',
     ($editor->of('current_mode_update', $from)[0]['params']['update']['currentModeId'] ?? '') === 'plan'
-    && (array_column($set['result']['configOptions'] ?? [], null, 'id')['mode']['currentValue'] ?? '') === 'plan', json_encode($set));
+    && (array_column($set['result']['configOptions'] ?? [], null, 'id')['mode']['currentValue'] ?? '') === 'plan',
+    json_encode($set),
+);
 check('another session stays as it was', (array_column(
     $editor->call('session/set_config_option', ['sessionId' => $session, 'configId' => 'model', 'value' => 'fake-other'])['result']['configOptions'] ?? [],
-    null, 'id')['mode']['currentValue'] ?? '') === 'default');
+    null,
+    'id',
+)['mode']['currentValue'] ?? '') === 'default');
 
 // ---- "/" in the editor -----------------------------------------------------------
 $offered = array_column($editor->of('available_commands_update')[0]['params']['update']['availableCommands'] ?? [], null, 'name');
@@ -388,13 +419,17 @@ check('a slash that names nothing is a message like any other', $stop === 'end_t
 $from = count($editor->updates);
 $cancelled = false;
 $started = microtime(true);
-$reply = $editor->call('session/prompt', ['sessionId' => $session, 'prompt' => [['type' => 'text', 'text' => 'Be slow']]], 20.0,
+$reply = $editor->call(
+    'session/prompt',
+    ['sessionId' => $session, 'prompt' => [['type' => 'text', 'text' => 'Be slow']]],
+    20.0,
     function (array $message) use ($editor, $session, &$cancelled): void {
         if (!$cancelled && ($message['params']['update']['sessionUpdate'] ?? '') === 'agent_message_chunk') {
             $cancelled = true;
             $editor->notify('session/cancel', ['sessionId' => $session]);
         }
-    });
+    },
+);
 check('a cancel ends the turn as cancelled, not as an error', ($reply['result']['stopReason'] ?? '') === 'cancelled', json_encode($reply));
 check('and soon', microtime(true) - $started < 5.0, sprintf('%.1f s', microtime(true) - $started));
 
@@ -418,8 +453,10 @@ check('which still edits', str_contains((string) file_get_contents("{$project}/I
 
 // ---- what is not right ------------------------------------------------------------
 check('an unknown method is said to be unknown', ($editor->call('session/teleport', [])['error']['code'] ?? 0) === -32601);
-check('a prompt to a session that does not exist is refused',
-    ($editor->call('session/prompt', ['sessionId' => 'nope', 'prompt' => [['type' => 'text', 'text' => 'x']]])['error']['code'] ?? 0) === -32002);
+check(
+    'a prompt to a session that does not exist is refused',
+    ($editor->call('session/prompt', ['sessionId' => 'nope', 'prompt' => [['type' => 'text', 'text' => 'x']]])['error']['code'] ?? 0) === -32002,
+);
 
 check('nothing but JSON-RPC messages on stdout', $editor->stray === [], implode("\n", $editor->stray));
 // ---- the conversations kept, listed -----------------------------------------------------
@@ -484,8 +521,11 @@ $memory->call('session/prompt', ['sessionId' => $first, 'prompt' => [['type' => 
 $second = (string) ($memory->call('session/new', ['cwd' => $project, 'mcpServers' => []])['result']['sessionId'] ?? '');
 $from = count($memory->updates);
 $memory->call('session/prompt', ['sessionId' => $second, 'prompt' => [['type' => 'text', 'text' => '/memory']]]);
-check('the facts of a conversation are kept once another opens', str_contains($memory->text('agent_message_chunk', $from), 'test-command: php tests/run.php'),
-    $memory->text('agent_message_chunk', $from));
+check(
+    'the facts of a conversation are kept once another opens',
+    str_contains($memory->text('agent_message_chunk', $from), 'test-command: php tests/run.php'),
+    $memory->text('agent_message_chunk', $from),
+);
 
 $slow = (string) ($memory->call('session/new', ['cwd' => $project, 'mcpServers' => []])['result']['sessionId'] ?? '');
 $memory->call('session/prompt', ['sessionId' => $slow, 'prompt' => [['type' => 'text', 'text' => 'Say hello, take your time']]]);
@@ -512,25 +552,33 @@ mkdir("{$work}/blank", 0777, true);
 $blank = new Editor($work, null, 'blank');
 $init = $blank->call('initialize', ['protocolVersion' => 1, 'clientCapabilities' => ['auth' => ['terminal' => true]]], 60.0);
 $methods = $init['result']['authMethods'] ?? [];
-check('an editor that can run a terminal is offered the setup as terminal authentication',
-    count($methods) === 1 && $methods[0]['type'] === 'terminal' && $methods[0]['args'] === ['--setup'] && $methods[0]['id'] === 'setup', json_encode($methods));
+check(
+    'an editor that can run a terminal is offered the setup as terminal authentication',
+    count($methods) === 1 && $methods[0]['type'] === 'terminal' && $methods[0]['args'] === ['--setup'] && $methods[0]['id'] === 'setup',
+    json_encode($methods),
+);
 $blank->close();
 
 // The form the registry's validator and earlier editors send.
 $blank = new Editor($work, null, 'blank');
 $methods = $blank->call('initialize', ['protocolVersion' => 1, 'clientCapabilities' => ['_meta' => ['terminal-auth' => true]]], 60.0)['result']['authMethods'] ?? [];
 $meta = $methods[0]['_meta']['terminal-auth'] ?? [];
-check('an editor asking the earlier way is offered it too, with the whole command',
+check(
+    'an editor asking the earlier way is offered it too, with the whole command',
     ($methods[0]['type'] ?? '') === 'terminal' && $meta['command'] === PHP_BINARY
-    && $meta['args'] === [realpath(dirname(__DIR__) . '/bin/sherpa'), 'acp', '--setup'], json_encode($methods));
+    && $meta['args'] === [realpath(dirname(__DIR__) . '/bin/sherpa'), 'acp', '--setup'],
+    json_encode($methods),
+);
 $refused = $blank->call('session/new', ['cwd' => $project, 'mcpServers' => []]);
 check('and a session asks for it: auth_required', ($refused['error']['code'] ?? 0) === -32000, json_encode($refused));
 check('saying what is missing', str_contains((string) ($refused['error']['message'] ?? ''), 'No API configured'), json_encode($refused));
 $blank->close();
 
 $plain = new Editor($work, null, 'blank');
-check('an editor that cannot run a terminal is offered nothing to run',
-    ($plain->call('initialize', ['protocolVersion' => 1], 60.0)['result']['authMethods'] ?? null) === []);
+check(
+    'an editor that cannot run a terminal is offered nothing to run',
+    ($plain->call('initialize', ['protocolVersion' => 1], 60.0)['result']['authMethods'] ?? null) === [],
+);
 $plain->close();
 
 exec(sprintf('%s %s acp --setup < /dev/null 2>&1', escapeshellarg(PHP_BINARY), escapeshellarg(dirname(__DIR__) . '/bin/sherpa')), $said, $code);

@@ -1,4 +1,5 @@
 <?php
+
 // A model that takes a second over every request, then reports on the task it
 // was given, with as many prompt tokens as the task has characters. Served by
 // `php -S` with workers in delegate_test, so that two sub-agents can be

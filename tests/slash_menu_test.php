@@ -1,4 +1,5 @@
 <?php
+
 // The prompt's two helpers: the menu under "/", and the scrollback Page Up
 // opens. Both are text in, text out, so neither needs a terminal here.
 

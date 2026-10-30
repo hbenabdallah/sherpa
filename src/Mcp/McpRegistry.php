@@ -6,6 +6,8 @@ use App\Agent\Tool\Permission;
 use App\Agent\Tool\Toolbox;
 use App\Agent\Tool\ToolDefinition;
 use App\Runtime\Interrupt;
+use LogicException;
+use stdClass;
 
 /**
  * Brings the configured MCP servers into the session: their tools and a reader
@@ -176,7 +178,7 @@ class McpRegistry
                 ));
                 $this->toolNames[$server->name][] = $name;
                 $added++;
-            } catch (\LogicException) {
+            } catch (LogicException) {
                 $skipped[] = $tool['name'];
             }
         }
@@ -197,7 +199,7 @@ class McpRegistry
                 $this->toolNames[$server->name][] = $this->localName($server->name, 'read_resource');
                 $this->resources[$server->name] = $resources;
                 $this->templates[$server->name] = $templates;
-            } catch (\LogicException) {
+            } catch (LogicException) {
                 $skipped[] = 'read_resource';
             }
         }
@@ -285,7 +287,7 @@ class McpRegistry
             $type = $this->type($spec['type'] ?? 'string');
             $extra = array_diff_key($spec, ['type' => true, 'description' => true]);
             if ($type === 'array' && !isset($extra['items'])) {
-                $extra['items'] = new \stdClass();
+                $extra['items'] = new stdClass();
             }
 
             $parameters[(string) $name] = [

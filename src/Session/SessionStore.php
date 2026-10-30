@@ -6,6 +6,8 @@ namespace App\Session;
 
 use App\Agent\PlanMode;
 use App\Project\Project;
+use DateTimeImmutable;
+use Throwable;
 
 /**
  * Conversations kept on disk, so closing the terminal is not the end of one:
@@ -35,8 +37,10 @@ final class SessionStore
     private const TIME = 'Y-m-d\\TH:i:s.uP';
 
     private ?string $dir = null;
+
     private ?string $id = null;
-    private ?\DateTimeImmutable $startedAt = null;
+
+    private ?DateTimeImmutable $startedAt = null;
 
     /**
      * Named once, after the first thing asked. Compacting the history folds
@@ -104,7 +108,7 @@ final class SessionStore
     public function reserve(): string
     {
         $this->startNew();
-        $this->startedAt = new \DateTimeImmutable();
+        $this->startedAt = new DateTimeImmutable();
 
         return $this->id = $this->startedAt->format('Ymd-His') . '-' . bin2hex(random_bytes(2));
     }
@@ -114,14 +118,14 @@ final class SessionStore
      * the same process uses it — an editor holds several — and put back with
      * resume().
      *
-     * @return array{0: ?string, 1: ?\DateTimeImmutable, 2: ?string, 3: ?int}
+     * @return array{0: ?string, 1: ?DateTimeImmutable, 2: ?string, 3: ?int}
      */
     public function cursor(): array
     {
         return [$this->id, $this->startedAt, $this->title, $this->inode];
     }
 
-    /** @param array{0: ?string, 1: ?\DateTimeImmutable, 2: ?string, 3: ?int} $cursor */
+    /** @param array{0: ?string, 1: ?DateTimeImmutable, 2: ?string, 3: ?int} $cursor */
     public function resume(array $cursor): void
     {
         [$this->id, $this->startedAt, $this->title, $this->inode] = $cursor;
@@ -155,7 +159,7 @@ final class SessionStore
             return false;
         }
 
-        $now = new \DateTimeImmutable();
+        $now = new DateTimeImmutable();
 
         // Written meanwhile from elsewhere: both stay, this one in a file of
         // its own under the same title, rather than one erasing the other.
@@ -316,15 +320,15 @@ final class SessionStore
         try {
             return new SavedSession(
                 id: $data['id'],
-                startedAt: new \DateTimeImmutable((string) ($data['started_at'] ?? 'now')),
-                updatedAt: new \DateTimeImmutable((string) ($data['updated_at'] ?? 'now')),
+                startedAt: new DateTimeImmutable((string) ($data['started_at'] ?? 'now')),
+                updatedAt: new DateTimeImmutable((string) ($data['updated_at'] ?? 'now')),
                 backend: (string) ($data['backend'] ?? ''),
                 model: (string) ($data['model'] ?? ''),
                 title: (string) ($data['title'] ?? ''),
                 messages: array_values(array_filter($data['messages'], is_array(...))),
                 excerpts: array_values(array_filter($data['excerpts'] ?? [], is_array(...))),
             );
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return null;
         }
     }

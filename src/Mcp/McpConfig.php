@@ -2,6 +2,8 @@
 
 namespace App\Mcp;
 
+use stdClass;
+
 /**
  * Where MCP servers are declared: ~/.config/sherpa/mcp.json.
  *
@@ -143,14 +145,14 @@ class McpConfig
         $data = json_decode($raw, true);
         if (!is_array($data)) {
             throw new McpException(
-                'Invalid MCP configuration (' . $this->path() . '): ' . json_last_error_msg()
+                'Invalid MCP configuration (' . $this->path() . '): ' . json_last_error_msg(),
             );
         }
 
         $key = isset($data['mcpServers']) || !isset($data['servers']) ? 'mcpServers' : 'servers';
         if (!is_array($data[$key] ?? null)) {
             throw new McpException(
-                'Invalid MCP configuration (' . $this->path() . '): a "mcpServers" key was expected.'
+                'Invalid MCP configuration (' . $this->path() . '): a "mcpServers" key was expected.',
             );
         }
 
@@ -177,7 +179,7 @@ class McpConfig
         // An empty list is written as {}, which is what the file means.
         foreach (['mcpServers', 'servers'] as $key) {
             if (($data[$key] ?? null) === []) {
-                $data[$key] = new \stdClass();
+                $data[$key] = new stdClass();
             }
         }
 

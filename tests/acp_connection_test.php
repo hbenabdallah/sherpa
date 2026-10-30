@@ -1,4 +1,5 @@
 <?php
+
 // JSON-RPC over stdio, as ACP frames it: one message per line, requests both
 // ways, and a cancel that has to be heard while Sherpa waits on something else.
 
@@ -86,8 +87,11 @@ check('and the next message is still read', ($after['method'] ?? '') === 'after'
 
 $connection->fail(7, new AcpError('No such session', AcpError::RESOURCE_NOT_FOUND));
 $failed = sent($editor);
-check('a failure carries the request id, the code and the message',
-    ($failed[0]['id'] ?? null) === 7 && $failed[0]['error']['code'] === -32002 && $failed[0]['error']['message'] === 'No such session', json_encode($failed));
+check(
+    'a failure carries the request id, the code and the message',
+    ($failed[0]['id'] ?? null) === 7 && $failed[0]['error']['code'] === -32002 && $failed[0]['error']['message'] === 'No such session',
+    json_encode($failed),
+);
 
 // ---- Sherpa asking ----------------------------------------------------------------
 // The editor answers after sending something else first: a notification that
@@ -116,6 +120,7 @@ check('a cancel that arrived meanwhile was heard at once', $interrupt->requested
 check('a request that arrived meanwhile waits its turn', ($connection->receive(0.1)['id'] ?? null) === 9);
 
 say($editor, ['jsonrpc' => '2.0', 'id' => 2, 'error' => ['code' => -32601, 'message' => 'Method not found']]);
+
 try {
     $connection->request('fs/read_text_file', ['path' => '/x']);
     check('an error answer is thrown', false);
@@ -147,6 +152,7 @@ check('then the end is reported', $connection->receive(1.0) === null && $connect
 
 [$connection, $editor] = pair();
 fclose($editor);
+
 try {
     $connection->request('session/request_permission', []);
     check('asking an editor that is gone fails', false);

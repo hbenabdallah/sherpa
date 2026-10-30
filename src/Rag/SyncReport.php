@@ -8,8 +8,11 @@ namespace App\Rag;
 final class SyncReport
 {
     public int $added = 0;
+
     public int $updated = 0;
+
     public int $removed = 0;
+
     public int $unchanged = 0;
 
     /** @var array<string, string> path => why it could not be indexed */

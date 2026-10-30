@@ -25,7 +25,7 @@ final class Offer
     public function commands(): array
     {
         return array_map(
-            static fn (string $grant): string => str_starts_with($grant, CommandPolicy::PREFIX)
+            static fn(string $grant): string => str_starts_with($grant, CommandPolicy::PREFIX)
                 ? substr($grant, strlen(CommandPolicy::PREFIX))
                 : $grant,
             $this->grants,

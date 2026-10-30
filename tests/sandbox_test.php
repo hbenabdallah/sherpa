@@ -1,4 +1,5 @@
 <?php
+
 // Verification that filesystem tools cannot escape the project root.
 //
 // file_read runs at AUTO permission — no confirmation prompt stands between a
@@ -7,8 +8,8 @@
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
-use App\Agent\Tool\ToolCall;
 use App\Agent\Tool\Toolbox;
+use App\Agent\Tool\ToolCall;
 use App\Project\PathOutsideProjectException;
 use App\Project\ProjectPathResolver;
 use App\Tool\FilePatchTool;
@@ -33,6 +34,7 @@ function blocked(ProjectPathResolver $r, string $path): bool
 {
     try {
         $r->resolve($path);
+
         return false;
     } catch (PathOutsideProjectException) {
         return true;

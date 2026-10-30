@@ -9,6 +9,7 @@ use App\Agent\Tool\Permission;
 use App\Project\PathSuggestions;
 use App\Project\ProjectPathResolver;
 use App\Tool\Edit\Files;
+use RuntimeException;
 
 #[AsTool(
     name: 'file_read',
@@ -24,7 +25,9 @@ class FileReadTool
      * where the read stopped, and reads on with an offset if it needs to.
      */
     private const READ_SHARE = 0.35;
+
     private const MIN_CHARS = 24000;
+
     private const MAX_CHARS = 400000;
 
     /** Longest line shown whole: minified code is one line of a megabyte. */
@@ -41,9 +44,12 @@ class FileReadTool
     ) {}
 
     public function __invoke(
-        #[Param('Path to the file, relative to the project root. Must be inside the project.')] string $path,
-        #[Param('Line to start reading from (1-based, optional)')] ?int $offset = null,
-        #[Param('Number of lines to read (optional)')] ?int $limit = null,
+        #[Param('Path to the file, relative to the project root. Must be inside the project.')]
+        string $path,
+        #[Param('Line to start reading from (1-based, optional)')]
+        ?int $offset = null,
+        #[Param('Number of lines to read (optional)')]
+        ?int $limit = null,
     ): string {
         $resolved = $this->paths->resolve($path);
 
@@ -52,7 +58,7 @@ class FileReadTool
         // one, and which SearchTrace needs, since a read that found nothing is
         // one more guess, not the end of a search.
         if (!file_exists($resolved)) {
-            throw new \RuntimeException("file not found: {$path}" . PathSuggestions::hint($this->paths->root(), $path, directory: false));
+            throw new RuntimeException("file not found: {$path}" . PathSuggestions::hint($this->paths->root(), $path, directory: false));
         }
         // Models do ask for a directory — the project root, typically. file()
         // on one prints a PHP notice into the terminal and returns nothing,
@@ -60,16 +66,16 @@ class FileReadTool
         // said with the refusal: the next call can be the right read, rather
         // than a list_dir first.
         if (is_dir($resolved)) {
-            throw new \RuntimeException("{$path} is a directory, not a file. It holds:\n" . self::entries($resolved, $path)
+            throw new RuntimeException("{$path} is a directory, not a file. It holds:\n" . self::entries($resolved, $path)
                 . "\nRead one of these, or list_dir to look deeper.");
         }
         if (!is_readable($resolved)) {
-            throw new \RuntimeException("file is not readable: {$path}");
+            throw new RuntimeException("file is not readable: {$path}");
         }
 
         $text = $this->files->read($resolved);
         if ($text === null) {
-            throw new \RuntimeException("could not read file: {$path}");
+            throw new RuntimeException("could not read file: {$path}");
         }
         $lines = Files::lines($text);
 
@@ -89,8 +95,13 @@ class FileReadTool
             $row = sprintf('%4d | %s', $startLine + $i, LongLine::clip($line, self::MAX_LINE_CHARS));
             if ($numbered !== [] && $chars + strlen($row) > $cap) {
                 $last = $startLine + $i - 1;
-                $numbered[] = sprintf('... (truncated to fit the context: lines %d-%d of %d shown; read on with offset=%d)',
-                    $startLine, $last, $total, $last + 1);
+                $numbered[] = sprintf(
+                    '... (truncated to fit the context: lines %d-%d of %d shown; read on with offset=%d)',
+                    $startLine,
+                    $last,
+                    $total,
+                    $last + 1,
+                );
                 break;
             }
             $numbered[] = $row;

@@ -2,6 +2,9 @@
 
 namespace App\Tool\Edit;
 
+use Closure;
+use RuntimeException;
+
 /**
  * Where file_read, file_write and file_patch get a file's text and put it
  * back: the disk, unless an editor serves them. In an editor the file open in
@@ -10,21 +13,21 @@ namespace App\Tool\Edit;
  */
 class Files
 {
-    /** @var (\Closure(string): ?string)|null */
-    private ?\Closure $reader = null;
+    /** @var (Closure(string): ?string)|null */
+    private ?Closure $reader = null;
 
-    /** @var (\Closure(string, string): void)|null */
-    private ?\Closure $writer = null;
+    /** @var (Closure(string, string): void)|null */
+    private ?Closure $writer = null;
 
     /**
      * Read and write through an editor from now on. $reader answers null for
      * a file it cannot give, which is then read from disk; $writer throws
      * \RuntimeException saying why it could not write.
      *
-     * @param (\Closure(string): ?string)|null    $reader
-     * @param (\Closure(string, string): void)|null $writer
+     * @param (Closure(string): ?string)|null    $reader
+     * @param (Closure(string, string): void)|null $writer
      */
-    public function through(?\Closure $reader, ?\Closure $writer): void
+    public function through(?Closure $reader, ?Closure $writer): void
     {
         $this->reader = $reader;
         $this->writer = $writer;
@@ -49,7 +52,7 @@ class Files
     /**
      * @param string $path as the model named it, for what it is told on failure
      *
-     * @throws \RuntimeException
+     * @throws RuntimeException
      */
     public function write(string $resolved, string $path, string $content): void
     {

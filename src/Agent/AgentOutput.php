@@ -40,5 +40,5 @@ interface AgentOutput
     public function showError(string $message): void;
 
     /** Where a sub-agent started from this output shows its work. */
-    public function forSubagent(): AgentOutput;
+    public function forSubagent(): self;
 }

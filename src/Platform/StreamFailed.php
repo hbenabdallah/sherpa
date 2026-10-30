@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Platform;
 
+use RuntimeException;
+
 /**
  * The server gave up after the stream opened. Overloads say so this way on
  * some providers, and are worth a retry — as long as nothing reached the
  * screen yet, since a second reply would print after the first half.
  */
-final class StreamFailed extends \RuntimeException
+final class StreamFailed extends RuntimeException
 {
     public function __construct(string $message, public readonly bool $retryable)
     {

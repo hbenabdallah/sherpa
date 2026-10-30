@@ -1,4 +1,5 @@
 <?php
+
 // Defaults live in two places, and they must say the same thing.
 //
 // docker-compose.yml passes every variable as ${VAR:-default}: a variable it
@@ -62,8 +63,11 @@ check('the variables Sherpa reads were found', isset($read['OLLAMA_URL'], $read[
 $sherpaOwn = array_filter(array_keys($read), fn(string $name) => !str_starts_with($name, 'APP_'));
 
 $undefaulted = array_values(array_filter($sherpaOwn, fn(string $name) => !array_key_exists($name, $symfonyDefaults)));
-check('every setting Sherpa reads has a default without compose',
-    $undefaulted === [], 'with no default outside compose: ' . implode(', ', $undefaulted));
+check(
+    'every setting Sherpa reads has a default without compose',
+    $undefaulted === [],
+    'with no default outside compose: ' . implode(', ', $undefaulted),
+);
 
 $drift = [];
 foreach ($symfonyDefaults as $name => $value) {

@@ -1,4 +1,5 @@
 <?php
+
 // The embedding model is found, never asked for: the user gives an address, a
 // key and a chat model, and a chat model cannot make vectors. The provider's
 // catalogue is read first; without one, known names are tried on one word. A
@@ -28,12 +29,18 @@ function check(string $label, bool $ok, string $detail = ''): void
 }
 
 // ---- picking from a catalogue -------------------------------------------------
-check('a known embedding model is picked out of a chat catalogue',
-    EmbeddingDetector::pick(['gpt-4o', 'text-embedding-3-large', 'text-embedding-3-small']) === 'text-embedding-3-small');
-check('an Ollama tag is matched without its ":latest"',
-    EmbeddingDetector::pick(['qwen2.5-coder:7b', 'bge-m3:latest']) === 'bge-m3:latest');
-check('an unknown model that says it embeds is still taken',
-    EmbeddingDetector::pick(['gpt-4o', 'acme-embed-v2']) === 'acme-embed-v2');
+check(
+    'a known embedding model is picked out of a chat catalogue',
+    EmbeddingDetector::pick(['gpt-4o', 'text-embedding-3-large', 'text-embedding-3-small']) === 'text-embedding-3-small',
+);
+check(
+    'an Ollama tag is matched without its ":latest"',
+    EmbeddingDetector::pick(['qwen2.5-coder:7b', 'bge-m3:latest']) === 'bge-m3:latest',
+);
+check(
+    'an unknown model that says it embeds is still taken',
+    EmbeddingDetector::pick(['gpt-4o', 'acme-embed-v2']) === 'acme-embed-v2',
+);
 check('a catalogue of chat models has none', EmbeddingDetector::pick(['gpt-4o', 'gpt-4o-mini']) === null);
 
 /**

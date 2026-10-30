@@ -1,4 +1,5 @@
 <?php
+
 // file_find: files by name pattern, confined to the project, newest first.
 
 require dirname(__DIR__) . '/vendor/autoload.php';
@@ -57,19 +58,35 @@ $out = $find('src/**/*.php');
 check('a path pattern is taken from the root', substr_count($out, "\n") === 3 && !str_contains($out, 'tests/'), $out);
 
 $out = $find('*.php', 'src/Billing');
-check('path narrows the search, and the paths stay relative to the root',
-    str_contains($out, 'src/Billing/Invoice.php') && !str_contains($out, 'Kernel.php'), $out);
+check(
+    'path narrows the search, and the paths stay relative to the root',
+    str_contains($out, 'src/Billing/Invoice.php') && !str_contains($out, 'Kernel.php'),
+    $out,
+);
 
 $out = $find('src/*.php');
-check('a miss says why when "*" was meant to cross directories',
-    str_contains($find('lib/*.php'), 'No file matches') && str_contains($find('lib/*.php'), '"**"'), $find('lib/*.php'));
+check(
+    'a miss says why when "*" was meant to cross directories',
+    str_contains($find('lib/*.php'), 'No file matches') && str_contains($find('lib/*.php'), '"**"'),
+    $find('lib/*.php'),
+);
 
 $threw = false;
-try { $find('*.php', '../'); } catch (PathOutsideProjectException) { $threw = true; }
+
+try {
+    $find('*.php', '../');
+} catch (PathOutsideProjectException) {
+    $threw = true;
+}
 check('a path outside the project is refused', $threw);
 
 $threw = false;
-try { $find('   '); } catch (RuntimeException $e) { $threw = str_contains($e->getMessage(), 'empty pattern'); }
+
+try {
+    $find('   ');
+} catch (RuntimeException $e) {
+    $threw = str_contains($e->getMessage(), 'empty pattern');
+}
 check('an empty pattern is an error the model can act on', $threw);
 
 // ---- in a git repository: .gitignore counts -----------------------------------
@@ -85,8 +102,11 @@ for ($i = 0; $i < 150; $i++) {
     file_put_contents("{$root}/many/f{$i}.txt", 'x');
 }
 $out = $find('many/*.txt');
-check('a long list is capped, with how many were left out',
-    str_starts_with($out, '150 files match') && str_contains($out, '… and 50 more'), substr($out, -80));
+check(
+    'a long list is capped, with how many were left out',
+    str_starts_with($out, '150 files match') && str_contains($out, '… and 50 more'),
+    substr($out, -80),
+);
 
 exec('rm -rf ' . escapeshellarg($root));
 

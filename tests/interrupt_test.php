@@ -1,4 +1,5 @@
 <?php
+
 // Ctrl+C cancels the turn, not the session — and leaves the conversation in a
 // state the next request can actually be built from.
 
@@ -50,7 +51,9 @@ $_SERVER['HOME'] = $home;
 // ---- the signal path, driven by real signals -------------------------------
 $interrupt = new Interrupt();
 $quits = 0;
-$interrupt->install(function () use (&$quits) { $quits++; });
+$interrupt->install(function () use (&$quits) {
+    $quits++;
+});
 
 check('nothing is requested to start with', !$interrupt->requested());
 
@@ -98,7 +101,9 @@ $cancelling = new Interrupt();
 $cancelling->request();
 $platform = new OllamaPlatform(new MockHttpClient(new MockResponse($chunks)), 'http://x', 'm', 32768, -1.0, $cancelling);
 $tokens = [];
-$msg = $platform->stream([], [], function (string $t) use (&$tokens) { $tokens[] = $t; });
+$msg = $platform->stream([], [], function (string $t) use (&$tokens) {
+    $tokens[] = $t;
+});
 check('a cancelled stream yields no content', $msg['content'] === '', json_encode($msg));
 check('and emits no tokens', $tokens === [], json_encode($tokens));
 
@@ -242,7 +247,9 @@ $brief = new Interrupt();
 check('a quick one is not', !str_contains($shown, 'running…'), Terminal::plain($shown));
 
 $ticks = 0;
-$before = function () use (&$ticks): void { $ticks++; };
+$before = function () use (&$ticks): void {
+    $ticks++;
+};
 $kept = new Interrupt();
 $kept->meanwhile($before);
 loopWith($kept, [new SlowTool($kept, 0.1)], $oneCall);
