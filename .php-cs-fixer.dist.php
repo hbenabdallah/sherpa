@@ -6,8 +6,8 @@ $finder = (new PhpCsFixer\Finder())
     ->in([__DIR__ . '/src', __DIR__ . '/tests'])
     ->ignoreVCSIgnored(true);
 
-// strict_comparison, strict_param and date_time_immutable change behaviour, not layout:
-// each is turned on by its own change, with the suites run on the result.
+// date_time_immutable changes behaviour, not layout: it is turned on by its own change,
+// with the suites run on the result.
 return (new PhpCsFixer\Config())
     ->setRiskyAllowed(true)
     ->setCacheFile(__DIR__ . '/var/.php-cs-fixer.cache')
@@ -22,6 +22,8 @@ return (new PhpCsFixer\Config())
             'consider_absent_docblock_as_internal_class' => true,
         ],
         'modernize_types_casting' => true,
+        'strict_comparison' => true,
+        'strict_param' => true,
         'no_unused_imports' => true,
         'ordered_imports' => ['imports_order' => ['class', 'function', 'const']],
         'global_namespace_import' => ['import_classes' => true, 'import_constants' => false, 'import_functions' => false],

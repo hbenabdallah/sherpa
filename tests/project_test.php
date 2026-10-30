@@ -142,7 +142,7 @@ check('and the memory database stays where it was', $after->memoryDb === $memory
 
 // The stack belongs to the new location, not the old one.
 check('the stack is re-detected at the new path', str_contains($after->stack, 'Symfony'), $after->stack);
-check('creation date is preserved', $after->createdAt == $before->createdAt);
+check('creation date is preserved', $after->createdAt->format(DATE_ATOM) === $before->createdAt->format(DATE_ATOM));
 
 $reloaded = new ProjectStore(new StackDetector());
 check(

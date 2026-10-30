@@ -64,9 +64,9 @@ class Toolbox
             $typeName = $type instanceof ReflectionNamedType ? $type->getName() : 'string';
 
             $jsonType = match (true) {
-                in_array($typeName, ['int', 'integer'])     => 'integer',
-                in_array($typeName, ['float', 'double'])    => 'number',
-                in_array($typeName, ['bool', 'boolean'])    => 'boolean',
+                in_array($typeName, ['int', 'integer'], true)     => 'integer',
+                in_array($typeName, ['float', 'double'], true)    => 'number',
+                in_array($typeName, ['bool', 'boolean'], true)    => 'boolean',
                 $typeName === 'array'                       => 'array',
                 default                                     => 'string',
             };
