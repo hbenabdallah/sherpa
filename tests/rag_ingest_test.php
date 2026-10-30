@@ -78,7 +78,7 @@ check(
     !in_array('Orders', $headings($doc), true),
 );
 
-$delivery = array_values(array_filter($doc->sections, fn(Section $s): bool => ($s->headings[1] ?? '') === 'Delivery'))[0] ?? null;
+$delivery = array_first(array_filter($doc->sections, fn(Section $s): bool => ($s->headings[1] ?? '') === 'Delivery')) ?? null;
 check('a table is kept as written', str_contains($delivery?->text ?? '', '| Paris | 2 days |'), $delivery?->text ?? '');
 check('line numbers point at the file: the section starts right under its heading', $delivery?->startLine === 18, (string) $delivery?->startLine);
 
@@ -96,7 +96,7 @@ HTML;
 
 $doc = new HtmlParser()->parse('site/tarifs.html', $html);
 check('an HTML title is read', $doc->title === 'Prices', $doc->title);
-$france = array_values(array_filter($doc->sections, fn(Section $s): bool => ($s->headings[1] ?? '') === 'France'))[0] ?? null;
+$france = array_first(array_filter($doc->sections, fn(Section $s): bool => ($s->headings[1] ?? '') === 'France')) ?? null;
 check('HTML headings nest the same way', $france !== null, json_encode($headings($doc), JSON_UNESCAPED_UNICODE));
 check(
     'a table becomes a Markdown table, row by row, not a stream of cells',

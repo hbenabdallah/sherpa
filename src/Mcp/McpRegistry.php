@@ -309,7 +309,7 @@ class McpRegistry
     private function type(mixed $type): string
     {
         if (is_array($type)) {
-            $type = array_values(array_filter($type, fn($t): bool => $t !== 'null'))[0] ?? 'string';
+            $type = array_first(array_filter($type, fn($t): bool => $t !== 'null')) ?? 'string';
         }
 
         return in_array($type, ['string', 'integer', 'number', 'boolean', 'array', 'object'], true)
