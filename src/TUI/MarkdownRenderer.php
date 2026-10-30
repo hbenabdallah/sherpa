@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\TUI;
 
-class MarkdownRenderer
+final class MarkdownRenderer
 {
     private bool $inCodeBlock = false;
 

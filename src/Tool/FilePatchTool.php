@@ -22,13 +22,13 @@ use RuntimeException;
     description: 'Apply a targeted replacement in a file: replace a string that occurs once with a new string. Safer than full file_write for small edits.',
     permission: Permission::CONFIRM,
 )]
-class FilePatchTool
+final readonly class FilePatchTool
 {
     public function __construct(
-        private readonly ProjectPathResolver $paths = new ProjectPathResolver(),
-        private readonly SyntaxGuard $syntax = new SyntaxGuard(),
+        private ProjectPathResolver $paths = new ProjectPathResolver(),
+        private SyntaxGuard $syntax = new SyntaxGuard(),
         // The disk, or the editor's buffers under `sherpa acp`.
-        private readonly Files $files = new Files(),
+        private Files $files = new Files(),
     ) {}
 
     /**

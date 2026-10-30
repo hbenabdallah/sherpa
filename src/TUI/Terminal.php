@@ -6,6 +6,7 @@ namespace App\TUI;
 
 use RuntimeException;
 
+/** @open the suites extend it with a terminal of a given size */
 class Terminal
 {
     // ANSI colors

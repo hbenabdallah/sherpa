@@ -15,6 +15,7 @@ use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpKernel\Kernel as BaseKernel;
 use Throwable;
 
+/** @open the suites extend it to see the checkout from another path */
 class Kernel extends BaseKernel
 {
     use MicroKernelTrait;

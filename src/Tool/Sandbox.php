@@ -20,11 +20,11 @@ use Throwable;
  * SHERPA_SANDBOX=strict also cuts the network. A command run in the project's
  * container is not wrapped: the container is its sandbox.
  */
-class Sandbox
+final class Sandbox
 {
-    public const BUBBLEWRAP = 'bubblewrap';
+    public const string BUBBLEWRAP = 'bubblewrap';
 
-    public const SANDBOX_EXEC = 'sandbox-exec';
+    public const string SANDBOX_EXEC = 'sandbox-exec';
 
     /**
      * Under the home, where installs and test runs write what they download

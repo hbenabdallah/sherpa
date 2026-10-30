@@ -33,7 +33,7 @@ use Throwable;
  * beside it, readable by its owner only — or in the variable a provider
  * names (key_env). Switching providers never sends one's key to another.
  */
-class MachineConfig
+final class MachineConfig
 {
     private ?string $overridePath = null;
 

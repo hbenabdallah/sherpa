@@ -14,7 +14,7 @@ namespace App\Project;
  * declarations first (a composer script, a make target, a runner's config) and
  * the README last, since prose goes stale — but it is often the only place.
  */
-class TestCommandDetector
+final class TestCommandDetector
 {
     /** The first word of a line in a README that can be a test command. */
     private const array COMMAND_STARTS = [

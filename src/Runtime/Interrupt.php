@@ -19,7 +19,7 @@ use Fiber;
  * comes. The handler stays installed all session because Sherpa runs as PID 1
  * in its container, where SIG_DFL does nothing at all.
  */
-class Interrupt
+final class Interrupt
 {
     private bool $inTurn = false;
 

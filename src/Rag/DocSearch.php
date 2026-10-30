@@ -24,10 +24,10 @@ use Throwable;
  *
  * @phpstan-import-type Run from RetrievalEval
  */
-class DocSearch
+final class DocSearch
 {
     /** Passages returned at most: the best few, not everything that matched. */
-    public const PASSAGES = 5;
+    public const int PASSAGES = 5;
 
     /** Share of the prompt window one search may take. */
     private const float SHARE = 0.10;

@@ -14,7 +14,7 @@ use App\Project\TestCommand;
 use App\Project\TestCommandDetector;
 use App\Skills\SkillRegistry;
 
-class SystemPromptBuilder
+final readonly class SystemPromptBuilder
 {
     /**
      * Share of the prompt allowance spent quoting remembered facts. A flat
@@ -34,22 +34,22 @@ class SystemPromptBuilder
     private const int MEMORY_BUDGET_MAX_CHARS = 24000;
 
     public function __construct(
-        private readonly MemoryStore $memory,
-        private readonly SkillRegistry $skills,
-        private readonly StackDetector $detector,
+        private MemoryStore $memory,
+        private SkillRegistry $skills,
+        private StackDetector $detector,
         // Optional so the builder stays constructible on its own — stack_test
         // builds one with no budget at all. Absent, the floor applies, which is
         // the behaviour this class had before the window became a variable.
-        private readonly ?ContextBudget $budget = null,
+        private ?ContextBudget $budget = null,
         // Optional for the same reason as the budget: stack_test builds a
         // builder on its own. Absent, the digest ranks on what it always did.
-        private readonly ?RecentActivity $activity = null,
+        private ?RecentActivity $activity = null,
         // Optional for the same reason. Absent, the prompt says the command is
         // unknown and where to look for it.
-        private readonly ?TestCommandDetector $tests = null,
+        private ?TestCommandDetector $tests = null,
         // Optional for the same reason. Absent, the prompt has no MCP section,
         // as when no server is configured.
-        private readonly ?McpRegistry $mcp = null,
+        private ?McpRegistry $mcp = null,
     ) {}
 
     /**

@@ -10,7 +10,7 @@ use stdClass;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Throwable;
 
-class OllamaPlatform implements PlatformInterface, EmbeddingBackend
+final class OllamaPlatform implements PlatformInterface, EmbeddingBackend
 {
     use LastCall;
 

@@ -10,7 +10,7 @@ namespace App\Project;
  * A table of manifests rather than a ladder of ifs: adding an ecosystem is a
  * row, and each row says how to recognise its own frameworks.
  */
-class StackDetector
+final class StackDetector
 {
     public function detect(string $projectPath): Stack
     {

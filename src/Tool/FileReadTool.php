@@ -18,7 +18,7 @@ use RuntimeException;
     description: 'Read the contents of a file in the project. Returns file content with line numbers.',
     permission: Permission::AUTO,
 )]
-class FileReadTool
+final readonly class FileReadTool
 {
     /**
      * Share of the prompt window one read may fill, with the floor a 32k
@@ -39,10 +39,10 @@ class FileReadTool
     private const int DIRECTORY_ENTRIES = 40;
 
     public function __construct(
-        private readonly ProjectPathResolver $paths = new ProjectPathResolver(),
-        private readonly ?ContextBudget $budget = null,
+        private ProjectPathResolver $paths = new ProjectPathResolver(),
+        private ?ContextBudget $budget = null,
         // The disk, or the editor's buffers under `sherpa acp`.
-        private readonly Files $files = new Files(),
+        private Files $files = new Files(),
     ) {}
 
     public function __invoke(

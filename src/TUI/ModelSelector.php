@@ -19,7 +19,7 @@ use App\Platform\PlatformInterface;
  * Hard-coding a menu of known-good models would have made Sherpa work on the
  * machine it was written on and nowhere else.
  */
-class ModelSelector
+final class ModelSelector
 {
     /** Above this, a window is very unlikely to fit beside the weights. */
     private const int LARGE_WINDOW = 131072;

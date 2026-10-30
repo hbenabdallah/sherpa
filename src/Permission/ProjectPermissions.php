@@ -15,7 +15,7 @@ use App\Project\ProjectStore;
  * means every future session runs commands in that project unprompted, so the
  * grants have to be listable and revocable — see /permissions.
  */
-class ProjectPermissions
+final class ProjectPermissions
 {
     private ?Project $project = null;
 

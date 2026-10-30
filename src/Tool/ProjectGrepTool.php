@@ -18,7 +18,7 @@ use Symfony\Component\Process\Process;
     description: 'Search for a pattern in project files using grep. Returns matching lines with filenames and line numbers.',
     permission: Permission::AUTO,
 )]
-class ProjectGrepTool
+final readonly class ProjectGrepTool
 {
     /**
      * Floors, chosen against a 32k window and kept as the small-window
@@ -45,13 +45,13 @@ class ProjectGrepTool
     private const int MAX_LINE_CHARS = 300;
 
     public function __construct(
-        private readonly ProjectPathResolver $paths = new ProjectPathResolver(),
+        private ProjectPathResolver $paths = new ProjectPathResolver(),
         // Optional so the tool stays constructible on its own; absent, the
         // floors above apply.
-        private readonly ?ContextBudget $budget = null,
+        private ?ContextBudget $budget = null,
         // Counts hits and misses. The code half of the retrieval question had
         // no instrument at all, so it could only be argued about.
-        private readonly ?MemoryStore $store = null,
+        private ?MemoryStore $store = null,
     ) {}
 
     /** How many match lines this window can afford from one search. */

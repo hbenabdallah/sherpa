@@ -14,9 +14,9 @@ use App\Agent\Tool\Permission;
     // It reads the output of a command the user already allowed.
     permission: Permission::AUTO,
 )]
-class JobOutputTool
+final readonly class JobOutputTool
 {
-    public function __construct(private readonly ShellExecTool $shell) {}
+    public function __construct(private ShellExecTool $shell) {}
 
     public function __invoke(#[Param('The job id shell_exec gave')] int $id): string
     {

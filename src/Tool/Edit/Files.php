@@ -13,7 +13,7 @@ use RuntimeException;
  * a tab may hold changes not yet saved; read from disk, the model would patch
  * what the user no longer sees, and the editor would then hold two versions.
  */
-class Files
+final class Files
 {
     /** @var (Closure(string): ?string)|null */
     private ?Closure $reader = null;

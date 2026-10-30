@@ -19,7 +19,7 @@ use App\TUI\ConfirmOverlay;
  * one instance, as SwitchablePlatform is given for the model: nothing else
  * needs to know there are two.
  */
-class Frontend implements AgentOutput, Approver
+final class Frontend implements AgentOutput, Approver
 {
     private AgentOutput $output;
 

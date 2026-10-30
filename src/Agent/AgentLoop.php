@@ -16,7 +16,7 @@ use App\Usage\UsageMeter;
 use Fiber;
 use Throwable;
 
-class AgentLoop
+final class AgentLoop
 {
     /**
      * The hard stop, and only that. Ten capped work rather than caught a fault:

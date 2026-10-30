@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Skills;
 
-class SkillRegistry
+final class SkillRegistry
 {
     /** @var array<string, Skill> */
     private array $skills = [];

@@ -16,12 +16,12 @@ use App\Memory\Recorded;
     description: 'Persist a durable fact about the project for future sessions. Use for architectural decisions, conventions, key file locations, etc. Set replaces=true only to correct something already known under the same key.',
     permission: Permission::AUTO,
 )]
-class MemoryRememberTool
+final readonly class MemoryRememberTool
 {
     public function __construct(
-        private readonly MemoryStore $store,
+        private MemoryStore $store,
         // What the session read from outside by now, kept with the fact.
-        private readonly ?Provenance $provenance = null,
+        private ?Provenance $provenance = null,
     ) {}
 
     public function __invoke(

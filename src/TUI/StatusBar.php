@@ -8,7 +8,7 @@ use App\Platform\RateLimits;
 use App\Project\Project;
 use App\Version;
 
-class StatusBar
+final class StatusBar
 {
     /**
      * One-line status printed above the prompt.

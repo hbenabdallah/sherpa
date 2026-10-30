@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Agent;
 
-class MessageBag
+final class MessageBag
 {
     /** @var list<array<string, mixed>> */
     private array $messages = [];

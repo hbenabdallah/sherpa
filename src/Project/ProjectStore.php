@@ -10,7 +10,7 @@ use Symfony\Component\String\UnicodeString;
 use Symfony\Component\Yaml\Yaml;
 use Throwable;
 
-class ProjectStore
+final class ProjectStore
 {
     private readonly string $configFile;
 

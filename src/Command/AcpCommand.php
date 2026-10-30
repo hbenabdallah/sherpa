@@ -32,7 +32,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  * asked, since there is nobody at a terminal to answer.
  */
 #[AsCommand(name: 'acp', description: 'Run Sherpa for an editor, over the Agent Client Protocol (stdin and stdout)')]
-class AcpCommand extends Command
+final class AcpCommand extends Command
 {
     public function __construct(
         private readonly AcpServer $server,

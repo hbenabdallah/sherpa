@@ -9,7 +9,7 @@ use ReflectionClass;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 
-class ToolboxPass implements CompilerPassInterface
+final class ToolboxPass implements CompilerPassInterface
 {
     public function process(ContainerBuilder $container): void
     {

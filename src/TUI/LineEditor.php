@@ -25,6 +25,8 @@ use Closure;
  * readline(), so the wait happens in stream_select(): PHP dispatches an async
  * signal only between VM instructions, so inside C a Ctrl+C would sit unhandled
  * until the next Enter.
+ *
+ * @open the suites extend it with an editor that says it is interactive
  */
 class LineEditor
 {

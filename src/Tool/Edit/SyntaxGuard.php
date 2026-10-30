@@ -25,14 +25,14 @@ use Throwable;
  * file that did not parse before is not guarded, so repairing one in several
  * steps stays possible.
  */
-class SyntaxGuard
+final readonly class SyntaxGuard
 {
     /**
      * @param bool|null $inProcess parse here rather than run `php -l`; by
      *                             default, when running from the single
      *                             executable, where PHP_BINARY is Sherpa itself
      */
-    public function __construct(private readonly ?bool $inProcess = null) {}
+    public function __construct(private ?bool $inProcess = null) {}
 
     /** Why $content is not valid for a file at $path, or null when it is or this cannot tell. */
     public function problem(string $path, string $content): ?string

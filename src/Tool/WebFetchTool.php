@@ -23,7 +23,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
     permission: Permission::CONFIRM,
     untrusted: true,
 )]
-class WebFetchTool
+final class WebFetchTool
 {
     /** Past this, the rest of the page is not downloaded. */
     private const int MAX_BYTES = 3_000_000;

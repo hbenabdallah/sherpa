@@ -17,7 +17,7 @@ use RuntimeException;
     description: 'List a project directory as a tree: subdirectories first, then files. Use it when you do not know where something lives, instead of guessing file names.',
     permission: Permission::AUTO,
 )]
-class ListDirTool
+final class ListDirTool
 {
     /**
      * Directories named but never opened. What is in them is somebody else's
