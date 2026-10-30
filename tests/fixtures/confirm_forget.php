@@ -2,6 +2,11 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\Fixtures\ConfirmForget;
+
+use App\TUI\Terminal;
+use DateTimeImmutable;
+
 // Answers ProjectQuestions::confirmForget() from stdin and prints the verdict,
 // so the one question before an irreversible delete can be tested without a
 // terminal. Usage: php confirm_forget.php
@@ -30,4 +35,4 @@ ob_start();
 $confirmed = (new ProjectQuestions(new LineEditor(), new ProjectStore(new StackDetector())))->confirmForget($project, 12, 3);
 $shown = (string) ob_get_clean();
 
-echo json_encode(['confirmed' => $confirmed, 'shown' => App\TUI\Terminal::plain($shown)]);
+echo json_encode(['confirmed' => $confirmed, 'shown' => Terminal::plain($shown)]);

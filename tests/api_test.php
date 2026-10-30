@@ -2,13 +2,17 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\ApiTest;
+
 use App\Config\Backend;
 use App\Platform\ModelInfo;
 use App\Platform\ModelResidency;
 use App\Platform\OllamaPlatform;
 use App\Platform\SwitchablePlatform;
 use App\Usage\UsageMeter;
+use RuntimeException;
 use Symfony\Component\HttpClient\HttpClient;
+use Throwable;
 
 // The hosted-API backend: OpenAI's /chat/completions dialect, which is what
 // every provider but Ollama speaks. Nothing here reaches a network — the whole
@@ -388,7 +392,7 @@ foreach ($cases as [$status, $body, $expected]) {
     }
     check(
         "HTTP {$status} is explained rather than dumped",
-        $thrown instanceof \Throwable && str_contains($thrown->getMessage(), $expected),
+        $thrown instanceof Throwable && str_contains($thrown->getMessage(), $expected),
         $thrown?->getMessage() ?? 'nothing',
     );
 }

@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\Rag\EvalLive;
+
 // Retrieval measured with a real embedding model, on the same 32 questions as
 // tests/rag_eval_test.php. Not part of `make test`: it calls the provider and
 // costs a little — the corpus and the questions are a few thousand tokens.

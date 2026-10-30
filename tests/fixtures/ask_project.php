@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\Fixtures\AskProject;
+
 // Answers ProjectQuestions::ask() from stdin, as a person at the keyboard
 // would, and prints the draft it made — so the questions can be tested
 // without a terminal. Usage: php ask_project.php <directory>
@@ -14,7 +16,7 @@ use App\Project\StackDetector;
 use App\TUI\LineEditor;
 
 ob_start();
-$draft = (new ProjectQuestions(new LineEditor(), new ProjectStore(new StackDetector())))->ask($argv[1]);
+$draft = (new ProjectQuestions(new LineEditor(), new ProjectStore(new StackDetector())))->ask($_SERVER['argv'][1]);
 ob_end_clean();
 
 echo json_encode([

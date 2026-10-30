@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\UntrustedTest;
+
+use PDO;
+use ReflectionProperty;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\LazyCommand;
 

@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\SandboxTest;
+
 use App\Agent\Tool\ToolResult;
 
 // Verification that filesystem tools cannot escape the project root.

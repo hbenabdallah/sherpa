@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\PermissionTest;
+
 use App\Permission\Offer;
 
 // Per-project permissions: they have to survive the process that granted them,

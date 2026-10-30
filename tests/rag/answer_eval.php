@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\Rag\AnswerEval;
+
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
 
 // The documentation search measured where it counts: in the agent's answers.
@@ -47,10 +49,11 @@ use App\Rag\Ingestor;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Component\Process\Process;
 use Symfony\Component\Yaml\Yaml;
+use Throwable;
 
 $options = [];
 $positional = [];
-foreach (array_slice($argv, 1) as $arg) {
+foreach (array_slice($_SERVER['argv'], 1) as $arg) {
     if (preg_match('/^--([a-z]+)=(.*)$/', $arg, $m) === 1) {
         $options[$m[1]] = $m[2];
     } else {
@@ -119,7 +122,7 @@ if ($embeddingModel !== '') {
 
     try {
         new ChunkEmbedder()->embed($docs, new FixedEmbeddings($platform, $embeddingModel));
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         // A quota spent before the first question: nothing measured, and
         // better said in one line than in a stack trace.
         fwrite(STDERR, "\n  Cannot embed, nothing is measured: " . $e->getMessage() . "\n\n");

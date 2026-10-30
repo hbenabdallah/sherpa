@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\RagEvalTest;
+
 use App\Rag\Hit;
 
 // Retrieval, measured. A small documentation corpus written for this purpose,

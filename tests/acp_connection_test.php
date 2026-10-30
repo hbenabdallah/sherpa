@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\AcpConnectionTest;
+
+use stdClass;
+
 // JSON-RPC over stdio, as ACP frames it: one message per line, requests both
 // ways, and a cancel that has to be heard while Sherpa waits on something else.
 

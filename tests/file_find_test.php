@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\FileFindTest;
+
+use RuntimeException;
+
 // file_find: files by name pattern, confined to the project, newest first.
 
 require __DIR__ . '/../vendor/autoload.php';

@@ -2,7 +2,11 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\AnthropicTest;
+
 use App\Platform\ModelInfo;
+use RuntimeException;
+use stdClass;
 
 // Anthropic's Messages API, spoken natively: the request shape, the event
 // stream, prompt caching and thinking blocks. Nothing reaches a network.

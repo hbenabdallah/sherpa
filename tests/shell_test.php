@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\ShellTest;
+
+use ReflectionMethod;
+
 // shell_exec: the tool that runs arbitrary commands, and the one with no test
 // until now.
 
@@ -12,6 +16,7 @@ use App\Project\PathOutsideProjectException;
 use App\Project\ProjectPathResolver;
 use App\Tool\ContainerInspector;
 use App\Tool\ShellExecTool;
+use RuntimeException;
 
 $pass = 0;
 $fail = 0;
@@ -161,7 +166,7 @@ function refusal(ShellExecTool $tool, string $command, bool $background = false)
 {
     try {
         return 'ran: ' . $tool($command, background: $background);
-    } catch (\RuntimeException $e) {
+    } catch (RuntimeException $e) {
         return $e->getMessage();
     }
 }

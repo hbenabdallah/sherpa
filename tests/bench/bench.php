@@ -2,8 +2,16 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\Bench\Bench;
+
+use FilesystemIterator;
+use PDO;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
+use RuntimeException;
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Yaml\Yaml;
+use Throwable;
 
 // Sherpa's benchmark: realistic tasks on throwaway projects, run end to end
 // against a real model and scored automatically — how "good enough" gets a

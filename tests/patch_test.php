@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\PatchTest;
+
 use App\Agent\Tool\ToolResult;
+use ReflectionMethod;
 
 // file_patch and file_write: placing an edit the way the model meant it, and
 // never breaking a file that parsed. Every case below is a failure the

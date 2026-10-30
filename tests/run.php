@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\Run;
+
 /**
  * Minimal test runner — no PHPUnit dependency yet.
  *

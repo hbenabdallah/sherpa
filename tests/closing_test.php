@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\ClosingTest;
+
 use App\Agent\Tool\ToolCall;
 use App\Agent\Tool\ToolDefinition;
 
@@ -30,6 +32,7 @@ use App\TUI\MarkdownRenderer;
 use App\TUI\Terminal;
 use App\Usage\TokenCapReached;
 use App\Usage\UsageMeter;
+use Closure;
 
 $pass = 0;
 $fail = 0;
@@ -78,8 +81,8 @@ final class Reader implements PlatformInterface
     /** @var array<int, array<int, array<string, mixed>>> */
     public array $seen = [];
 
-    /** @param \Closure(array<int, array<string, mixed>>, int): array<string, mixed> $reply */
-    public function __construct(private readonly \Closure $reply, private readonly ?UsageMeter $meter = null, private readonly int $perRequest = 0) {}
+    /** @param Closure(array<int, array<string, mixed>>, int): array<string, mixed> $reply */
+    public function __construct(private readonly Closure $reply, private readonly ?UsageMeter $meter = null, private readonly int $perRequest = 0) {}
 
     public function stream(array $messages, array $tools = [], ?callable $onToken = null, ?callable $onWait = null): array
     {
@@ -148,7 +151,7 @@ final class Reader implements PlatformInterface
  * Reads file n on request n. Told to stop, it answers — or, if it does not
  * obey, goes on reading, with $aside written alongside the call.
  */
-function reader(bool $obeys, string $aside = ''): \Closure
+function reader(bool $obeys, string $aside = ''): Closure
 {
     return function (array $messages, int $n) use ($obeys, $aside): array {
         $told = str_contains(json_encode($messages), 'Stop investigating');

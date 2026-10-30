@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\StreamTest;
+
 // Verification of OllamaPlatform::stream() tool-call accumulation.
 require __DIR__ . '/../vendor/autoload.php';
 

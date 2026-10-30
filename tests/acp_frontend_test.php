@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\AcpFrontendTest;
+
 use App\Acp\SessionConfig;
 use App\Permission\Offer;
 

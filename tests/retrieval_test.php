@@ -2,11 +2,14 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\RetrievalTest;
+
 use App\Agent\Tool\Toolbox;
 use App\Agent\Tool\ToolCall;
 use App\Project\ProjectPathResolver;
 use App\Tool\FileReadTool;
 use App\Tool\ProjectGrepTool;
+use PDO;
 
 // Retrieval that does not cost a turn: what compaction takes out of the window
 // and can hand back, and the situational signals that rank the memory block

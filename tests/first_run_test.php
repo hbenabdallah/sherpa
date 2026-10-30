@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\FirstRunTest;
+
 // The first run asks for the key even when SHERPA_API_KEY is set: that
 // variable may hold another provider's key, and must not reach this one
 // unless the person says so.

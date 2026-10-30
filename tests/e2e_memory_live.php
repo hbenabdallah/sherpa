@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\E2eMemoryLive;
+
 /**
  * End-to-end check of project memory against a LIVE Ollama model.
  *

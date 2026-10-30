@@ -2,6 +2,11 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\LineEditorTest;
+
+use ReflectionMethod;
+use ReflectionProperty;
+
 // The input line when there is no libreadline — the static PHP Sherpa runs
 // with on the host has none. Before this editor existed, that case fell back on
 // a bare fgets(): arrow keys typed "^[[A" into the line, and a Ctrl+C at the

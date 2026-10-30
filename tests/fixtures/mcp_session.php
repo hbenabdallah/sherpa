@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\Fixtures\McpSession;
+
+use DateTimeImmutable;
+
 // Runs one /mcp command in a session, answering its questions from stdin, and
 // prints what happened as JSON — so declaring a server from a session can be
 // tested without a terminal.
@@ -26,7 +30,7 @@ use App\TUI\LineEditor;
 use App\TUI\MarkdownRenderer;
 use App\TUI\Terminal;
 
-[, $configPath, $args] = $argv;
+[, $configPath, $args] = $_SERVER['argv'];
 $dir = dirname($configPath);
 
 $config = new McpConfig();

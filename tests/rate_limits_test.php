@@ -2,6 +2,11 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\RateLimitsTest;
+
+use DateTimeImmutable;
+use ReflectionClass;
+
 // What a provider says about its limits, read from its headers and shown at
 // the bottom of the conversation — and nothing when it says nothing.
 

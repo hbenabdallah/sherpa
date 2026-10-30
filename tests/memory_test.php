@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\MemoryTest;
+
 use App\Agent\PlanMode;
+use PDO;
 
 // Project memory: what gets kept, what gets found again, and what must never be
 // lost quietly.
@@ -16,6 +19,7 @@ use App\Memory\MemoryStore;
 use App\Memory\Recorded;
 use App\Platform\OllamaPlatform;
 use App\Runtime\Interrupt;
+use LogicException;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 
@@ -172,7 +176,7 @@ $threw = false;
 
 try {
     $closed->recall();
-} catch (\LogicException) {
+} catch (LogicException) {
     $threw = true;
 }
 check('using a store with no database open throws', $threw);

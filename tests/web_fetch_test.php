@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\WebFetchTest;
+
+use RuntimeException;
+
 // web_fetch: a page read as text, bounded, confirmed first — against a fake
 // web, so nothing leaves the machine.
 

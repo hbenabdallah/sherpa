@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\Fixtures\FirstRun;
+
 // The first-run question about the API, run on its own with its answers piped
 // in, as a person would type them. Used by first_run_test.php.
 //
@@ -34,7 +36,7 @@ use App\Usage\UsageMeter;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 
-$dir = $argv[1];
+$dir = $_SERVER['argv'][1];
 $sent = [];
 $memory = new MemoryStore();
 $memory->open(':memory:');

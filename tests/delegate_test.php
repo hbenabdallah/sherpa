@@ -2,7 +2,12 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\DelegateTest;
+
 use App\Agent\Lanes;
+use Fiber;
+use ReflectionClass;
+use RuntimeException;
 use Symfony\Component\HttpClient\HttpClient;
 
 // delegate: a sub-agent that reads in its own context and reports back —
@@ -326,7 +331,7 @@ for ($i = 0; $i < 50 && @fsockopen('127.0.0.1', $port) === false; $i++) {
 
 $interrupt = new Interrupt();
 $sub = new Counted(new OpenAiCompatiblePlatform(HttpClient::create(), "http://127.0.0.1:{$port}/v1", 'm', 'k', 32768, 30.0, $interrupt));
-$asks = fn(array $tasks): \Scripted => new Scripted([
+$asks = fn(array $tasks): Scripted => new Scripted([
     ['role' => 'assistant', 'content' => '', 'tool_calls' => array_map(
         fn(string $task, int $i): array => ['id' => "d{$i}", 'function' => ['name' => 'delegate', 'arguments' => ['task' => $task]]],
         $tasks,

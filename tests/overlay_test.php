@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\OverlayTest;
+
 use App\Permission\Offer;
+use ReflectionMethod;
 
 // Verification of ConfirmOverlay previews resolving against the project root.
 require __DIR__ . '/../vendor/autoload.php';

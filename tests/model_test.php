@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\ModelTest;
+
 use Symfony\Component\Yaml\Yaml;
 
 // Verification of model selection: the precedence chain, what gets written down,
@@ -23,6 +25,7 @@ use App\Project\DockerConfig;
 use App\Project\Project;
 use App\Project\StackDetector;
 use App\Skills\SkillRegistry;
+use DateTimeImmutable;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 
@@ -389,8 +392,8 @@ $project = new Project(
     memoryDb: '/dev/null',
     docker: new DockerConfig(enabled: false),
     stack: '',
-    createdAt: new \DateTimeImmutable(),
-    lastUsedAt: new \DateTimeImmutable(),
+    createdAt: new DateTimeImmutable(),
+    lastUsedAt: new DateTimeImmutable(),
 );
 
 function promptFor(MemoryStore $memory, ?ContextBudget $budget): string

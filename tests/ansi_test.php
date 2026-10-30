@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\AnsiTest;
+
 use App\Agent\Tool\Permission;
 use App\Agent\Tool\ToolCall;
 use App\Agent\Tool\ToolDefinition;
@@ -9,6 +11,9 @@ use App\Platform\ModelInfo;
 use App\Platform\OllamaPlatform;
 use App\TUI\LineEditor;
 use App\TUI\ModelSelector;
+use ReflectionClass;
+use ReflectionMethod;
+use stdClass;
 use Symfony\Component\HttpClient\MockHttpClient;
 
 // Terminal escape handling: what gets stripped from untrusted text, and the

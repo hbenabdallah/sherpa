@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\RagIngestTest;
+
 use App\Rag\Chunk;
 use App\Rag\DocSource;
 use App\Rag\Section;

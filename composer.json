@@ -87,7 +87,10 @@
     "scripts": {
         "cs": "php-cs-fixer check --diff",
         "cs:fix": "php-cs-fixer fix",
-        "stan": "phpstan analyse --no-progress --memory-limit=1G",
+        "stan": [
+            "phpstan analyse --no-progress --memory-limit=1G",
+            "phpstan analyse --no-progress --memory-limit=2G -c phpstan.tests.neon"
+        ],
         "rector": "rector --dry-run",
         "test": "php tests/run.php",
         "check": ["@cs", "@rector", "@stan", "@test"],

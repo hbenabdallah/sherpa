@@ -2,10 +2,13 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\ProviderTest;
+
 use App\Platform\OllamaPlatform;
 use App\Platform\OpenAiCompatiblePlatform;
 use App\Platform\SwitchablePlatform;
 use App\Rag\Embedding\BackendEmbeddings;
+use RuntimeException;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 
@@ -338,6 +341,7 @@ file_put_contents($dir . '/emb/keys.yaml', "chat: k-chat\noa: k-emb\n");
 $embConfig = configAt($dir . '/emb/config.yaml');
 $embModels = new ModelResolver($embConfig, 'env:7b', 32768);
 
+/** @var list<array{url: string, auth: string, model: mixed}> $sent filled by the client below, by reference */
 $sent = [];
 $client = new MockHttpClient(function (string $method, string $url, array $options) use (&$sent): MockResponse {
     $body = json_decode($options['body'] ?? '{}', true);
@@ -365,6 +369,7 @@ check('and they are normalised like any other', abs(($vectors[0][0] ?? 0) - 0.6)
 $file = Yaml::parseFile($dir . '/emb/config.yaml');
 $file['embeddings'] = ['provider' => 'ollama', 'model' => 'nomic-embed-text'];
 file_put_contents($dir . '/emb/config.yaml', Yaml::dump($file, 4, 2));
+/** @var list<array{url: string, auth: string, model: mixed}> $sent filled by the client below, by reference */
 $sent = [];
 $embeddings->embed(['trois']);
 check(

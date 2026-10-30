@@ -2,10 +2,13 @@
 
 declare(strict_types=1);
 
+namespace App\Tests\FrontendTest;
+
 use App\Agent\Tool\Permission;
 use App\Permission\Offer;
 use App\Tool\Edit\ProposedEdit;
 use App\Tool\FileReadTool;
+use ReflectionProperty;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\LazyCommand;
 
