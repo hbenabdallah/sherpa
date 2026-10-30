@@ -217,7 +217,7 @@ $answers = [
 [$front, $editor] = frontend($paths, $todos, $answers);
 $front->showToolCall('file_patch', $call->arguments, 'p1');
 check('"for this session" is the session grant', $front->confirm($call, $def, new Offer()) === ConfirmChoice::Session);
-$asked = array_values(array_filter(out($editor), fn(array $m): bool => ($m['method'] ?? '') === 'session/request_permission'))[0]['params'] ?? [];
+$asked = array_first(array_filter(out($editor), fn(array $m): bool => ($m['method'] ?? '') === 'session/request_permission'))['params'] ?? [];
 check('the question names the session and the call, with the diff', $asked['sessionId'] === 's1' && $asked['toolCall']['toolCallId'] === 'p1'
     && $asked['toolCall']['content'][0]['type'] === 'diff' && str_contains($asked['toolCall']['content'][0]['newText'], 'return 1;'), json_encode($asked));
 check('a cancelled question is a refusal', $front->confirm($call, $def, new Offer()) === ConfirmChoice::Deny);

@@ -388,7 +388,7 @@ with the same model, tools, permissions and saved conversations. Set it up once
 with `sherpa acp --setup`; [how-to](docs/how-to.md#use-sherpa-in-your-editor-zed-jetbrains).
 
 **Do I need PHP?** No. The executable bundles its own PHP runtime. Sherpa works
-on projects in any language; it is written in PHP 8.4 and Symfony 8.
+on projects in any language; it is written in PHP 8.5 and Symfony 8.
 
 **How much does it cost?** What your provider charges for the tokens. Add the
 model's prices to `config.yaml` and Sherpa shows the cost of the session;

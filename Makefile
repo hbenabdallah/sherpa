@@ -112,7 +112,7 @@ link: ## Install a `sherpa` command in ~/.local/bin that works from anywhere
 	@if php=$$(./bin/find-php.sh); then \
 	  echo "✓ sherpa will run on this machine, with $$php"; \
 	else \
-	  echo "• sherpa will run in Docker: no PHP 8.4 with pdo_sqlite and pcntl here."; \
+	  echo "• sherpa will run in Docker: no PHP 8.5 with pdo_sqlite and pcntl here."; \
 	  echo "  On the host, shell_exec runs your own tools. To switch:  make php"; \
 	fi
 	@case ":$$PATH:" in \

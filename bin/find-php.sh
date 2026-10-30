@@ -7,7 +7,7 @@
 #
 # In order: one named with SHERPA_PHP, Sherpa's own (`make php` puts it outside
 # PATH), then whatever `php` is on PATH. Each is kept only if it can actually
-# run Sherpa: 8.4, SQLite for its memory, pcntl for Ctrl+C.
+# run Sherpa: 8.5, SQLite for its memory, pcntl for Ctrl+C.
 
 set -u
 
@@ -16,7 +16,7 @@ for candidate in "${SHERPA_PHP:-}" "$HOME/.local/share/sherpa/php" "$(command -v
         continue
     fi
 
-    if "$candidate" -r 'exit(PHP_VERSION_ID >= 80400 && extension_loaded("pdo_sqlite") && extension_loaded("pcntl") ? 0 : 1);' 2>/dev/null; then
+    if "$candidate" -r 'exit(PHP_VERSION_ID >= 80500 && extension_loaded("pdo_sqlite") && extension_loaded("pcntl") ? 0 : 1);' 2>/dev/null; then
         printf '%s\n' "$candidate"
         exit 0
     fi

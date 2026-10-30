@@ -213,7 +213,7 @@ final class WebFetchTool
 
         $parts = [];
         foreach ($document->sections as $section) {
-            $heading = $section->headings === [] ? '' : str_repeat("#", min(6, count($section->headings))) . " " . $section->headings[array_key_last($section->headings)] . "\n\n";
+            $heading = $section->headings === [] ? '' : str_repeat("#", min(6, count($section->headings))) . " " . array_last($section->headings) . "\n\n";
             $parts[] = $heading . trim($section->text);
         }
 

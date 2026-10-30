@@ -40,12 +40,12 @@ final class KeyReader
 
             // A continuation byte (0x80–0xBF) where a character should start,
             // or a byte UTF-8 never uses: the remains of broken input, dropped.
-            if ((ord($byte) >= 0x80 && ord($byte) <= 0xBF) || ord($byte) >= 0xF8) {
+            if ((ord($byte[0]) >= 0x80 && ord($byte[0]) <= 0xBF) || ord($byte[0]) >= 0xF8) {
                 $i++;
                 continue;
             }
 
-            $size = self::utf8Size(ord($byte));
+            $size = self::utf8Size(ord($byte[0]));
 
             // A lead byte promises continuation bytes (0x80–0xBF). One that is
             // not followed by them is broken input — a terminal speaking

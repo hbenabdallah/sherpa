@@ -39,7 +39,7 @@ if [ "$runtime" != "docker" ] && php=$("$SHERPA_HOME/bin/find-php.sh"); then
 fi
 
 if [ "$runtime" = "host" ]; then
-    echo "sherpa: no PHP 8.4 with pdo_sqlite and pcntl was found." >&2
+    echo "sherpa: no PHP 8.5 with pdo_sqlite and pcntl was found." >&2
     echo "        installez celui de Sherpa :  make -C $SHERPA_HOME php" >&2
     exit 1
 fi

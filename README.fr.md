@@ -414,7 +414,7 @@ et les mêmes conversations enregistrées. À configurer une fois avec
 `sherpa acp --setup` ; [mode d'emploi](docs/how-to.md#use-sherpa-in-your-editor-zed-jetbrains).
 
 **Faut-il PHP ?** Non. L'exécutable embarque son propre PHP. Sherpa travaille
-sur des projets dans n'importe quel langage ; il est écrit en PHP 8.4 et
+sur des projets dans n'importe quel langage ; il est écrit en PHP 8.5 et
 Symfony 8.
 
 **Combien ça coûte ?** Ce que votre fournisseur facture pour les tokens. Ajoutez
