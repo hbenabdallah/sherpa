@@ -408,7 +408,7 @@ HELP . Terminal::RESET;
                     echo Terminal::GRAY . "  (none reported: this provider sends no rate-limit headers)\n" . Terminal::RESET;
                 } else {
                     foreach ($limits->windows as $name => $window) {
-                        $this->row($name, '%s', sprintf(
+                        $this->row((string) $name, '%s', sprintf(
                             '%s of %s left (%d%%)%s',
                             number_format($window['remaining']),
                             number_format($window['limit']),

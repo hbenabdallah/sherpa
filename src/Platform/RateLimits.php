@@ -18,7 +18,7 @@ namespace App\Platform;
 final readonly class RateLimits
 {
     /**
-     * @param array<string, array{remaining: int, limit: int, reset: ?string}> $windows by name
+     * @param array<int|string, array{remaining: int, limit: int, reset: ?string}> $windows by name; a name like "60" is an int key
      */
     private function __construct(public array $windows) {}
 
@@ -35,6 +35,7 @@ final readonly class RateLimits
             $values[strtolower((string) $name)] = is_array($value) ? (string) ($value[0] ?? '') : (string) $value;
         }
 
+        /** @var array<int|string, array<string, string>> $found a window named "60" is keyed 60 */
         $found = [];
         foreach ($values as $name => $value) {
             if (preg_match('/^(?:x-)?ratelimit-(limit|remaining|reset)(?:-(.+))?$/', $name, $m) === 1) {
@@ -54,7 +55,7 @@ final readonly class RateLimits
                 continue;
             }
 
-            $windows[self::label($key)] = [
+            $windows[self::label((string) $key)] = [
                 'remaining' => max(0, min($remaining, $limit)),
                 'limit'     => $limit,
                 'reset'     => isset($parts['reset']) && trim($parts['reset']) !== '' ? trim($parts['reset']) : null,

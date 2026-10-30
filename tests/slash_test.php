@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Session\SavedSession;
 use App\Skills\Skill;
 
@@ -112,7 +114,13 @@ $session = new SessionPermissions();
 
 $platform = new SwitchablePlatform(
     new OllamaPlatform(new MockHttpClient(new MockResponse('{"message":{"content":"ok"},"done":true}')), 'http://ollama.test', 'local:7b'),
-    new OpenAiCompatiblePlatform(new MockHttpClient(new MockResponse('')), 'https://api.example.com/v1', 'distant/modele'),
+    new OpenAiCompatiblePlatform(new MockHttpClient(fn(string $method, string $url): MockResponse => str_ends_with($url, '/chat/completions')
+        ? new MockResponse(['data: {"choices":[{"delta":{"content":"ok"}}]}' . "\n\ndata: [DONE]\n\n"], ['response_headers' => [
+            'content-type' => 'text/event-stream',
+            'x-ratelimit-limit-60' => '100',
+            'x-ratelimit-remaining-60' => '25',
+        ]])
+        : new MockResponse('')), 'https://api.example.com/v1', 'distant/modele'),
 );
 $platform->switchTo(Backend::Api);
 
@@ -335,6 +343,11 @@ check(
 check('with the provider\'s cache hits apart', str_contains($out, '400 of them cached'), $out);
 check('and no cost claimed without a declared price', str_contains($out, 'no price'), $out);
 check('the measured throughput appears too', str_contains($out, '900 tokens/s'), $out);
+
+// A window named by a number is keyed by an integer in PHP.
+$platform->stream([['role' => 'user', 'content' => 'x']], [], fn(): null => null);
+[, $out] = $slash('/context');
+check('the provider\'s limits are listed, a window named by a number too', str_contains($out, 'Provider limits') && str_contains($out, '60'), $out);
 
 // ---- compaction and reset --------------------------------------------------
 [, $out] = $slash('/compact');

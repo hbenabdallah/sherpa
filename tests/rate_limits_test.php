@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // What a provider says about its limits, read from its headers and shown at
 // the bottom of the conversation — and nothing when it says nothing.
 
@@ -61,6 +63,10 @@ check(
     isset($mistral?->windows['tokens/month']) && $mistral?->tightest()['name'] === 'tokens/month',
     json_encode($mistral?->windows),
 );
+
+// A window named by a number becomes an integer key in a PHP array.
+$numbered = RateLimits::fromHeaders(['x-ratelimit-limit-60' => ['100'], 'x-ratelimit-remaining-60' => ['25']]);
+check('a window named by a number is read too', $numbered?->tightest()['percentLeft'] === 25, json_encode($numbered?->windows));
 
 $ietf = RateLimits::fromHeaders(['RateLimit-Limit' => ['100, 100;w=60'], 'RateLimit-Remaining' => ['40']]);
 check('the IETF draft form, header case and all', $ietf?->tightest() === ['name' => 'requests', 'percentLeft' => 40], json_encode($ietf?->windows));
