@@ -41,17 +41,17 @@
         "ext-pdo": "*",
         "ext-pdo_sqlite": "*",
         "ext-posix": "*",
-        "doctrine/dbal": "^4.4.4",
+        "doctrine/dbal": "^4.5.0",
         "mcp/sdk": "^0.8.1",
         "nyholm/psr7": "^1.8",
-        "symfony/console": "8.0.*",
-        "symfony/dotenv": "8.0.*",
-        "symfony/flex": "^2",
-        "symfony/framework-bundle": "8.0.*",
-        "symfony/http-client": "8.0.*",
-        "symfony/process": "8.0.*",
-        "symfony/runtime": "8.0.*",
-        "symfony/yaml": "8.0.*"
+        "symfony/console": "8.1.*",
+        "symfony/dotenv": "8.1.*",
+        "symfony/flex": "^2.12",
+        "symfony/framework-bundle": "8.1.*",
+        "symfony/http-client": "8.1.*",
+        "symfony/process": "8.1.*",
+        "symfony/runtime": "8.1.*",
+        "symfony/yaml": "8.1.*"
     },
     "config": {
         "allow-plugins": {
@@ -107,7 +107,7 @@
     "extra": {
         "symfony": {
             "allow-contrib": false,
-            "require": "8.0.*"
+            "require": "8.1.*"
         }
     },
     "require-dev": {
