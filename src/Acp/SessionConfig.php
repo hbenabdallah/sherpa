@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Acp;
 
+use App\Agent\Mode;
 use App\Config\ModelProfile;
 use App\Platform\ModelInfo;
 use App\Platform\SwitchablePlatform;
@@ -24,6 +25,7 @@ final class SessionConfig
     private const array MODES = [
         'default' => ['Default', 'Reads freely; asks before anything that writes or runs'],
         'plan'    => ['Plan', 'Reads and proposes a plan; nothing is changed until you approve it'],
+        'auto'    => ['Auto', 'Edits and sandboxed commands run without asking; the rest asks as usual'],
     ];
 
     /** @var list<ModelInfo>|null the provider's models, asked once: the list is one request away */
@@ -34,34 +36,27 @@ final class SessionConfig
 
     public function __construct(private readonly SwitchablePlatform $platform) {}
 
-    public static function modeId(bool $planning): string
+    /** The mode $modeId names; an unknown one is the editor's mistake. */
+    public static function mode(mixed $modeId): Mode
     {
-        return $planning ? 'plan' : 'default';
-    }
+        $mode = is_string($modeId) ? Mode::tryFrom($modeId) : null;
 
-    /** Whether $modeId is plan mode; an unknown one is the editor's mistake. */
-    public static function planning(mixed $modeId): bool
-    {
-        if (!is_string($modeId) || !isset(self::MODES[$modeId])) {
-            throw AcpError::invalidParams('Unknown mode: ' . (is_string($modeId) ? $modeId : '?') . '. Sherpa has default and plan.');
-        }
-
-        return $modeId === 'plan';
+        return $mode ?? throw AcpError::invalidParams('Unknown mode: ' . (is_string($modeId) ? $modeId : '?') . '. Sherpa has default, plan and auto.');
     }
 
     /** @return array<string, mixed> */
-    public function modes(bool $planning): array
+    public function modes(Mode $mode): array
     {
         $modes = [];
         foreach (self::MODES as $id => [$name, $description]) {
             $modes[] = ['id' => $id, 'name' => $name, 'description' => $description];
         }
 
-        return ['currentModeId' => self::modeId($planning), 'availableModes' => $modes];
+        return ['currentModeId' => $mode->value, 'availableModes' => $modes];
     }
 
     /** @return list<array<string, mixed>> */
-    public function options(bool $planning, ?ModelProfile $model): array
+    public function options(Mode $mode, ?ModelProfile $model): array
     {
         $modes = [];
         foreach (self::MODES as $id => [$name, $description]) {
@@ -73,7 +68,7 @@ final class SessionConfig
             'name'         => 'Mode',
             'category'     => 'mode',
             'type'         => 'select',
-            'currentValue' => self::modeId($planning),
+            'currentValue' => $mode->value,
             'options'      => $modes,
         ]];
 

@@ -640,7 +640,7 @@ final class SherpaCommand extends Command
             $this->budget->isCalibrated(),
             $this->usage->statusLabel(),
             $this->platform->rateLimits(),
-            $this->planMode->isActive(),
+            $this->planMode->mode(),
         );
     }
 

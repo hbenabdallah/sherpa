@@ -8,10 +8,12 @@ use App\Agent\ContextBudget;
 use App\Agent\Tool\AsTool;
 use App\Agent\Tool\Param;
 use App\Agent\Tool\Permission;
+use App\Permission\CommandConfinement;
 use App\Project\DockerConfig;
 use App\Project\PathOutsideProjectException;
 use App\Project\ProjectPathResolver;
 use App\Runtime\Interrupt;
+use Override;
 use RuntimeException;
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
@@ -21,7 +23,7 @@ use Symfony\Component\Process\Process;
     description: 'Execute a shell command in the project directory. Use for running tests, checking routes, debugging, and the project\'s own tools (linters, fixers, generators, package managers). Never to edit a file yourself — no sed -i, perl -pi, cat/echo/tee into a file: that is file_patch and file_write. With background=true it is left running — a dev server, a watcher, a long suite — and you get a job id: read it with job_output, stop it with job_stop.',
     permission: Permission::CONFIRM,
 )]
-final class ShellExecTool
+final class ShellExecTool implements CommandConfinement
 {
     /**
      * Floors, not limits: a hundred lines is often fewer than the failures of a
@@ -74,6 +76,19 @@ final class ShellExecTool
     public function sandbox(): Sandbox
     {
         return $this->sandbox;
+    }
+
+    /** A command in the project's container is held by it, as Sandbox says; on the host, by the sandbox. */
+    #[Override]
+    public function confinedBy(): ?string
+    {
+        if ($this->dockerContainer !== null) {
+            return "the container {$this->dockerContainer}";
+        }
+
+        $sandbox = $this->sandbox->kind();
+
+        return $sandbox === null ? null : "the sandbox ({$sandbox})";
     }
 
     /** How many bytes of output this window can afford from one command. */

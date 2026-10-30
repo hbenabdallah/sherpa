@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Acp;
 
 use App\Agent\MessageBag;
+use App\Agent\Mode;
 use App\Config\ModelProfile;
 use DateTimeImmutable;
 
@@ -21,7 +22,7 @@ final class AcpSession
     /** @var list<array{id: int, tool: string, content: string, created_at: string}> */
     public array $excerpts = [];
 
-    public bool $planning = false;
+    public Mode $mode = Mode::Default;
 
     /** The model its turns run on: each conversation keeps the one chosen for it. */
     public ?ModelProfile $profile = null;

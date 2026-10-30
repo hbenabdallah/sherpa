@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\SlashTest;
 
+use App\Agent\Mode;
+use App\Agent\PlanMode;
+use App\Permission\AutoMode;
 use App\Session\SavedSession;
 use App\Skills\Skill;
+use App\Tool\Sandbox;
 use DateTimeImmutable;
 
 // The slash commands: what a session is steered with. They were three hundred
@@ -167,6 +171,8 @@ $commands = new SlashCommands(
     $working = new WorkingProject($projects, $memory, $permissions, $sessions, new ProjectPathResolver(), new ShellExecTool()),
     new ProjectQuestions($editor, $projects),
     $docSearch = new DocSearch(new DocIndex(), new Ingestor(new DocSource(), new Chunker()), $working),
+    planMode: $modes = new PlanMode(),
+    autoMode: new AutoMode($modes, new ShellExecTool(sandbox: new Sandbox(mode: 'off'))),
 );
 
 $project = new Project(
@@ -204,6 +210,17 @@ check('an unknown command is not handled, so the caller can say so', !$handled &
 [$handled, $out] = $slash('/help');
 check('/help is handled', $handled);
 check('and lists the commands, including the newest', str_contains($out, '/backend') && str_contains($out, '/memory'), $out);
+
+// ---- auto mode -------------------------------------------------------------------
+check('and auto mode', str_contains($out, '/auto'), $out);
+[, $out] = $slash('/auto');
+check('/auto turns auto mode on', $modes->mode() === Mode::Auto && str_contains($out, 'Auto mode on'), $out);
+check('and with no sandbox here, says commands still ask', str_contains($out, 'Commands still ask'), $out);
+[, $out] = $slash('/plan');
+check('/plan then leaves it for plan mode: one mode at a time', $modes->mode() === Mode::Plan, $out);
+$slash('/auto on');
+[, $out] = $slash('/auto off');
+check('/auto off goes back to asking', $modes->mode() === Mode::Default && str_contains($out, 'asks again'), $out);
 
 // ---- memory ----------------------------------------------------------------
 [, $out] = $slash('/memory');

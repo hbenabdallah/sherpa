@@ -323,8 +323,8 @@ check('and no tool card for it', $editor->of('tool_call', $from) === []);
 
 // ---- the mode and the model, beside the prompt box ----------------------------------
 $modes = $new['result']['modes'] ?? [];
-check('a session says its modes: default, and plan', ($modes['currentModeId'] ?? '') === 'default'
-    && array_column($modes['availableModes'] ?? [], 'id') === ['default', 'plan'], json_encode($modes));
+check('a session says its modes: default, plan and auto', ($modes['currentModeId'] ?? '') === 'default'
+    && array_column($modes['availableModes'] ?? [], 'id') === ['default', 'plan', 'auto'], json_encode($modes));
 $options = array_column($new['result']['configOptions'] ?? [], null, 'id');
 check('and offers the mode and the model as options', array_keys($options) === ['mode', 'model']
     && ($options['mode']['category'] ?? '') === 'mode' && ($options['model']['category'] ?? '') === 'model', json_encode($options));
@@ -395,7 +395,7 @@ check('another session stays as it was', (array_column(
 
 // ---- "/" in the editor -----------------------------------------------------------
 $offered = array_column($editor->of('available_commands_update')[0]['params']['update']['availableCommands'] ?? [], null, 'name');
-check('the commands are offered under "/", named without it', isset($offered['help'], $offered['compact'], $offered['memory'], $offered['plan']), json_encode(array_keys($offered)));
+check('the commands are offered under "/", named without it', isset($offered['help'], $offered['compact'], $offered['memory'], $offered['plan'], $offered['auto']), json_encode(array_keys($offered)));
 check('with the project\'s skills', str_starts_with((string) ($offered['greet']['description'] ?? ''), 'skill · Greet the user'), json_encode($offered['greet'] ?? null));
 check('but none that needs the terminal\'s keyboard', !isset($offered['model']) && !isset($offered['reset']) && !isset($offered['provider']));
 check('a command that takes an argument says which', ($offered['remember']['input']['hint'] ?? '') === '<key> <value>', json_encode($offered['remember'] ?? null));
@@ -417,6 +417,21 @@ check('/plan turns plan mode on, and the menu follows', str_starts_with($said, '
     && ($editor->of('current_mode_update', $from)[0]['params']['update']['currentModeId'] ?? '') === 'plan', $said);
 [, $said, $from] = $command('/plan off');
 check('/plan off turns it off', ($editor->of('current_mode_update', $from)[0]['params']['update']['currentModeId'] ?? '') === 'default', $said);
+[, $said, $from] = $command('/auto');
+check('/auto turns auto mode on, and the menu follows', str_starts_with($said, 'Auto mode on')
+    && ($editor->of('current_mode_update', $from)[0]['params']['update']['currentModeId'] ?? '') === 'auto', $said);
+check('and says what is still asked', str_contains($said, 'Still asked every time'), $said);
+$asked = count($editor->asked);
+$invoice = (string) file_get_contents("{$project}/Invoice.php");
+$command('Patch the invoice again');
+check('in auto mode, an edit in the project is made without asking', count($editor->asked) === $asked
+    && str_contains((string) file_get_contents("{$project}/Invoice.php"), 'return 43;'), json_encode(array_slice($editor->asked, $asked)));
+file_put_contents("{$project}/Invoice.php", $invoice);
+[, $said, $from] = $command('/auto off');
+check('/auto off turns it off', ($editor->of('current_mode_update', $from)[0]['params']['update']['currentModeId'] ?? '') === 'default', $said);
+$command('Patch the invoice again');
+check('and the same edit is asked about again', count($editor->asked) === $asked + 1, json_encode(array_slice($editor->asked, $asked)));
+file_put_contents("{$project}/Invoice.php", $invoice);
 [, $said] = $command('/greet the new colleague');
 check('a skill run as a command goes to the model with its text', $said === 'Skill applied: greet', $said);
 [$stop, $said] = $command('/etc/hosts is wrong here');

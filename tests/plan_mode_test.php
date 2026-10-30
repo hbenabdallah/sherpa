@@ -19,6 +19,7 @@ use App\Agent\AgentLoop;
 use App\Agent\ContextBudget;
 use App\Agent\HistoryCompactor;
 use App\Agent\MessageBag;
+use App\Agent\Mode;
 use App\Agent\PlanMode;
 use App\Agent\Tool\AsTool;
 use App\Agent\Tool\Param;
@@ -265,7 +266,7 @@ $project = new Project(
 );
 $bar = new ReflectionClass(StatusBar::class)->newInstanceWithoutConstructor();
 ob_start();
-$bar->render($project, 'm', planning: true);
+$bar->render($project, 'm', mode: Mode::Plan);
 check('the status bar says plan mode is on', str_contains(Terminal::plain(ob_get_clean()), 'plan mode'));
 
 // ---- arguments cut off ---------------------------------------------------------------

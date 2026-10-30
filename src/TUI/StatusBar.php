@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\TUI;
 
+use App\Agent\Mode;
 use App\Platform\RateLimits;
 use App\Project\Project;
 use App\Version;
@@ -29,16 +30,21 @@ final class StatusBar
         ?string $usage = null,
         // The provider's tightest limit, as it last reported it.
         ?RateLimits $limits = null,
-        // Plan mode on: said where the eye goes before each message.
-        bool $planning = false,
+        // Plan or auto mode on: said where the eye goes before each message.
+        Mode $mode = Mode::Default,
     ): void {
         $parts = [
             Terminal::BOLD . Terminal::plain($project->name, singleLine: true) . Terminal::RESET . Terminal::GRAY,
             Terminal::plain($model, singleLine: true),
         ];
 
-        if ($planning) {
-            $parts[] = Terminal::YELLOW . 'plan mode' . Terminal::GRAY;
+        $shown = match ($mode) {
+            Mode::Plan    => Terminal::YELLOW . 'plan mode' . Terminal::GRAY,
+            Mode::Auto    => Terminal::CYAN . 'auto mode' . Terminal::GRAY,
+            Mode::Default => null,
+        };
+        if ($shown !== null) {
+            $parts[] = $shown;
         }
 
         if ($project->docker->enabled && $project->docker->container !== '') {

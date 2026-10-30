@@ -7,6 +7,7 @@ namespace App\Acp;
 use App\Agent\AgentLoop;
 use App\Agent\ContextBudget;
 use App\Agent\MessageBag;
+use App\Agent\Mode;
 use App\Agent\PlanMode;
 use App\Agent\Result;
 use App\Agent\SystemPromptBuilder;
@@ -20,6 +21,7 @@ use App\Mcp\McpRegistry;
 use App\Mcp\ServerConfig;
 use App\Memory\ContextStore;
 use App\Memory\FactExtractor;
+use App\Permission\AutoMode;
 use App\Permission\SessionPermissions;
 use App\Platform\SwitchablePlatform;
 use App\Project\Project;
@@ -139,6 +141,8 @@ final class AcpServer
         private readonly FactExtractor $facts,
         /** As in the terminal: what a conversation taught is kept, at one request per conversation. SHERPA_FACT_EXTRACTION. */
         private readonly bool $extractFacts = true,
+        // What auto mode lets run here, said when /auto turns it on.
+        private readonly ?AutoMode $autoMode = null,
     ) {}
 
     /** Answer the editor until it closes its end. */
@@ -475,11 +479,11 @@ final class AcpServer
      */
     private function settings(AcpSession $session): array
     {
-        $planning = $this->planning($session);
+        $mode = $this->mode($session);
 
         return [
-            'modes'         => $this->config->modes($planning),
-            'configOptions' => $this->config->options($planning, $session->profile),
+            'modes'         => $this->config->modes($mode),
+            'configOptions' => $this->config->options($mode, $session->profile),
         ];
     }
 
@@ -491,7 +495,7 @@ final class AcpServer
     private function setMode(array $params): array
     {
         $session = $this->session($params);
-        $this->plan($session, SessionConfig::planning($params['modeId'] ?? null));
+        $this->switchMode($session, SessionConfig::mode($params['modeId'] ?? null));
         $this->update($session, ['sessionUpdate' => 'config_option_update', 'configOptions' => $this->settings($session)['configOptions']]);
 
         return [];
@@ -509,8 +513,8 @@ final class AcpServer
 
         switch ($params['configId'] ?? null) {
             case SessionConfig::MODE:
-                $this->plan($session, SessionConfig::planning($value));
-                $this->update($session, ['sessionUpdate' => 'current_mode_update', 'currentModeId' => SessionConfig::modeId($this->planning($session))]);
+                $this->switchMode($session, SessionConfig::mode($value));
+                $this->update($session, ['sessionUpdate' => 'current_mode_update', 'currentModeId' => $this->mode($session)->value]);
                 break;
 
             case SessionConfig::MODEL:
@@ -538,17 +542,17 @@ final class AcpServer
         return $this->open[$id] ?? throw new AcpError("No session {$id}: open one with session/new.", AcpError::RESOURCE_NOT_FOUND);
     }
 
-    /** Whether $session plans first: the service holds it for the session in use. */
-    private function planning(AcpSession $session): bool
+    /** $session's mode: the service holds it for the session in use. */
+    private function mode(AcpSession $session): Mode
     {
-        return $this->current === $session->id ? $this->planMode->isActive() : $session->planning;
+        return $this->current === $session->id ? $this->planMode->mode() : $session->mode;
     }
 
-    private function plan(AcpSession $session, bool $on): void
+    private function switchMode(AcpSession $session, Mode $mode): void
     {
-        $session->planning = $on;
+        $session->mode = $mode;
         if ($this->current === $session->id) {
-            $on ? $this->planMode->on() : $this->planMode->off();
+            $this->planMode->switchTo($mode);
         }
     }
 
@@ -617,7 +621,7 @@ final class AcpServer
             $this->sessions->resume($cursor);
         }
 
-        $planning = $this->planMode->isActive();
+        $mode = $this->planMode->mode();
         $session->bag->user($this->planMode->frame($text), $images);
 
         $this->running = $id;
@@ -649,7 +653,7 @@ final class AcpServer
         }
 
         // A plan approved ends plan mode: the editor's menu follows.
-        if ($this->planMode->isActive() !== $planning) {
+        if ($this->planMode->mode() !== $mode) {
             $this->modeChanged($session);
         }
 
@@ -661,17 +665,28 @@ final class AcpServer
     /**
      * A command's answer, in place of a turn.
      *
-     * @param array{reply: string}|array{output: string}|array{plan: bool|null} $route
+     * @param array{reply: string}|array{output: string}|array{plan: bool|null}|array{auto: bool|null} $route
      */
     private function answer(AcpSession $session, array $route): void
     {
         if (array_key_exists('plan', $route)) {
             $on = $route['plan'] ?? !$this->planMode->isActive();
-            $this->plan($session, $on);
+            $this->switchMode($session, $on ? Mode::Plan : $this->leaving(Mode::Plan, $session));
             $this->modeChanged($session);
             $this->editor->say($on
                 ? 'Plan mode on: the model reads and proposes; nothing is written or run until you approve its plan.'
                 : 'Plan mode off: the model can change things again, asking as usual.');
+
+            return;
+        }
+
+        if (array_key_exists('auto', $route)) {
+            $on = $route['auto'] ?? $this->mode($session) !== Mode::Auto;
+            $this->switchMode($session, $on ? Mode::Auto : $this->leaving(Mode::Auto, $session));
+            $this->modeChanged($session);
+            $this->editor->say($on
+                ? 'Auto mode on: ' . ($this->autoMode?->describe() ?? 'edits and sandboxed commands run without asking.')
+                : 'Auto mode off: everything that writes or runs asks again.');
 
             return;
         }
@@ -681,9 +696,17 @@ final class AcpServer
         $this->save($session);
     }
 
+    /** Turning $mode off leaves the default mode, if $session is in it; another mode stays as it is. */
+    private function leaving(Mode $mode, AcpSession $session): Mode
+    {
+        $current = $this->mode($session);
+
+        return $current === $mode ? Mode::Default : $current;
+    }
+
     private function modeChanged(AcpSession $session): void
     {
-        $this->update($session, ['sessionUpdate' => 'current_mode_update', 'currentModeId' => SessionConfig::modeId($this->planning($session))]);
+        $this->update($session, ['sessionUpdate' => 'current_mode_update', 'currentModeId' => $this->mode($session)->value]);
         $this->update($session, ['sessionUpdate' => 'config_option_update', 'configOptions' => $this->settings($session)['configOptions']]);
     }
 
@@ -782,7 +805,7 @@ final class AcpServer
         $this->excerpts->import($session->excerpts);
         // The plan was another conversation's.
         $this->todos->clear();
-        $session->planning ? $this->planMode->on() : $this->planMode->off();
+        $this->planMode->switchTo($session->mode);
         $this->useModel($session->profile);
         $this->grants->clear();
         foreach ($session->grants as $tool) {
@@ -802,7 +825,7 @@ final class AcpServer
 
         $session->cursor = $this->sessions->cursor();
         $session->excerpts = $this->excerpts->export();
-        $session->planning = $this->planMode->isActive();
+        $session->mode = $this->planMode->mode();
         $session->grants = $this->grants->all();
         $this->current = null;
     }
