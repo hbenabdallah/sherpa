@@ -1,12 +1,14 @@
 <?php
 
+use App\Mcp\ServerLog;
+
 // The MCP client, driven against a server that misbehaves on purpose.
 //
 // Every server is somebody else's process: it can die at the handshake, print
 // junk where a message belongs, or answer nothing at all. None of that may take
 // Sherpa with it.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\Tool\Permission;
 use App\Agent\Tool\Toolbox;
@@ -32,14 +34,14 @@ function check(string $label, bool $ok, string $detail = ''): void
     }
 }
 
-$fixture = dirname(__DIR__) . '/tests/fixtures/mcp_server.php';
+$fixture = __DIR__ . '/../tests/fixtures/mcp_server.php';
 
 function server(string $mode, string $name = 'demo'): ServerConfig
 {
     return new ServerConfig(
         name: $name,
         command: PHP_BINARY,
-        args: [dirname(__DIR__) . '/tests/fixtures/mcp_server.php', $mode],
+        args: [__DIR__ . '/../tests/fixtures/mcp_server.php', $mode],
     );
 }
 
@@ -79,7 +81,7 @@ $paged->close();
 // ---- what is quoted of a server's log --------------------------------------
 // A stack trace of four thousand characters buried the line that said what
 // was wrong: the end is quoted, a screenful at most.
-$log = new App\Mcp\ServerLog();
+$log = new ServerLog();
 for ($i = 1; $i <= 40; $i++) {
     $log->debug('Server stderr', ['output' => "at frame {$i}"]);
 }
@@ -87,10 +89,10 @@ $log->debug('Server stderr', ['output' => 'fatal: missing DATABASE_URL']);
 $quoted = $log->stderr();
 check('a long log is quoted by its end, the reason included', str_ends_with($quoted, 'fatal: missing DATABASE_URL'), $quoted);
 check('a screenful at most, and said to be the end', substr_count($quoted, "\n") <= 15 && str_contains($quoted, 'the end of what it printed'), $quoted);
-$short = new App\Mcp\ServerLog();
+$short = new ServerLog();
 $short->debug('Server stderr', ['output' => 'fatal: missing configuration']);
 check('a short one is quoted as it is', $short->stderr() === 'fatal: missing configuration', $short->stderr());
-$wide = new App\Mcp\ServerLog();
+$wide = new ServerLog();
 $wide->debug('Server stderr', ['output' => str_repeat('é', 3000)]);
 check('a single huge line is cut too, without breaking a character', strlen($wide->stderr()) < 1600 && mb_check_encoding($wide->stderr(), 'UTF-8'), (string) strlen($wide->stderr()));
 
@@ -203,7 +205,7 @@ function registryFor(string $path): array
     return [$registry, $toolbox];
 }
 
-$fixtureArgs = fn(string $mode) => [dirname(__DIR__) . '/tests/fixtures/mcp_server.php', $mode];
+$fixtureArgs = fn(string $mode): array => [__DIR__ . '/../tests/fixtures/mcp_server.php', $mode];
 
 $path = writeConfig([
     'demo' => ['command' => PHP_BINARY, 'args' => $fixtureArgs('ok')],
@@ -298,7 +300,7 @@ $path = writeConfig([
 [$registry, $toolbox] = registryFor($path);
 
 $names = array_map(fn($d) => $d->name, $toolbox->getDefinitions());
-check('two servers cannot both claim one tool name', count(array_filter($names, fn($n) => $n === 'mcp__demo__echo')) === 1, implode(',', $names));
+check('two servers cannot both claim one tool name', count(array_filter($names, fn($n): bool => $n === 'mcp__demo__echo')) === 1, implode(',', $names));
 
 $report = implode("\n", $registry->report());
 check(
@@ -549,7 +551,7 @@ function interruptedCall(McpClient $client): array
     $client->listTools();
     $interrupt->beginTurn();
     $ticks = 0;
-    $interrupt->meanwhile(function () use (&$ticks) {
+    $interrupt->meanwhile(function () use (&$ticks): void {
         $ticks++;
     });
     pcntl_async_signals(true);
@@ -577,7 +579,7 @@ check('the wait for it was heard throughout', $slow['ticks'] > 5, json_encode($s
 
 $port = freePort();
 $httpServer = proc_open(
-    [PHP_BINARY, '-S', "127.0.0.1:{$port}", dirname(__DIR__) . '/tests/fixtures/mcp_http_server.php'],
+    [PHP_BINARY, '-S', "127.0.0.1:{$port}", __DIR__ . '/../tests/fixtures/mcp_http_server.php'],
     [1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']],
     $pipes,
 );
@@ -682,7 +684,7 @@ $_SERVER['SHERPA_API_KEY'] = 'sk-from-dotenv';
 $envClient = McpClient::for(new ServerConfig(
     name: 'envcheck',
     command: PHP_BINARY,
-    args: [dirname(__DIR__) . '/tests/fixtures/mcp_server.php', 'env'],
+    args: [__DIR__ . '/../tests/fixtures/mcp_server.php', 'env'],
     env: ['SERVER_TOKEN' => 'declared'],
 ));
 $envClient->listTools();

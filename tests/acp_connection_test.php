@@ -3,7 +3,7 @@
 // JSON-RPC over stdio, as ACP frames it: one message per line, requests both
 // ways, and a cancel that has to be heard while Sherpa waits on something else.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Acp\AcpError;
 use App\Acp\Connection;
@@ -38,7 +38,7 @@ function sent($editor): array
         $lines .= $chunk;
     }
 
-    return array_map(fn(string $l) => json_decode($l, true), array_values(array_filter(explode("\n", $lines))));
+    return array_map(fn(string $l): mixed => json_decode($l, true), array_values(array_filter(explode("\n", $lines))));
 }
 
 function say($editor, array $message): void

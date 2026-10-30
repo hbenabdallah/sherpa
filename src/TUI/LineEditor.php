@@ -31,11 +31,11 @@ class LineEditor
      * have to be bracketed as invisible or it lands in the wrong column after
      * every backspace — the very drift this class exists to remove.
      */
-    private const INVIS_START = "\x01";
+    private const string INVIS_START = "\x01";
 
-    private const INVIS_END   = "\x02";
+    private const string INVIS_END   = "\x02";
 
-    private const MAX_HISTORY = 500;
+    private const int MAX_HISTORY = 500;
 
     private bool $historyLoaded = false;
 
@@ -63,7 +63,7 @@ class LineEditor
     private int $cursorRow = 0;
 
     /** How a line break is kept in the one-line-per-entry history file. */
-    private const NEWLINE_IN_HISTORY = "\u{2424}";
+    private const string NEWLINE_IN_HISTORY = "\u{2424}";
 
     public function __construct(private readonly ?Scrollback $scrollback = null) {}
 
@@ -183,7 +183,7 @@ class LineEditor
         // installed, readline redraws the prompt for the next line the moment
         // this one is submitted, and that ghost prompt stays on screen above
         // whatever the answer prints.
-        readline_callback_handler_install($prompt, function (?string $input) use (&$line, &$done) {
+        readline_callback_handler_install($prompt, function (?string $input) use (&$line, &$done): void {
             readline_callback_handler_remove();
             $line = $input;
             $done = true;
@@ -245,7 +245,7 @@ class LineEditor
         // message of several lines is one entry, its breaks written as ␤.
         // Whole or not at all, and for its owner only: it holds everything
         // ever typed at the prompt.
-        $lines = array_map(fn(string $e) => str_replace("\n", self::NEWLINE_IN_HISTORY, $e), $entries);
+        $lines = array_map(fn(string $e): string => str_replace("\n", self::NEWLINE_IN_HISTORY, $e), $entries);
         $tmp = $file . '.' . getmypid() . '.tmp';
         if (@file_put_contents($tmp, implode("\n", $lines) . ($lines === [] ? '' : "\n")) === false
             || !@chmod($tmp, 0600) || !@rename($tmp, $file)) {
@@ -416,7 +416,7 @@ class LineEditor
         }
 
         if ($main && $key === "\e[5~") {
-            (new ScrollView(new Terminal()))->show($this->scrollback?->lines() ?? []);
+            new ScrollView(new Terminal())->show($this->scrollback?->lines() ?? []);
 
             return null;
         }
@@ -528,7 +528,7 @@ class LineEditor
         $lines = is_file($file) ? @file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) : false;
 
         return is_array($lines)
-            ? array_map(fn(string $e) => str_replace(self::NEWLINE_IN_HISTORY, "\n", $e), array_slice(array_values($lines), -self::MAX_HISTORY))
+            ? array_map(fn(string $e): string => str_replace(self::NEWLINE_IN_HISTORY, "\n", $e), array_slice(array_values($lines), -self::MAX_HISTORY))
             : [];
     }
 }

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Config;
 
+use App\Usage\Price;
+
 /**
  * Which backend and which model this run uses, and why.
  *
@@ -20,18 +22,18 @@ namespace App\Config;
  * when this machine never chose — not when .env is unset, since .env always has
  * a value and the question would then never be asked.
  */
-final class ModelResolver
+final readonly class ModelResolver
 {
     public function __construct(
-        private readonly MachineConfig $config,
+        private MachineConfig $config,
         // Ollama's fallback model and window. Named as they always were, since
         // they are what .env has always carried.
-        private readonly string $envModel,
-        private readonly int $envContext,
-        private readonly string $envBackend = Backend::DEFAULT->value,
-        private readonly string $envApiModel = '',
-        private readonly int $envApiContext = ModelProfile::SAFE_CONTEXT,
-        private readonly string $envEmbeddingModel = '',
+        private string $envModel,
+        private int $envContext,
+        private string $envBackend = Backend::DEFAULT->value,
+        private string $envApiModel = '',
+        private int $envApiContext = ModelProfile::SAFE_CONTEXT,
+        private string $envEmbeddingModel = '',
     ) {}
 
     /**
@@ -241,7 +243,7 @@ final class ModelResolver
     }
 
     /** The price the user declared for this model, if any. */
-    public function price(ModelProfile $profile): ?\App\Usage\Price
+    public function price(ModelProfile $profile): ?Price
     {
         return $this->config->price($profile->model);
     }

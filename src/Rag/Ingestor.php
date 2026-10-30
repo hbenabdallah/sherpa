@@ -20,15 +20,15 @@ use Throwable;
  * and a stat per file, which is what lets it run before every search rather
  * than on a schedule someone has to remember.
  */
-final class Ingestor
+final readonly class Ingestor
 {
     /** @var list<DocumentParser> */
-    private readonly array $parsers;
+    private array $parsers;
 
     /** @param list<DocumentParser>|null $parsers */
     public function __construct(
-        private readonly DocSource $source,
-        private readonly Chunker $chunker,
+        private DocSource $source,
+        private Chunker $chunker,
         ?array $parsers = null,
     ) {
         $this->parsers = $parsers ?? [new MarkdownParser(), new TextParser(), new HtmlParser()];
@@ -64,7 +64,7 @@ final class Ingestor
             }
 
             $parser = $this->parserFor($path);
-            if ($parser === null) {
+            if (!$parser instanceof DocumentParser) {
                 continue;
             }
 

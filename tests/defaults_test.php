@@ -9,7 +9,7 @@
 // is meant to be used. Two copies of one fact drift, silently, and the symptom
 // is a Sherpa that behaves differently depending on how it was started.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use Symfony\Component\Yaml\Yaml;
 
@@ -60,9 +60,9 @@ check('the variables Sherpa reads were found', isset($read['OLLAMA_URL'], $read[
 
 // APP_SECRET and APP_ENV come from .env (or .env.dist) through Symfony's
 // runtime on the host, and are not Sherpa's own settings.
-$sherpaOwn = array_filter(array_keys($read), fn(string $name) => !str_starts_with($name, 'APP_'));
+$sherpaOwn = array_filter(array_keys($read), fn(string $name): bool => !str_starts_with($name, 'APP_'));
 
-$undefaulted = array_values(array_filter($sherpaOwn, fn(string $name) => !array_key_exists($name, $symfonyDefaults)));
+$undefaulted = array_values(array_filter($sherpaOwn, fn(string $name): bool => !array_key_exists($name, $symfonyDefaults)));
 check(
     'every setting Sherpa reads has a default without compose',
     $undefaulted === [],
@@ -79,7 +79,7 @@ check('compose and services.yaml agree on every default they share', $drift === 
 
 $missingInCompose = array_values(array_filter(
     $sherpaOwn,
-    fn(string $name) => !array_key_exists($name, $composeDefaults),
+    fn(string $name): bool => !array_key_exists($name, $composeDefaults),
 ));
 check('and compose passes every setting Sherpa reads', $missingInCompose === [], implode(', ', $missingInCompose));
 

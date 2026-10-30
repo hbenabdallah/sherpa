@@ -57,7 +57,7 @@ class BackendEmbeddings implements EmbeddingProvider
         $where = (array) $this->models->embeddingsElsewhere();
         $key = json_encode($where);
 
-        if ($this->elsewhere !== null && $key === $this->elsewhereKey) {
+        if ($this->elsewhere instanceof PlatformInterface && $key === $this->elsewhereKey) {
             return $this->elsewhere;
         }
 

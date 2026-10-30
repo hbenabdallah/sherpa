@@ -1,8 +1,10 @@
 <?php
 
+use App\Runtime\Interrupt;
+
 // Verification of ContextBudget accounting/calibration and HistoryCompactor.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\ContextBudget;
 use App\Agent\HistoryCompactor;
@@ -230,7 +232,7 @@ $pairBag->assistant('lu');
 $pairBag->user('turn 2 ' . str_repeat('bla ', 400));
 $pairBag->assistant('fin');
 
-$pairActions = (new HistoryCompactor(platform(), new ContextBudget(contextWindow: 2048, reservedForResponse: 256)))->compact($pairBag);
+$pairActions = new HistoryCompactor(platform(), new ContextBudget(contextWindow: 2048, reservedForResponse: 256))->compact($pairBag);
 check(
     'the summary ran on a history cut among tool results',
     in_array('history summarised', $pairActions, true),
@@ -267,9 +269,9 @@ for ($i = 0; $i < 6; $i++) {
     $longBag->tool('doc_search', str_repeat("passage {$i} ", 300), $id);
 }
 
-$longActions = (new HistoryCompactor(platform(), new ContextBudget(contextWindow: 2048, reservedForResponse: 256)))->compact($longBag);
+$longActions = new HistoryCompactor(platform(), new ContextBudget(contextWindow: 2048, reservedForResponse: 256))->compact($longBag);
 $long = $longBag->all();
-$shape = json_encode(array_map(fn($m) => $m['role'] . ': ' . mb_substr((string) ($m['content'] ?? ''), 0, 25), $long), JSON_UNESCAPED_UNICODE);
+$shape = json_encode(array_map(fn(array $m): string => $m['role'] . ': ' . mb_substr((string) ($m['content'] ?? ''), 0, 25), $long), JSON_UNESCAPED_UNICODE);
 
 check('one long exchange is summarised like several', in_array('history summarised', $longActions, true), json_encode($longActions, JSON_UNESCAPED_UNICODE));
 check(
@@ -314,11 +316,11 @@ function loadedBag(): MessageBag
     return $bag;
 }
 
-$window = fn() => new ContextBudget(contextWindow: 8192, reservedForResponse: 512);
+$window = fn(): ContextBudget => new ContextBudget(contextWindow: 8192, reservedForResponse: 512);
 
 // Unmeasured: the frugal order, which is also what a slow machine wants.
 $slowBag = loadedBag();
-$slowActions = (new HistoryCompactor(platform(), $window()))->compact($slowBag);
+$slowActions = new HistoryCompactor(platform(), $window())->compact($slowBag);
 check(
     'an unmeasured machine elides and does not pay for a summary',
     !in_array('history summarised', $slowActions, true),
@@ -330,7 +332,7 @@ $fast = new InferenceSpeed();
 $fast->observe(100_000.0, 500.0);
 
 $fastBag = loadedBag();
-$fastActions = (new HistoryCompactor(platform(), $window(), $fast))->compact($fastBag);
+$fastActions = new HistoryCompactor(platform(), $window(), $fast)->compact($fastBag);
 
 check(
     'a fast machine summarises first',
@@ -352,7 +354,7 @@ check(
 $slow = new InferenceSpeed();
 $slow->observe(12.0, 3.0);
 $crawlBag = loadedBag();
-$crawlActions = (new HistoryCompactor(platform(), $window(), $slow))->compact($crawlBag);
+$crawlActions = new HistoryCompactor(platform(), $window(), $slow)->compact($crawlBag);
 check(
     'a measured but slow machine still takes the frugal branch',
     !in_array('history summarised', $crawlActions, true),
@@ -362,7 +364,7 @@ check(
 // ---- compaction aims at the target, not merely under the trigger -----------
 $deepBag = loadedBag();
 $deepBudget = $window();
-(new HistoryCompactor(platform(), $deepBudget))->compact($deepBag);
+new HistoryCompactor(platform(), $deepBudget)->compact($deepBag);
 check(
     'compaction lands at or below the target, so the next one is far off',
     !$deepBudget->isAboveTarget($deepBag->all()),
@@ -380,7 +382,7 @@ for ($i = 0; $i < 12; $i++) {
 }
 $countBefore = $bag4->count();
 
-$cancelled = new App\Runtime\Interrupt();
+$cancelled = new Interrupt();
 $cancelled->request();
 $c4 = new HistoryCompactor(platform(), new ContextBudget(contextWindow: 2048, reservedForResponse: 256), null, $cancelled);
 $c4->compact($bag4);
@@ -407,7 +409,7 @@ for ($i = 0; $i < 8; $i++) {
     $swapBag->tool('file_read', "fichier {$i}\n" . str_repeat("class PaymentGateway {}\n", 140));
 }
 
-$swapActions = (new HistoryCompactor(platform(), $window(), null, null, $kept))->compact($swapBag);
+$swapActions = new HistoryCompactor(platform(), $window(), null, null, $kept)->compact($swapBag);
 
 check(
     'eliding still happens',
@@ -437,12 +439,12 @@ check(
 
 // The index ignores accents; the passages were cut by a plain substring match,
 // so "facture" found the excerpt holding "facturé", then no line in it.
-$accents = new App\Memory\ContextStore();
+$accents = new ContextStore();
 $accents->open();
 $accents->keep('file_read', "ligne un\n// Le montant facturé au client\nligne trois");
 $found = $accents->search('facture', 2000);
 check('a search without the accents finds the passage with them', str_contains($found, 'facturé au client'), $found);
-$plain = new App\Memory\ContextStore();
+$plain = new ContextStore();
 $plain->open();
 $plain->keep('file_read', "ligne un\n// total facture HT\nligne trois");
 check('and the other way round', str_contains($plain->search('facturé', 2000), 'total facture HT'), $plain->search('facturé', 2000));
@@ -459,7 +461,7 @@ for ($i = 0; $i < 8; $i++) {
     $lossyBag->user("question {$i}");
     $lossyBag->tool('file_read', str_repeat("ligne de contenu\n", 200));
 }
-(new HistoryCompactor(platform(), $window()))->compact($lossyBag);
+new HistoryCompactor(platform(), $window())->compact($lossyBag);
 check(
     'with no store, the stub still says to re-run the tool',
     str_contains(json_encode($lossyBag->all(), JSON_UNESCAPED_UNICODE), 'Call the tool again'),

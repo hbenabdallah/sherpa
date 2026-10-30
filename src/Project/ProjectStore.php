@@ -10,7 +10,7 @@ use Throwable;
 
 class ProjectStore
 {
-    private string $configFile;
+    private readonly string $configFile;
 
     /** @var array<string, Project> */
     private array $projects = [];
@@ -62,7 +62,7 @@ class ProjectStore
         }
 
         // sort by last_used_at desc
-        uasort($projects, fn(Project $a, Project $b) => $b->lastUsedAt <=> $a->lastUsedAt);
+        uasort($projects, fn(Project $a, Project $b): int => $b->lastUsedAt <=> $a->lastUsedAt);
 
         return $projects;
     }
@@ -320,7 +320,7 @@ class ProjectStore
         }
 
         try {
-            (new Filesystem())->remove($own);
+            new Filesystem()->remove($own);
         } catch (Throwable) {
         }
     }
@@ -341,7 +341,7 @@ class ProjectStore
 
     public function isEmpty(): bool
     {
-        return empty($this->projects);
+        return $this->projects === [];
     }
 
     /**
@@ -402,7 +402,7 @@ class ProjectStore
      * "??????" and then a hash. A table does not depend on which libc is
      * underneath. Anything else still falls back to the hash, everywhere.
      */
-    private const TRANSLITERATION = [
+    private const array TRANSLITERATION = [
         // Russian, Ukrainian, Belarusian
         'а' => 'a', 'б' => 'b', 'в' => 'v', 'г' => 'g', 'ґ' => 'g', 'д' => 'd', 'е' => 'e', 'ё' => 'e',
         'є' => 'ye', 'ж' => 'zh', 'з' => 'z', 'и' => 'i', 'і' => 'i', 'ї' => 'yi', 'й' => 'y', 'к' => 'k',
@@ -420,7 +420,7 @@ class ProjectStore
     private function slugify(string $name): string
     {
         $spelled = strtr(mb_strtolower($name), self::TRANSLITERATION);
-        $slug = (new UnicodeString($spelled))->ascii()->lower()->toString();
+        $slug = new UnicodeString($spelled)->ascii()->lower()->toString();
         $slug = preg_replace('/[^a-z0-9]+/', '-', $slug);
         $slug = trim($slug, '-');
 

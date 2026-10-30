@@ -3,7 +3,7 @@
 // What a session consumes, what it costs, and the cap that stops it — now that
 // the default backend bills by the token.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Config\Backend;
 use App\Config\MachineConfig;
@@ -95,7 +95,7 @@ try {
 } catch (TokenCapReached $e) {
     $refused = $e;
 }
-check('below the cap a request goes through', $refused === null);
+check('below the cap a request goes through', !$refused instanceof TokenCapReached);
 
 $capped->record(['prompt' => 2_000, 'completion' => 0]);
 
@@ -106,13 +106,13 @@ try {
 }
 check('at the cap the next one is refused', $refused instanceof TokenCapReached);
 check('and the refusal says what to do', str_contains($refused?->getMessage() ?? '', 'SHERPA_MAX_SESSION_TOKENS'), $refused?->getMessage() ?? '');
-check('a request that goes straight past the cap is not also "warned" about', (function () {
+check('a request that goes straight past the cap is not also "warned" about', (function (): bool {
     $jump = new UsageMeter(cap: 1_500);
     $jump->record(['prompt' => 1_800, 'completion' => 86]);
 
     return !$jump->shouldWarn();
 })());
-check('no cap means never refused', (function () {
+check('no cap means never refused', (function (): bool {
     $free = new UsageMeter();
     $free->record(['prompt' => 50_000_000, 'completion' => 0]);
     $free->assertRoom();
@@ -121,7 +121,7 @@ check('no cap means never refused', (function () {
 })());
 
 // ---- every request is counted, at the one door they all go through --------
-$sse = fn(int $prompt, int $completion, int $cached = 0) => new MockResponse([
+$sse = fn(int $prompt, int $completion, int $cached = 0): MockResponse => new MockResponse([
     'data: ' . json_encode(['choices' => [['delta' => ['content' => 'ok']]]]) . "\n\n",
     'data: ' . json_encode(['choices' => [], 'usage' => [
         'prompt_tokens' => $prompt,
@@ -133,7 +133,7 @@ $sse = fn(int $prompt, int $completion, int $cached = 0) => new MockResponse([
 
 $sent = 0;
 $api = new OpenAiCompatiblePlatform(
-    new MockHttpClient(function () use (&$sent, $sse) {
+    new MockHttpClient(function () use (&$sent, $sse): MockResponse {
         $sent++;
 
         return $sse(900, 100, 600);
@@ -194,13 +194,13 @@ $config->setPath($dir . '/config.yaml');
 $declared = $config->price('fournisseur/modele');
 check(
     'a declared price is read',
-    $declared !== null && near($declared->input, 0.15) && near($declared->output, 0.6)
+    $declared instanceof Price && near($declared->input, 0.15) && near($declared->output, 0.6)
     && near($declared->cachedInput ?? 0.0, 0.03) && $declared->currency === '€',
 );
-check('a model with no price has none', $config->price('autre') === null);
+check('a model with no price has none', !$config->price('autre') instanceof Price);
 check(
     'half a price is no price: a wrong number shown with confidence is worse',
-    $config->price('a-moitie') === null,
+    !$config->price('a-moitie') instanceof Price,
 );
 
 exec('rm -rf ' . escapeshellarg($dir));

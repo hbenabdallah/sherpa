@@ -1,7 +1,9 @@
 <?php
 
+use App\Permission\Offer;
+
 // Verification of ConfirmOverlay previews resolving against the project root.
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\Tool\Permission;
 use App\Agent\Tool\ToolCall;
@@ -40,9 +42,9 @@ $shell = new ShellExecTool($paths);
 
 $overlay = new ConfirmOverlay(new Terminal(), $write, $patch, $shell);
 $method = new ReflectionMethod($overlay, 'buildPreview');
-$preview = fn(...$a) => $method->invoke($overlay, ...$a);
+$preview = fn(...$a): mixed => $method->invoke($overlay, ...$a);
 $def = new ToolDefinition('x', 'x', [], Permission::CONFIRM, $write);
-$call = fn(string $name, array $args) => new ToolCall('id', $name, $args);
+$call = fn(string $name, array $args): ToolCall => new ToolCall('id', $name, $args);
 
 // ---- The regression: overwriting an existing file must NOT read as "new" ----
 $out = $preview($call('file_write', [
@@ -93,7 +95,7 @@ check('no cursor movement: it prints where the conversation is', !preg_match('/\
 check('a diff cannot clear the screen from inside the box', !str_contains($frame, "\e[2J"), json_encode($frame));
 check(
     'every line of the box is the same width, long ones cut',
-    count(array_unique(array_map('mb_strwidth', $lines))) === 1,
+    count(array_unique(array_map(mb_strwidth(...), $lines))) === 1,
     implode("\n", $lines),
 );
 check('the tool is named in the title', str_contains($lines[0], 'Confirmation — shell_exec'), $lines[0]);
@@ -106,7 +108,7 @@ $granting = Terminal::plain($overlay->frame(
     $shellDef,
     ['$ make'],
     40,
-    new App\Permission\Offer(['shell_exec: make test *', 'shell_exec: php tests/run.php *']),
+    new Offer(['shell_exec: make test *', 'shell_exec: php tests/run.php *']),
 ));
 check('the box names the commands a grant would cover', str_contains(preg_replace('/ *│\n *│ */u', '', $granting), 'would allow: make test *, php tests/run.php *'), $granting);
 $once = Terminal::plain($overlay->frame(
@@ -114,12 +116,12 @@ $once = Terminal::plain($overlay->frame(
     $shellDef,
     ['$ git push'],
     40,
-    new App\Permission\Offer([], 'it pushes to a remote'),
+    new Offer([], 'it pushes to a remote'),
 ));
 check('and says why a command is asked every time', str_contains($once, 'Asked every time: it pushes'), $once);
 check(
     'the grant made is named once chosen',
-    str_contains(Terminal::plain(ConfirmOverlay::verdict(ConfirmChoice::Session, 'shell_exec', new App\Permission\Offer(['shell_exec: make test *']))), 'Allowed for this session: make test *'),
+    str_contains(Terminal::plain(ConfirmOverlay::verdict(ConfirmChoice::Session, 'shell_exec', new Offer(['shell_exec: make test *']))), 'Allowed for this session: make test *'),
 );
 
 // ---- What was chosen stays on screen ------------------------------------------

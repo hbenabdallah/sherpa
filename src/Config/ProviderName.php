@@ -12,7 +12,7 @@ namespace App\Config;
 final class ProviderName
 {
     /** Host labels that name nothing: the API's own subdomain, and the like. */
-    private const GENERIC = ['api', 'www'];
+    private const array GENERIC = ['api', 'www'];
 
     public static function fromUrl(?string $url): string
     {

@@ -17,10 +17,10 @@ class MarkdownRenderer
     private array $table = [];
 
     /** Narrowest a column is squeezed to before a table overflows instead. */
-    private const MIN_COLUMN = 6;
+    private const int MIN_COLUMN = 6;
 
     /** Widest a table is drawn, however wide the terminal. */
-    private const MAX_TABLE_WIDTH = 120;
+    private const int MAX_TABLE_WIDTH = 120;
 
     /** @param int|null $width the terminal's width; asked of the terminal when null */
     public function __construct(private readonly ?int $width = null) {}
@@ -79,7 +79,7 @@ class MarkdownRenderer
             array_push($output, ...$this->feed($line));
         }
 
-        return implode("\n", $output) . (empty($output) ? '' : "\n");
+        return implode("\n", $output) . ($output === [] ? '' : "\n");
     }
 
     /**
@@ -135,19 +135,19 @@ class MarkdownRenderer
         $aligns = [];
         $header = null;
         if (count($rows) >= 2 && self::isSeparator($rows[1])) {
-            $aligns = array_map(fn(string $c) => str_ends_with($c, ':') ? (str_starts_with($c, ':') ? 'center' : 'right') : 'left', $rows[1]);
+            $aligns = array_map(fn(string $c): string => str_ends_with($c, ':') ? (str_starts_with($c, ':') ? 'center' : 'right') : 'left', $rows[1]);
             $header = $rows[0];
             $rows = array_slice($rows, 2);
         } else {
-            $rows = array_values(array_filter($rows, fn(array $r) => !self::isSeparator($r)));
+            $rows = array_values(array_filter($rows, fn(array $r): bool => !self::isSeparator($r)));
         }
 
-        $count = max(array_map('count', [...($header !== null ? [$header] : []), ...$rows, [0]]));
+        $count = max(array_map(count(...), [...($header !== null ? [$header] : []), ...$rows, [0]]));
         if ($count === 0) {
             return [];
         }
 
-        $pad = fn(array $r) => array_pad($r, $count, '');
+        $pad = fn(array $r): array => array_pad($r, $count, '');
         $header = $header !== null ? $pad($header) : null;
         $rows = array_map($pad, $rows);
 
@@ -159,8 +159,8 @@ class MarkdownRenderer
         }
         $widths = $this->fit($widths);
 
-        $border = fn(string $left, string $mid, string $right) => Terminal::GRAY . $left
-            . implode($mid, array_map(fn(int $w) => str_repeat('─', $w + 2), $widths)) . $right . Terminal::RESET;
+        $border = fn(string $left, string $mid, string $right): string => Terminal::GRAY . $left
+            . implode($mid, array_map(fn(int $w): string => str_repeat('─', $w + 2), $widths)) . $right . Terminal::RESET;
 
         $wrapped = false;
         $render = function (array $row, bool $bold) use ($widths, $aligns, &$wrapped): array {
@@ -168,7 +168,7 @@ class MarkdownRenderer
             foreach ($row as $i => $cell) {
                 $cells[$i] = self::wrap($cell, $widths[$i]);
             }
-            $height = max(array_map('count', $cells));
+            $height = max(array_map(count(...), $cells));
             $wrapped = $wrapped || $height > 1;
 
             $out = [];
@@ -191,7 +191,7 @@ class MarkdownRenderer
             return $out;
         };
 
-        $body = array_map(fn(array $row) => $render($row, false), $rows);
+        $body = array_map(fn(array $row): array => $render($row, false), $rows);
 
         $out = [$border('┌', '┬', '┐')];
         if ($header !== null) {
@@ -226,7 +226,7 @@ class MarkdownRenderer
         // many terminals wrapping on the next character, and doubled rows when
         // the window is resized or the text copied. And no wider than a line
         // can be read across, however wide the screen.
-        $terminal = $this->width ?? ((new Terminal())->size()[0] ?: 100);
+        $terminal = $this->width ?? (new Terminal()->size()[0] ?: 100);
         $room = min($terminal - 1, self::MAX_TABLE_WIDTH) - (3 * count($widths) + 1);
 
         if (array_sum($widths) <= $room) {
@@ -234,11 +234,11 @@ class MarkdownRenderer
         }
 
         $cap = max($widths);
-        while ($cap > self::MIN_COLUMN && array_sum(array_map(fn(int $w) => min($w, $cap), $widths)) > $room) {
+        while ($cap > self::MIN_COLUMN && array_sum(array_map(fn(int $w): int => min($w, $cap), $widths)) > $room) {
             $cap--;
         }
 
-        return array_map(fn(int $w) => min($w, $cap), $widths);
+        return array_map(fn(int $w): int => min($w, $cap), $widths);
     }
 
     /** @return list<string> */
@@ -248,7 +248,7 @@ class MarkdownRenderer
         $line = preg_replace('/^\||\|$/', '', $line) ?? $line;
 
         return array_map(
-            fn(string $cell) => self::plainCell(trim(str_replace('\\|', '|', $cell))),
+            fn(string $cell): string => self::plainCell(trim(str_replace('\\|', '|', $cell))),
             preg_split('/(?<!\\\\)\|/', $line) ?: [],
         );
     }
@@ -266,7 +266,7 @@ class MarkdownRenderer
     /** @param list<string> $row */
     private static function isSeparator(array $row): bool
     {
-        return $row !== [] && array_filter($row, fn(string $c) => preg_match('/^:?-{2,}:?$/', $c) !== 1) === [];
+        return $row !== [] && array_filter($row, fn(string $c): bool => preg_match('/^:?-{2,}:?$/', $c) !== 1) === [];
     }
 
     /**

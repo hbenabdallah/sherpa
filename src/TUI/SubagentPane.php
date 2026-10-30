@@ -14,7 +14,7 @@ use App\Agent\Lanes;
  */
 final class SubagentPane extends ChatPane
 {
-    private const SPINNER_EVERY = 0.12;
+    private const float SPINNER_EVERY = 0.12;
 
     private float $lastFrame = 0.0;
 

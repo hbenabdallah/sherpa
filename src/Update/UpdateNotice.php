@@ -17,16 +17,16 @@ use App\Version;
  * with git, and "dev" has no number to compare. SHERPA_UPDATE_CHECK=off turns
  * it off; nothing but the request for the latest release number is sent.
  */
-final class UpdateNotice
+final readonly class UpdateNotice
 {
-    private const DAY = 86_400;
+    private const int DAY = 86_400;
 
-    private const TIMEOUT = 1.5;
+    private const float TIMEOUT = 1.5;
 
     public function __construct(
-        private readonly Releases $releases,
-        private readonly ?string $cacheFile = null,
-        private readonly ?string $current = null,
+        private Releases $releases,
+        private ?string $cacheFile = null,
+        private ?string $current = null,
     ) {}
 
     /** What to tell the user, or null when there is nothing newer, or no telling. */

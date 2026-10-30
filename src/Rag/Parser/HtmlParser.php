@@ -21,7 +21,7 @@ use DOMNode;
  */
 final class HtmlParser implements DocumentParser
 {
-    private const FURNITURE = ['script', 'style', 'noscript', 'nav', 'footer', 'template', 'svg'];
+    private const array FURNITURE = ['script', 'style', 'noscript', 'nav', 'footer', 'template', 'svg'];
 
     public function supports(string $path): bool
     {
@@ -44,7 +44,7 @@ final class HtmlParser implements DocumentParser
             }
         }
 
-        $title = trim((string) ($dom->getElementsByTagName('title')->item(0)?->textContent ?? ''));
+        $title = trim($dom->getElementsByTagName('title')->item(0)?->textContent ?? '');
 
         $sections = [];
         $stack = [];
@@ -146,8 +146,8 @@ final class HtmlParser implements DocumentParser
             return '';
         }
 
-        $width = max(array_map('count', $rows));
-        $line = static fn(array $cells) => '| ' . implode(' | ', array_pad($cells, $width, '')) . ' |';
+        $width = max(array_map(count(...), $rows));
+        $line = static fn(array $cells): string => '| ' . implode(' | ', array_pad($cells, $width, '')) . ' |';
 
         $out = [$line($rows[0]), '|' . str_repeat(' --- |', $width)];
         foreach (array_slice($rows, 1) as $row) {

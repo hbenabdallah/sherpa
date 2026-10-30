@@ -1,5 +1,15 @@
 <?php
 
+use App\Agent\Tool\ToolDefinition;
+use App\Permission\ProjectPermissions;
+use App\Platform\ModelInfo;
+use App\Project\ProjectStore;
+use App\Project\StackDetector;
+use App\Runtime\Interrupt;
+use App\Tool\FilePatchTool;
+use App\Tool\FileWriteTool;
+use App\Tool\ShellExecTool;
+
 /**
  * End-to-end check against a LIVE Ollama model.
  *
@@ -11,7 +21,7 @@
  * confirmation overlay waiting for a keypress.
  */
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\AgentLoop;
 use App\Agent\ContextBudget;
@@ -64,7 +74,7 @@ $url = getenv('OLLAMA_URL') ?: 'http://localhost:11434';
 
 $platform = new OllamaPlatform(HttpClient::create(), $url, $model, 32768);
 check('ollama reachable', $platform->isAvailable());
-$names = array_map(fn($m) => $m->name, $platform->catalogue());
+$names = array_map(fn(ModelInfo $m): string => $m->name, $platform->catalogue());
 check('model present', in_array($model, $names, true), implode(',', $names));
 
 $paths = new ProjectPathResolver();
@@ -77,10 +87,10 @@ $toolbox = new Toolbox([$read, $grep]);
 $chat = new ChatPane(new Terminal(), new MarkdownRenderer());
 $broker = new PermissionBroker(
     new SessionPermissions(),
-    new ConfirmOverlay(new Terminal(), new App\Tool\FileWriteTool(), new App\Tool\FilePatchTool(), new App\Tool\ShellExecTool()),
+    new ConfirmOverlay(new Terminal(), new FileWriteTool(), new FilePatchTool(), new ShellExecTool()),
     // No project bound: nothing is pre-authorised, and only AUTO tools are
     // registered below, so the overlay is never reached anyway.
-    new App\Permission\ProjectPermissions(new App\Project\ProjectStore(new App\Project\StackDetector())),
+    new ProjectPermissions(new ProjectStore(new StackDetector())),
 );
 
 $budget = new ContextBudget(contextWindow: 32768);
@@ -91,7 +101,7 @@ $loop = new AgentLoop(
     $chat,
     $budget,
     new HistoryCompactor($platform, $budget),
-    new App\Runtime\Interrupt(),
+    new Interrupt(),
 );
 
 $bag = new MessageBag();
@@ -134,7 +144,7 @@ check('the budget calibrated itself from it', $budget->isCalibrated());
 
 if ($measured !== null) {
     $estimate = $budget->estimateRequest($bag->all(), array_map(
-        fn($d) => $d->toFunctionSchema(),
+        fn(ToolDefinition $d): array => $d->toFunctionSchema(),
         $toolbox->getDefinitions(),
     ));
     $error = abs($estimate - $measured) / $measured;

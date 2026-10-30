@@ -2,11 +2,11 @@
 
 namespace App\Agent\Tool;
 
-final class ToolCall
+final readonly class ToolCall
 {
     public function __construct(
-        public readonly string $id,
-        public readonly string $name,
-        public readonly array $arguments,
+        public string $id,
+        public string $name,
+        public array $arguments,
     ) {}
 }

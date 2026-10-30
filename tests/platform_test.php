@@ -1,10 +1,14 @@
 <?php
 
+use App\Agent\Result;
+use App\Agent\Tool\TextToolCallParser;
+use Symfony\Component\Console\Command\LazyCommand;
+
 // The model backend behind an interface — and the proof that the interface is
 // real, by running the whole agent loop through a second implementation that
 // has never heard of Ollama or of HTTP.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\AgentLoop;
 use App\Agent\ContextBudget;
@@ -255,7 +259,7 @@ function unpairedCalls(array $messages): array
     return $problems;
 }
 
-/** @return array{0: \App\Agent\Result|\Throwable, 1: MessageBag, 2: ContextBudget, 3: InferenceSpeed} */
+/** @return array{0: Result|\Throwable, 1: MessageBag, 2: ContextBudget, 3: InferenceSpeed} */
 function loopWith(PlatformInterface $platform, array $tools = [], string $toolbox = Toolbox::class): array
 {
     $budget = new ContextBudget(contextWindow: 32768);
@@ -272,7 +276,7 @@ function loopWith(PlatformInterface $platform, array $tools = [], string $toolbo
         $budget,
         new HistoryCompactor($platform, $budget, $speed),
         new Interrupt(),
-        new App\Agent\Tool\TextToolCallParser(),
+        new TextToolCallParser(),
         $speed,
     );
 
@@ -297,7 +301,7 @@ function loopWith(PlatformInterface $platform, array $tools = [], string $toolbo
 check('the Ollama backend satisfies the interface', is_subclass_of(OllamaPlatform::class, PlatformInterface::class));
 
 $reflection = new ReflectionClass(PlatformInterface::class);
-$methods = array_map(fn($m) => $m->getName(), $reflection->getMethods());
+$methods = array_map(fn(\ReflectionMethod $m): string => $m->getName(), $reflection->getMethods());
 sort($methods);
 // Still a guard, not a rubber stamp: every name below has a caller in src/.
 // catalogue/describeModel/useModel/contextWindow arrived with model selection —
@@ -486,7 +490,7 @@ check('with the history still well-formed', unpairedCalls($bag->all()) === [], j
 // Different calls, the same error every time: no call repeats, so the check
 // above never fired, and a model went through twenty commands against a
 // stopped container before the iteration cap.
-$walled = new ScriptedPlatform(array_map(fn(int $i) => [
+$walled = new ScriptedPlatform(array_map(fn(int $i): array => [
     'role' => 'assistant',
     'content' => "\n",
     'tool_calls' => [['function' => ['name' => 'wall', 'arguments' => ['what' => "essai {$i}"]]]],
@@ -498,7 +502,7 @@ check('and names the error for the user', str_contains((string) $result->repeate
 check('with the history still well-formed', unpairedCalls($bag->all()) === [], json_encode(unpairedCalls($bag->all())));
 
 // shell_exec reports a failed command as its output, not as a tool error.
-$exiting = new ScriptedPlatform(array_map(fn(int $i) => [
+$exiting = new ScriptedPlatform(array_map(fn(int $i): array => [
     'role' => 'assistant',
     'content' => '',
     'tool_calls' => [['function' => ['name' => 'wall', 'arguments' => ['what' => "shell {$i}"]]]],
@@ -511,7 +515,7 @@ check(
 );
 
 // A success in between means the model is getting somewhere.
-$progressing = new ScriptedPlatform(array_map(fn(int $i) => [
+$progressing = new ScriptedPlatform(array_map(fn(int $i): array => [
     'role' => 'assistant',
     'content' => '',
     'tool_calls' => [['function' => ['name' => 'wall', 'arguments' => ['what' => $i % 2 === 0 ? 'ok' : "essai {$i}"]]]],
@@ -546,7 +550,7 @@ check(
     "{$result->content} / {$flaky->calls}",
 );
 check('and leaves no empty answer in the history', !in_array('', array_column(
-    array_filter($bag->all(), fn($m) => ($m['role'] ?? '') === 'assistant'),
+    array_filter($bag->all(), fn(array $m): bool => ($m['role'] ?? '') === 'assistant'),
     'content',
 ), true));
 
@@ -576,7 +580,7 @@ $scripted = new ScriptedPlatform([
 ]);
 [$result, $bag] = loopWith($scripted, [$tool]);
 
-$calls = array_merge(...array_map(fn($m) => $m['tool_calls'] ?? [], $bag->all()));
+$calls = array_merge(...array_map(fn(array $m) => $m['tool_calls'] ?? [], $bag->all()));
 check(
     'a call that arrived without an id is given one',
     count($calls) === 2 && preg_match('/^[A-Za-z0-9]{9}$/', $calls[0]['id'] ?? '') === 1,
@@ -602,7 +606,7 @@ $scripted = new ScriptedPlatform([
 ]);
 [, $bag] = loopWith($scripted, [$tool]);
 
-$call = array_merge(...array_map(fn($m) => $m['tool_calls'] ?? [], $bag->all()))[0] ?? [];
+$call = array_merge(...array_map(fn(array $m) => $m['tool_calls'] ?? [], $bag->all()))[0] ?? [];
 check('an id chosen by the backend is kept', ($call['id'] ?? null) === 'call_abc123', json_encode($call));
 check(
     'arguments streamed as JSON text are stored decoded',
@@ -670,10 +674,10 @@ check(
 $kernel = new Kernel('dev', true);
 $kernel->boot();
 $command = $kernel->getContainer()->get('console.command_loader')->get('sherpa');
-if ($command instanceof \Symfony\Component\Console\Command\LazyCommand) {
+if ($command instanceof LazyCommand) {
     $command = $command->getCommand();
 }
-$injected = (new ReflectionProperty($command::class, 'platform'))->getValue($command);
+$injected = new ReflectionProperty($command::class, 'platform')->getValue($command);
 check(
     'the container injects the interface, resolved to the backend switch',
     $injected instanceof PlatformInterface && $injected instanceof SwitchablePlatform,
@@ -686,10 +690,10 @@ check(
 );
 
 // The loop got the same thing: the alias is one service, not one per injection.
-$loop = (new ReflectionProperty($command::class, 'agentLoop'))->getValue($command);
+$loop = new ReflectionProperty($command::class, 'agentLoop')->getValue($command);
 check(
     'and the loop was handed that very instance',
-    (new ReflectionProperty(AgentLoop::class, 'platform'))->getValue($loop) === $injected,
+    new ReflectionProperty(AgentLoop::class, 'platform')->getValue($loop) === $injected,
 );
 
 if ($realHome !== null) {
@@ -698,7 +702,7 @@ if ($realHome !== null) {
 exec('rm -rf ' . escapeshellarg($home));
 
 // Ollama takes images as bare base64 on the message.
-$wire = (new ReflectionMethod(OllamaPlatform::class, 'wireMessages'))->invoke($local, [['role' => 'user', 'content' => 'Look', 'images' => [['mimeType' => 'image/png', 'data' => 'iVBO']]]]);
+$wire = new ReflectionMethod(OllamaPlatform::class, 'wireMessages')->invoke($local, [['role' => 'user', 'content' => 'Look', 'images' => [['mimeType' => 'image/png', 'data' => 'iVBO']]]]);
 check('Ollama gets an image as bare base64', ($wire[0]['images'] ?? null) === ['iVBO'], json_encode($wire));
 
 printf("\n%d passed, %d failed\n", $pass, $fail);

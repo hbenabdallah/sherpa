@@ -28,7 +28,7 @@ use RuntimeException;
 class DelegateTool
 {
     /** What a sub-agent is: the tools that read, and nothing that changes or leaves the machine. */
-    private const SYSTEM = <<<'PROMPT'
+    private const string SYSTEM = <<<'PROMPT'
 You are a research sub-agent working for another agent, inside a software project.
 You get one task. Investigate it with your tools — search, list, read — then answer.
 
@@ -42,7 +42,7 @@ Project root: %s
 PROMPT;
 
     /** A report longer than this is cut: it lands in the main agent's window. */
-    private const MAX_REPORT_CHARS = 12_000;
+    private const int MAX_REPORT_CHARS = 12_000;
 
     public function __construct(
         private readonly PlatformInterface $platform,

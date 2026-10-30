@@ -16,25 +16,25 @@ namespace App\Permission;
 final class CommandPolicy
 {
     /** The tool these grants are for. */
-    public const TOOL = 'shell_exec';
+    public const string TOOL = 'shell_exec';
 
     /** How a grant for one command is kept beside the grants for whole tools. */
-    public const PREFIX = self::TOOL . ': ';
+    public const string PREFIX = self::TOOL . ': ';
 
     /** Programs that run another command, given after their own options. */
-    private const WRAPPERS = ['command', 'builtin', 'exec', 'env', 'nice', 'nohup', 'time', 'timeout', 'stdbuf', 'ionice', 'xargs', 'watch', 'unbuffer'];
+    private const array WRAPPERS = ['command', 'builtin', 'exec', 'env', 'nice', 'nohup', 'time', 'timeout', 'stdbuf', 'ionice', 'xargs', 'watch', 'unbuffer'];
 
     /**
      * Programs whose first argument does not say what they will do: a grant
      * for one of them covers that exact command, never what follows it.
      */
-    private const EXACT_ONLY = [
+    private const array EXACT_ONLY = [
         'sh', 'bash', 'zsh', 'dash', 'ksh', 'fish', 'find', 'curl', 'wget',
         'docker', 'podman', 'kubectl', 'ssh', 'scp', 'rsync', 'npx', 'pnpx', 'bunx', 'sed', 'awk', 'perl',
     ];
 
     /** Programs that run what they read, when they are given no script. */
-    private const INTERPRETERS = ['sh', 'bash', 'zsh', 'dash', 'ksh', 'fish', 'python', 'python3', 'perl', 'ruby', 'php', 'node'];
+    private const array INTERPRETERS = ['sh', 'bash', 'zsh', 'dash', 'ksh', 'fish', 'python', 'python3', 'perl', 'ruby', 'php', 'node'];
 
     /** Why this command is asked about every time and allowed once at most, or null. */
     public static function onlyOnce(ShellCommand $command): ?string
@@ -96,13 +96,7 @@ final class CommandPolicy
         }
 
         foreach ($command->segments as $words) {
-            $covered = false;
-            foreach ($rules as $rule) {
-                if (self::covers($rule, $words)) {
-                    $covered = true;
-                    break;
-                }
-            }
+            $covered = array_any($rules, fn(string $rule): bool => self::covers($rule, $words));
             if (!$covered) {
                 return false;
             }

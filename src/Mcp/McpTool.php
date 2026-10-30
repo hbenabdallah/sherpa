@@ -9,11 +9,11 @@ namespace App\Mcp;
  * a variadic collects them with their names intact and hands them straight to
  * the server.
  */
-final class McpTool
+final readonly class McpTool
 {
     public function __construct(
-        private readonly McpClient $client,
-        private readonly string $remoteName,
+        private McpClient $client,
+        private string $remoteName,
     ) {}
 
     public function __invoke(mixed ...$arguments): string

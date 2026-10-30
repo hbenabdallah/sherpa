@@ -5,7 +5,7 @@
 // seat — initialize, open a session, prompt, answer the permission questions,
 // cancel, load the conversation back in a fresh process.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 $pass = 0;
 $fail = 0;
@@ -81,14 +81,14 @@ final class Editor
             'SHERPA_API_MODEL'       => $apiUrl === null ? null : 'fake-chat',
             'SHERPA_BACKEND'         => 'api',
             'SHERPA_FACT_EXTRACTION' => $facts ? 'on' : 'off',
-        ], static fn(?string $value) => $value !== null);
-        $this->process = proc_open([PHP_BINARY, dirname(__DIR__) . '/bin/sherpa', 'acp'], [
+        ], static fn(?string $value): bool => $value !== null);
+        $this->process = proc_open([PHP_BINARY, __DIR__ . '/../bin/sherpa', 'acp'], [
             0 => ['pipe', 'r'],
             1 => ['pipe', 'w'],
             2 => ['file', "{$work}/stderr.log", 'a'],
         ], $this->pipes, dirname(__DIR__), $env);
         stream_set_blocking($this->pipes[1], false);
-        $this->answer = static fn(array $question): ?string => 'allow-once';
+        $this->answer = static fn(array $question): string => 'allow-once';
     }
 
     /** @param array<string, mixed> $params */
@@ -140,7 +140,7 @@ final class Editor
                     fwrite($this->pipes[0], json_encode(['jsonrpc' => '2.0', 'id' => $message['id'], 'result' => null]) . "\n");
                 } elseif (isset($message['method'])) {
                     $this->updates[] = $message;
-                    if ($during !== null) {
+                    if ($during instanceof \Closure) {
                         $during($message);
                     }
                 }
@@ -161,13 +161,13 @@ final class Editor
      */
     public function of(string $kind, int $from = 0): array
     {
-        return array_values(array_filter(array_slice($this->updates, $from), static fn(array $m) => ($m['params']['update']['sessionUpdate'] ?? '') === $kind));
+        return array_values(array_filter(array_slice($this->updates, $from), static fn(array $m): bool => ($m['params']['update']['sessionUpdate'] ?? '') === $kind));
     }
 
     /** The text of every chunk of one kind since $from, joined. */
     public function text(string $kind, int $from = 0): string
     {
-        return implode('', array_map(static fn(array $m) => (string) ($m['params']['update']['content']['text'] ?? ''), $this->of($kind, $from)));
+        return implode('', array_map(static fn(array $m): string => (string) ($m['params']['update']['content']['text'] ?? ''), $this->of($kind, $from)));
     }
 
     public function close(): void
@@ -209,7 +209,7 @@ final class Editor
 foreach (['bin/sherpa', 'bin/sherpa-release.php'] as $entry) {
     check(
         "{$entry} runs `sherpa acp` as its own command, not as the session's options",
-        preg_match("/in_array\\(\\\$_SERVER\\['argv'\\]\\[1\\] \\?\\? '', \\[[^]]*'acp'/", (string) file_get_contents(dirname(__DIR__) . '/' . $entry)) === 1,
+        preg_match("/in_array\\(\\\$_SERVER\\['argv'\\]\\[1\\] \\?\\? '', \\[[^]]*'acp'/", (string) file_get_contents(__DIR__ . '/../' . $entry)) === 1,
     );
 }
 
@@ -263,7 +263,7 @@ $editor->call('session/prompt', ['sessionId' => $session, 'prompt' => [
     ['type' => 'image', 'mimeType' => 'image/png', 'data' => $png],
 ]]);
 check('an image goes to the model with the text', $editor->text('agent_message_chunk', $from) === 'Saw 1 image(s) with: What is on this screenshot?', $editor->text('agent_message_chunk', $from));
-$files = array_filter(glob("{$work}/home/.config/sherpa/projects/*/sessions/*.json") ?: [], static fn(string $f) => str_contains((string) file_get_contents($f), 'screenshot'));
+$files = array_filter(glob("{$work}/home/.config/sherpa/projects/*/sessions/*.json") ?: [], static fn(string $f): bool => str_contains((string) file_get_contents($f), 'screenshot'));
 $kept = (string) file_get_contents((string) reset($files));
 check('the conversation is saved without the image\'s data, saying one was there', $files !== [] && !str_contains($kept, $png) && str_contains($kept, 'an image was attached here'), implode(', ', $files));
 
@@ -300,7 +300,7 @@ check('and the file is changed', str_contains((string) file_get_contents("{$proj
 check('the model is told, and answers', str_starts_with($editor->text('agent_message_chunk', $from), 'Done: Patched: Invoice.php'), $editor->text('agent_message_chunk', $from));
 
 // ---- an edit, refused -------------------------------------------------------------
-$editor->answer = static fn(array $question): ?string => 'reject';
+$editor->answer = static fn(array $question): string => 'reject';
 $from = count($editor->updates);
 $editor->call('session/prompt', ['sessionId' => $session, 'prompt' => [['type' => 'text', 'text' => 'Patch it again']]]);
 $refused = $editor->of('tool_call_update', $from)[0]['params']['update'] ?? [];
@@ -365,12 +365,12 @@ check('in plan mode, an edit is not even asked about', count($editor->asked) ===
 check('the model is told to plan instead', str_starts_with($editor->text('agent_message_chunk', $from), 'Done: Plan mode'), $editor->text('agent_message_chunk', $from));
 check('and the file is unchanged', file_get_contents("{$project}/Invoice.php") === $invoice);
 
-$editor->answer = static fn(array $question): ?string => 'plan-go';
+$editor->answer = static fn(array $question): string => 'plan-go';
 $from = count($editor->updates);
 $editor->call('session/prompt', ['sessionId' => $thirdId, 'prompt' => [['type' => 'text', 'text' => 'Propose something']]]);
 $modeNow = $editor->of('current_mode_update', $from)[0]['params']['update']['currentModeId'] ?? '';
 check('a plan approved ends plan mode, and the editor\'s menu says so', $modeNow === 'default', json_encode($editor->of('current_mode_update', $from)));
-$editor->answer = static fn(array $question): ?string => 'allow-once';
+$editor->answer = static fn(array $question): string => 'allow-once';
 
 $from = count($editor->updates);
 $set = $editor->call('session/set_config_option', ['sessionId' => $thirdId, 'configId' => 'mode', 'value' => 'plan']);
@@ -440,7 +440,7 @@ check('the session goes on after a cancel', ($reply['result']['stopReason'] ?? '
 
 // ---- "for this session" is this session's ----------------------------------------------
 file_put_contents("{$project}/Invoice.php", "<?php\nfunction subtotal(): int\n{\n    return 0;\n}\n");
-$editor->answer = static fn(array $question): ?string => 'allow-session';
+$editor->answer = static fn(array $question): string => 'allow-session';
 $asked = count($editor->asked);
 $editor->call('session/prompt', ['sessionId' => $session, 'prompt' => [['type' => 'text', 'text' => 'Patch the invoice']]]);
 $other = (string) ($editor->call('session/new', ['cwd' => $project, 'mcpServers' => []])['result']['sessionId'] ?? '');
@@ -566,7 +566,7 @@ $meta = $methods[0]['_meta']['terminal-auth'] ?? [];
 check(
     'an editor asking the earlier way is offered it too, with the whole command',
     ($methods[0]['type'] ?? '') === 'terminal' && $meta['command'] === PHP_BINARY
-    && $meta['args'] === [realpath(dirname(__DIR__) . '/bin/sherpa'), 'acp', '--setup'],
+    && $meta['args'] === [realpath(__DIR__ . '/../bin/sherpa'), 'acp', '--setup'],
     json_encode($methods),
 );
 $refused = $blank->call('session/new', ['cwd' => $project, 'mcpServers' => []]);
@@ -581,7 +581,7 @@ check(
 );
 $plain->close();
 
-exec(sprintf('%s %s acp --setup < /dev/null 2>&1', escapeshellarg(PHP_BINARY), escapeshellarg(dirname(__DIR__) . '/bin/sherpa')), $said, $code);
+exec(sprintf('%s %s acp --setup < /dev/null 2>&1', escapeshellarg(PHP_BINARY), escapeshellarg(__DIR__ . '/../bin/sherpa')), $said, $code);
 check('the setup outside a terminal says it needs one, and fails', $code !== 0 && str_contains(implode("\n", $said), 'run it in a terminal'), implode("\n", $said));
 
 proc_terminate($server);

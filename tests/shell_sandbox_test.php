@@ -6,7 +6,7 @@
 // sandbox-exec on macOS. Without one here, said and skipped — unless
 // SHERPA_REQUIRE_SANDBOX is set, as CI does where it installs one.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Project\ProjectPathResolver;
 use App\Tool\BackgroundJobs;
@@ -32,7 +32,7 @@ check('turned off: no sandbox, and why', $off->kind() === null && str_contains((
 $elsewhere = new Sandbox(os: 'Windows');
 check('none known on another system: said', $elsewhere->kind() === null && str_contains((string) $elsewhere->why(), 'Windows'));
 check('the box says when there is none', str_starts_with($off->describe(), 'sandbox: none — turned off'), $off->describe());
-check('strict is read from the mode', (new Sandbox(mode: 'STRICT'))->strict() && !(new Sandbox(mode: 'auto'))->strict());
+check('strict is read from the mode', new Sandbox(mode: 'STRICT')->strict() && !new Sandbox(mode: 'auto')->strict());
 
 // ---- the real one ----------------------------------------------------------
 // Outside both the project and the temporary directories: under the home.

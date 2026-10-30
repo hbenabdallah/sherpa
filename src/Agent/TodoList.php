@@ -16,11 +16,11 @@ namespace App\Agent;
  */
 final class TodoList
 {
-    public const TODO = 'todo';
+    public const string TODO = 'todo';
 
-    public const DOING = 'doing';
+    public const string DOING = 'doing';
 
-    public const DONE = 'done';
+    public const string DONE = 'done';
 
     /** @var list<array{status: string, text: string}> */
     private array $tasks = [];
@@ -76,7 +76,7 @@ final class TodoList
     public function asText(): string
     {
         return implode("\n", array_map(
-            static fn(array $t) => match ($t['status']) {
+            static fn(array $t): string => match ($t['status']) {
                 self::DONE  => '[x] ',
                 self::DOING => '[>] ',
                 default     => '[ ] ',
@@ -88,7 +88,7 @@ final class TodoList
     /** "2/5 done", for a line that says where the plan stands. */
     public function progress(): string
     {
-        $done = count(array_filter($this->tasks, static fn(array $t) => $t['status'] === self::DONE));
+        $done = count(array_filter($this->tasks, static fn(array $t): bool => $t['status'] === self::DONE));
 
         return "{$done}/" . count($this->tasks) . ' done';
     }

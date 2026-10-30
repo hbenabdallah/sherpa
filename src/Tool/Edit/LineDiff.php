@@ -18,14 +18,14 @@ namespace App\Tool\Edit;
 final class LineDiff
 {
     /** Unchanged lines shown around each change. */
-    private const CONTEXT = 3;
+    private const int CONTEXT = 3;
 
     /**
      * Past this many line pairs in the changed part, its lines are not
      * aligned: it shows as all removed, then all added. A rewrite, not an
      * edit, and the alignment's table would outgrow the memory.
      */
-    private const ALIGN_LIMIT = 250_000;
+    private const int ALIGN_LIMIT = 250_000;
 
     public static function unified(string $old, string $new, string $label): string
     {
@@ -66,15 +66,15 @@ final class LineDiff
             $end++;
         }
 
-        $ops = array_map(fn(string $l) => [' ', $l], array_slice($a, 0, $start));
+        $ops = array_map(fn(string $l): array => [' ', $l], array_slice($a, 0, $start));
         $oldMid = array_slice($a, $start, $n - $start - $end);
         $newMid = array_slice($b, $start, $m - $start - $end);
 
         $ops = count($oldMid) * count($newMid) <= self::ALIGN_LIMIT
             ? [...$ops, ...self::aligned($oldMid, $newMid)]
-            : [...$ops, ...array_map(fn(string $l) => ['-', $l], $oldMid), ...array_map(fn(string $l) => ['+', $l], $newMid)];
+            : [...$ops, ...array_map(fn(string $l): array => ['-', $l], $oldMid), ...array_map(fn(string $l): array => ['+', $l], $newMid)];
 
-        return [...$ops, ...array_map(fn(string $l) => [' ', $l], array_slice($a, $n - $end))];
+        return [...$ops, ...array_map(fn(string $l): array => [' ', $l], array_slice($a, $n - $end))];
     }
 
     /**
@@ -125,7 +125,7 @@ final class LineDiff
      */
     private static function hunks(array $ops): array
     {
-        $changed = array_keys(array_filter($ops, fn(array $op) => $op[0] !== ' '));
+        $changed = array_keys(array_filter($ops, fn(array $op): bool => $op[0] !== ' '));
 
         $groups = [];
         foreach ($changed as $index) {
@@ -152,8 +152,8 @@ final class LineDiff
             $to = min(count($ops) - 1, $last + self::CONTEXT);
             $slice = array_slice($ops, $from, $to - $from + 1);
 
-            $oldCount = count(array_filter($slice, fn(array $op) => $op[0] !== '+'));
-            $newCount = count(array_filter($slice, fn(array $op) => $op[0] !== '-'));
+            $oldCount = count(array_filter($slice, fn(array $op): bool => $op[0] !== '+'));
+            $newCount = count(array_filter($slice, fn(array $op): bool => $op[0] !== '-'));
             [$oldStart, $newStart] = $positions[$from];
 
             $lines[] = sprintf('@@ -%s +%s @@', self::range($oldStart, $oldCount), self::range($newStart, $newCount));

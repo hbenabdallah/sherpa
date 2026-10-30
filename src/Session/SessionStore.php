@@ -21,12 +21,12 @@ use Throwable;
 final class SessionStore
 {
     /** How many conversations a project keeps. Older ones are removed. */
-    public const KEEP = 20;
+    public const int KEEP = 20;
 
-    private const FORMAT = 1;
+    private const int FORMAT = 1;
 
     /** What an id looks like: the shape save() gives it, and nothing a path could hide in. */
-    private const ID = '/^\d{8}-\d{6}-[0-9a-f]{4}$/';
+    private const string ID = '/^\d{8}-\d{6}-[0-9a-f]{4}$/';
 
     /**
      * To the microsecond. "Most recently active" is what orders the list and
@@ -34,7 +34,7 @@ final class SessionStore
      * ordinary — two terminals on one project, or a resume followed at once by
      * a turn. At second precision those tie, and a tie is an order nobody chose.
      */
-    private const TIME = 'Y-m-d\\TH:i:s.uP';
+    private const string TIME = 'Y-m-d\\TH:i:s.uP';
 
     private ?string $dir = null;
 
@@ -146,7 +146,7 @@ final class SessionStore
 
         $conversation = array_values(array_map(
             self::withoutImages(...),
-            array_filter($messages, static fn(array $m) => ($m['role'] ?? '') !== 'system'),
+            array_filter($messages, static fn(array $m): bool => ($m['role'] ?? '') !== 'system'),
         ));
 
         $title = $this->title ?? $this->title($conversation);
@@ -224,12 +224,12 @@ final class SessionStore
 
         foreach (glob($this->dir . '/*.json') ?: [] as $file) {
             $session = $this->read($file);
-            if ($session !== null) {
+            if ($session instanceof SavedSession) {
                 $sessions[] = $session;
             }
         }
 
-        usort($sessions, static fn(SavedSession $a, SavedSession $b) => $b->updatedAt <=> $a->updatedAt);
+        usort($sessions, static fn(SavedSession $a, SavedSession $b): int => $b->updatedAt <=> $a->updatedAt);
 
         return $sessions;
     }

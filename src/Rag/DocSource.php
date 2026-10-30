@@ -21,31 +21,31 @@ use Throwable;
  */
 final class DocSource
 {
-    public const EXTENSIONS = ['md', 'markdown', 'mdx', 'txt', 'text', 'rst', 'adoc', 'asciidoc', 'html', 'htm'];
+    public const array EXTENSIONS = ['md', 'markdown', 'mdx', 'txt', 'text', 'rst', 'adoc', 'asciidoc', 'html', 'htm'];
 
     /**
      * Never documentation of this project, whatever git says. Test fixtures
      * included: a fixture README describes a pretend project, and answering
      * from it would be answering about something that does not exist.
      */
-    private const SKIPPED = ['.git', 'vendor', 'node_modules', 'var', 'build', 'dist', 'coverage', '.cache', '.idea', '.vscode', 'tmp',
+    private const array SKIPPED = ['.git', 'vendor', 'node_modules', 'var', 'build', 'dist', 'coverage', '.cache', '.idea', '.vscode', 'tmp',
         'fixtures', '__fixtures__', 'testdata'];
 
     /**
      * Files whose extension says "text" and whose name says otherwise: they
      * configure a tool, they do not document the project.
      */
-    private const NOT_DOCUMENTATION = '/^(robots|humans|security|requirements.*|constraints.*|cmakelists|third[-_]party[-_]notices)\.txt$/i';
+    private const string NOT_DOCUMENTATION = '/^(robots|humans|security|requirements.*|constraints.*|cmakelists|third[-_]party[-_]notices)\.txt$/i';
 
     /**
      * Where HTML and plain text are the application, not its documentation:
      * a page served from public/, a template, an asset. Markdown is left alone
      * everywhere — a README in src/ is documentation wherever it sits.
      */
-    private const APPLICATION_DIRS = ['public', 'static', 'assets', 'templates', 'resources', 'web', 'www', 'src', 'app', 'lib'];
+    private const array APPLICATION_DIRS = ['public', 'static', 'assets', 'templates', 'resources', 'web', 'www', 'src', 'app', 'lib'];
 
     /** A file this large is generated, not written — and would drown the rest. */
-    public const MAX_BYTES = 1_000_000;
+    public const int MAX_BYTES = 1_000_000;
 
     /** @return list<string> paths relative to $root, sorted */
     public function files(string $root): array
@@ -99,7 +99,7 @@ final class DocSource
             return null;
         }
 
-        return array_values(array_filter(explode("\0", $process->getOutput()), static fn(string $p) => $p !== ''));
+        return array_values(array_filter(explode("\0", $process->getOutput()), static fn(string $p): bool => $p !== ''));
     }
 
     /** @return list<string> */
@@ -108,7 +108,7 @@ final class DocSource
         $files = [];
         $directories = new RecursiveCallbackFilterIterator(
             new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS),
-            static fn(SplFileInfo $file) => !($file->isDir() && in_array($file->getFilename(), self::SKIPPED, true)),
+            static fn(SplFileInfo $file): bool => !$file->isDir() || !in_array($file->getFilename(), self::SKIPPED, true),
         );
 
         foreach (new RecursiveIteratorIterator($directories) as $file) {

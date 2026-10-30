@@ -24,13 +24,13 @@ use stdClass;
  */
 final class AnthropicWire
 {
-    public const VERSION = '2023-06-01';
+    public const string VERSION = '2023-06-01';
 
     /** Where Sherpa keeps an assistant message's thinking blocks, verbatim. */
-    public const THINKING = 'anthropic_thinking';
+    public const string THINKING = 'anthropic_thinking';
 
     /** A reply needs room for the thinking that precedes it on current models. */
-    public const MAX_TOKENS = 16000;
+    public const int MAX_TOKENS = 16000;
 
     public static function handles(string $baseUrl): bool
     {
@@ -196,7 +196,7 @@ final class AnthropicWire
         $turns[$last]['content'] = array_merge($turns[$last]['content'], $blocks);
 
         if ($role === 'user') {
-            usort($turns[$last]['content'], static fn(array $a, array $b) => ($b['type'] === 'tool_result') <=> ($a['type'] === 'tool_result'));
+            usort($turns[$last]['content'], static fn(array $a, array $b): int => ($b['type'] === 'tool_result') <=> ($a['type'] === 'tool_result'));
         }
     }
 
@@ -209,7 +209,7 @@ final class AnthropicWire
     {
         $blocks = $message[self::THINKING] ?? [];
 
-        return is_array($blocks) ? array_values(array_filter($blocks, 'is_array')) : [];
+        return is_array($blocks) ? array_values(array_filter($blocks, is_array(...))) : [];
     }
 
     /**

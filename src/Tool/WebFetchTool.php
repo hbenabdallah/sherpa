@@ -11,6 +11,7 @@ use App\Runtime\Interrupt;
 use App\Runtime\InterruptibleHttpClient;
 use RuntimeException;
 use Symfony\Component\HttpClient\HttpClient;
+use Symfony\Contracts\HttpClient\Exception\ExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 #[AsTool(
@@ -23,21 +24,21 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 class WebFetchTool
 {
     /** Past this, the rest of the page is not downloaded. */
-    private const MAX_BYTES = 3_000_000;
+    private const int MAX_BYTES = 3_000_000;
 
-    private const TIMEOUT_SECONDS = 20;
+    private const int TIMEOUT_SECONDS = 20;
 
-    private const MAX_REDIRECTS = 5;
+    private const int MAX_REDIRECTS = 5;
 
     /** Share of the window one read may take, with a floor and a ceiling. */
-    private const SHARE = 0.25;
+    private const float SHARE = 0.25;
 
-    private const MIN_CHARS = 8_000;
+    private const int MIN_CHARS = 8_000;
 
     /** How often a page arriving slowly is let go of, to hear Ctrl+C. */
-    private const POLL_SECONDS = 0.1;
+    private const float POLL_SECONDS = 0.1;
 
-    private const MAX_CHARS = 60_000;
+    private const int MAX_CHARS = 60_000;
 
     /** @var array<string, array{type: string, text: string}> pages read this session, for reading on without fetching again */
     private array $pages = [];
@@ -52,7 +53,7 @@ class WebFetchTool
         private readonly ?Interrupt $interrupt = null,
     ) {
         $http ??= HttpClient::create();
-        $this->http = $interrupt === null ? $http : new InterruptibleHttpClient($http, $interrupt);
+        $this->http = $interrupt instanceof Interrupt ? new InterruptibleHttpClient($http, $interrupt) : $http;
     }
 
     public function __invoke(
@@ -149,8 +150,8 @@ class WebFetchTool
             }
             $type = strtolower(trim(explode(';', $response->getHeaders(false)['content-type'][0] ?? 'text/plain')[0]));
             $charset = preg_match('/charset=([\w-]+)/i', $response->getHeaders(false)['content-type'][0] ?? '', $m) === 1 ? $m[1] : null;
-        } catch (\Symfony\Contracts\HttpClient\Exception\ExceptionInterface $e) {
-            throw new RuntimeException("could not fetch {$url}: {$e->getMessage()}");
+        } catch (ExceptionInterface $e) {
+            throw new RuntimeException("could not fetch {$url}: {$e->getMessage()}", $e->getCode(), $e);
         }
 
         if ($status >= 400) {
@@ -179,13 +180,8 @@ class WebFetchTool
         }
 
         $addresses = filter_var($host, FILTER_VALIDATE_IP) !== false ? [$host] : (@gethostbynamel($host) ?: []);
-        foreach ($addresses as $address) {
-            if (filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
-                return true;
-            }
-        }
 
-        return false;
+        return array_any($addresses, fn(string $address): bool => filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false);
     }
 
     /** A Location header, absolute or relative, as a full address. */

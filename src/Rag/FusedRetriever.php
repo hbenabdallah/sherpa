@@ -18,19 +18,19 @@ namespace App\Rag;
  * k = 60 is the constant of the original paper, and nothing here has measured a
  * reason to move it.
  */
-final class FusedRetriever implements Retriever
+final readonly class FusedRetriever implements Retriever
 {
-    private const K = 60;
+    private const int K = 60;
 
     /** How deep each retriever is read before fusing: a candidate pool, not an answer. */
-    private const CANDIDATES = 30;
+    private const int CANDIDATES = 30;
 
     /** @param list<Retriever> $retrievers */
-    public function __construct(private readonly array $retrievers) {}
+    public function __construct(private array $retrievers) {}
 
     public function name(): string
     {
-        return implode('+', array_map(static fn(Retriever $r) => $r->name(), $this->retrievers));
+        return implode('+', array_map(static fn(Retriever $r): string => $r->name(), $this->retrievers));
     }
 
     public function retrieve(string $question, int $limit): array

@@ -11,15 +11,15 @@ namespace App\Rag;
  * passage means little out of its section: "30 jours" is an answer only once
  * it is known what the 30 days are for.
  */
-final class Section
+final readonly class Section
 {
     /**
      * @param list<string> $headings from the outermost heading to this one
      */
     public function __construct(
-        public readonly array $headings,
-        public readonly string $text,
-        public readonly int $startLine,
-        public readonly int $endLine,
+        public array $headings,
+        public string $text,
+        public int $startLine,
+        public int $endLine,
     ) {}
 }

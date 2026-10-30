@@ -1,9 +1,11 @@
 <?php
 
+use App\Platform\ModelInfo;
+
 // Anthropic's Messages API, spoken natively: the request shape, the event
 // stream, prompt caching and thinking blocks. Nothing reaches a network.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Platform\AnthropicWire;
 use App\Platform\OpenAiCompatiblePlatform;
@@ -74,10 +76,10 @@ function reply(array $reply): MockResponse
  */
 function anthropic(array $responses, array &$sent = []): OpenAiCompatiblePlatform
 {
-    $client = new MockHttpClient(function ($method, $url, $options) use (&$responses, &$sent) {
+    $client = new MockHttpClient(function ($method, $url, array $options) use (&$responses, &$sent) {
         $headers = [];
         foreach ($options['headers'] ?? [] as $line) {
-            [$name, $value] = array_map('trim', explode(':', $line, 2)) + [1 => ''];
+            [$name, $value] = array_map(trim(...), explode(':', $line, 2)) + [1 => ''];
             $headers[strtolower($name)] = $value;
         }
         $sent[] = ['method' => $method, 'url' => $url, 'body' => json_decode($options['body'] ?? '{}', true), 'raw' => (string) ($options['body'] ?? ''), 'headers' => $headers];
@@ -113,9 +115,9 @@ $history = [
     ['role' => 'system', 'content' => 'You are Sherpa.'],
     ['role' => 'user', 'content' => 'What does the README say?'],
 ];
-$message = $platform->stream($history, $tools, function (string $t) use (&$tokens) {
+$message = $platform->stream($history, $tools, function (string $t) use (&$tokens): void {
     $tokens[] = $t;
-}, function (bool $r) use (&$waited) {
+}, function (bool $r) use (&$waited): void {
     $waited[] = $r;
 });
 
@@ -172,7 +174,7 @@ $history[] = ['role' => 'tool', 'name' => 'file_read', 'tool_call_id' => 'toolu_
 
 $sent2 = [];
 $platform2 = anthropic([reply(['thinking' => 'Got it.', 'signature' => 'SIG-2', 'text' => 'It says Demo.'])], $sent2);
-$platform2->stream($history, $tools, fn() => null);
+$platform2->stream($history, $tools, fn(): null => null);
 $turns = $sent2[0]['body']['messages'];
 
 check(
@@ -244,7 +246,7 @@ $long = [
         AnthropicWire::THINKING => [['type' => 'thinking', 'thinking' => 'old', 'signature' => 'OLD']]],
     ['role' => 'tool', 'tool_call_id' => 't1', 'content' => str_repeat('x', 2000)],
 ];
-$platform3->stream($long, [], fn() => null);
+$platform3->stream($long, [], fn(): null => null);
 check('an untouched history keeps its thinking', str_contains(json_encode($sent3[0]['body']), '"OLD"'));
 
 // A side pass — a summary — has a conversation of its own and changes nothing.
@@ -255,13 +257,13 @@ $long[3]['content'] = '[output moved out of the window]';
 $long[] = ['role' => 'assistant', 'content' => '', 'tool_calls' => [['id' => 't2', 'function' => ['name' => 'file_read', 'arguments' => ['path' => 'b']]]],
     AnthropicWire::THINKING => [['type' => 'thinking', 'thinking' => 'new', 'signature' => 'NEW']]];
 $long[] = ['role' => 'tool', 'tool_call_id' => 't2', 'content' => 'B'];
-$platform3->stream($long, [], fn() => null);
+$platform3->stream($long, [], fn(): null => null);
 check('after a rewrite, the older thinking blocks are dropped', !str_contains(json_encode($sent3[2]['body']), '"OLD"'), json_encode($sent3[2]['body']['messages']));
 check('the side pass did not count as a rewrite of the conversation', str_contains(json_encode($sent3[2]['body']), 'moved out of the window'));
 
 $long[] = ['role' => 'assistant', 'content' => 'done', AnthropicWire::THINKING => [['type' => 'thinking', 'thinking' => 'later', 'signature' => 'LATER']]];
 $long[] = ['role' => 'user', 'content' => 'thanks'];
-$platform3->stream($long, [], fn() => null);
+$platform3->stream($long, [], fn(): null => null);
 $body = json_encode($sent3[3]['body']);
 check('blocks made after the rewrite are kept', str_contains($body, '"LATER"'), $body);
 check('and the dropped ones stay dropped', !str_contains($body, '"OLD"'), $body);
@@ -277,7 +279,7 @@ $recovered = $stale->stream([
     ['role' => 'user', 'content' => 'hi'],
     ['role' => 'assistant', 'content' => 'hello', AnthropicWire::THINKING => [['type' => 'thinking', 'thinking' => 'x', 'signature' => 'STALE']]],
     ['role' => 'user', 'content' => 'again'],
-], [], fn() => null);
+], [], fn(): null => null);
 check(
     'a stale thinking block is dropped and the request sent again',
     count($sent4) === 2 && str_contains(json_encode($sent4[0]['body']), 'STALE') && !str_contains(json_encode($sent4[1]['body']), 'STALE'),
@@ -313,10 +315,10 @@ $sentOverload = [];
 $overloaded = anthropic([
     new MockResponse([ev(['type' => 'error', 'error' => ['type' => 'overloaded_error', 'message' => 'Overloaded']])], ['response_headers' => ['content-type' => 'text/event-stream']]),
     reply(['text' => 'back']),
-], $sentOverload)->stream([['role' => 'user', 'content' => 'x']], [], fn() => null);
+], $sentOverload)->stream([['role' => 'user', 'content' => 'x']], [], fn(): null => null);
 check('an overload before any text is retried', count($sentOverload) === 2 && $overloaded['content'] === 'back', json_encode($overloaded));
 
-$refused = anthropic([reply(['stop' => 'refusal'])])->stream([['role' => 'user', 'content' => 'x']], [], fn() => null);
+$refused = anthropic([reply(['stop' => 'refusal'])])->stream([['role' => 'user', 'content' => 'x']], [], fn(): null => null);
 check('a refusal with nothing written says so', str_contains($refused['content'], 'declined'), json_encode($refused));
 
 // ---- models, and no embeddings ---------------------------------------------
@@ -332,7 +334,7 @@ check('and sends the Anthropic headers there too', ($sent5[0]['headers']['x-api-
 check(
     'each model comes with its context window',
     ($models[1]->name ?? '') === 'claude-sonnet-5' && ($models[1]->contextLength ?? 0) === 1000000,
-    json_encode(array_map(fn($m) => [$m->name, $m->contextLength], $models)),
+    json_encode(array_map(fn(ModelInfo $m): array => [$m->name, $m->contextLength], $models)),
 );
 
 $threw = false;

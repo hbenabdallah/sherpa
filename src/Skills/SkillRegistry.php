@@ -7,7 +7,7 @@ class SkillRegistry
     /** @var array<string, Skill> */
     private array $skills = [];
 
-    private string $globalDir;
+    private readonly string $globalDir;
 
     private ?string $projectDir = null;
 
@@ -84,7 +84,7 @@ class SkillRegistry
 
     public function getIndex(): string
     {
-        if (empty($this->skills)) {
+        if ($this->skills === []) {
             return '(no skill loaded)';
         }
 

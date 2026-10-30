@@ -11,6 +11,7 @@ use App\Agent\PlanMode;
 use App\Agent\SystemPromptBuilder;
 use App\Agent\Tool\Toolbox;
 use App\Config\Backend;
+use App\Config\ModelProfile;
 use App\Config\ModelResolver;
 use App\Config\ProviderName;
 use App\Mcp\McpException;
@@ -20,6 +21,7 @@ use App\Memory\ContextStore;
 use App\Memory\FactExtractor;
 use App\Permission\ProjectPermissions;
 use App\Permission\SessionPermissions;
+use App\Platform\ModelResidency;
 use App\Platform\SwitchablePlatform;
 use App\Project\DockerConfig;
 use App\Project\DockerWrapper;
@@ -28,6 +30,7 @@ use App\Project\ProjectQuestions;
 use App\Project\ProjectStore;
 use App\Project\WorkingProject;
 use App\Runtime\Interrupt;
+use App\Session\SavedSession;
 use App\Session\SessionStore;
 use App\Skills\Skill;
 use App\Skills\SkillRegistry;
@@ -128,7 +131,7 @@ class SherpaCommand extends Command
         // Whatever happens — Ctrl+C, an uncaught error, a fatal — the tty must
         // not be handed back in raw mode. A shutdown function covers the paths
         // a signal handler cannot.
-        register_shutdown_function(function () {
+        register_shutdown_function(function (): void {
             $this->terminal->restoreSane();
             // MCP servers and background jobs are child processes. Whatever
             // ends the session — /exit, Ctrl+C, a fatal — they are not left
@@ -139,7 +142,7 @@ class SherpaCommand extends Command
 
         // Ctrl+C cancels the turn while one is running; at an idle prompt, or on
         // a second press, it quits through here.
-        $this->interrupt->install(function () {
+        $this->interrupt->install(function (): void {
             $this->terminal->restoreSane();
             echo "\n";
             exit(0);
@@ -166,7 +169,7 @@ class SherpaCommand extends Command
         $flagged = is_string($flag) && trim($flag) !== '';
         $requested = $flagged ? Backend::parse($flag) : null;
 
-        if ($flagged && $requested === null) {
+        if ($flagged && !$requested instanceof Backend) {
             echo Terminal::RED . "✗ Unknown backend: {$flag}. Possible values: api, ollama.\n" . Terminal::RESET;
 
             return Command::FAILURE;
@@ -224,7 +227,7 @@ class SherpaCommand extends Command
             $backend,
             rememberAsDefault: !$flagged,
         );
-        if ($profile === null) {
+        if (!$profile instanceof ModelProfile) {
             echo Terminal::GRAY . "Goodbye.\n" . Terminal::RESET;
 
             return Command::SUCCESS;
@@ -264,11 +267,11 @@ class SherpaCommand extends Command
         $this->lineEditor->useCompletions(fn(): array => [
             ...SlashCommands::catalogue(),
             ...array_values(array_map(
-                fn(Skill $skill) => ['name' => '/' . $skill->name, 'hint' => '[request]', 'description' => 'skill · ' . $skill->description],
-                array_filter($this->skillRegistry->all(), fn(Skill $skill) => !$this->isCommand('/' . $skill->name)),
+                fn(Skill $skill): array => ['name' => '/' . $skill->name, 'hint' => '[request]', 'description' => 'skill · ' . $skill->description],
+                array_filter($this->skillRegistry->all(), fn(Skill $skill): bool => !$this->isCommand('/' . $skill->name)),
             )),
             ...array_map(
-                fn(array $prompt) => [
+                fn(array $prompt): array => [
                     'name'        => $prompt['command'],
                     'hint'        => PromptArguments::usage($prompt['arguments']),
                     'description' => 'MCP prompt · ' . $prompt['description'],
@@ -317,7 +320,7 @@ class SherpaCommand extends Command
 
         // Commands run on this machine, not in a container: where they may
         // write, or that nothing keeps them in.
-        if ($this->sandbox !== null && !($project->docker->enabled && $project->docker->container !== '') && !is_file('/.dockerenv')) {
+        if ($this->sandbox instanceof Sandbox && (!$project->docker->enabled || $project->docker->container === '') && !is_file('/.dockerenv')) {
             echo $this->sandbox->kind() === null
                 ? Terminal::YELLOW . '  ⚠ Commands run without a sandbox: ' . $this->sandbox->why()
                     . Terminal::GRAY . " — they can write anywhere you can.\n" . Terminal::RESET
@@ -328,7 +331,7 @@ class SherpaCommand extends Command
         $resume = $input->getOption('resume');
         if ($resume !== false) {
             $this->commands->resume(is_string($resume) ? trim($resume) : '', $bag, $project);
-        } elseif (($last = $this->sessions->latest()) !== null) {
+        } elseif (($last = $this->sessions->latest()) instanceof SavedSession) {
             // A feature nobody knows about does not exist. The conversation
             // left behind is named, with how to get it back, and nothing more:
             // opening a new one is still what an empty prompt means.
@@ -366,7 +369,7 @@ class SherpaCommand extends Command
             $this->renderStatus($project, $bag);
             $userInput = $this->readUserInput();
 
-            if ($userInput === null || $userInput === '/exit' || $userInput === '/quit') {
+            if (in_array($userInput, [null, '/exit', '/quit'], true)) {
                 break;
             }
 
@@ -573,7 +576,7 @@ class SherpaCommand extends Command
     {
         $residency = $this->platform->residency();
 
-        if ($residency === null || !$residency->isLoaded() || $residency->isFullyOnGpu()) {
+        if (!$residency instanceof ModelResidency || !$residency->isLoaded() || $residency->isFullyOnGpu()) {
             return;
         }
 
@@ -617,7 +620,7 @@ class SherpaCommand extends Command
         }
 
         $known = $this->projectStore->forDirectory($directory);
-        if ($known !== null) {
+        if ($known instanceof Project) {
             $this->working->open($known);
 
             return true;
@@ -669,7 +672,7 @@ class SherpaCommand extends Command
         }
 
         $skill = $this->skillRegistry->get(substr($word, 1));
-        if ($skill === null) {
+        if (!$skill instanceof Skill) {
             return null;
         }
 

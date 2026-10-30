@@ -20,6 +20,7 @@ use App\Memory\ContextStore;
 use App\Memory\FactExtractor;
 use App\Permission\SessionPermissions;
 use App\Platform\SwitchablePlatform;
+use App\Project\Project;
 use App\Project\ProjectQuestions;
 use App\Project\ProjectStore;
 use App\Project\WorkingProject;
@@ -52,10 +53,10 @@ use Throwable;
  */
 final class AcpServer
 {
-    private const PROTOCOL_VERSION = 1;
+    private const int PROTOCOL_VERSION = 1;
 
     /** Conversations per page of session/list. */
-    private const LIST_PAGE = 50;
+    private const int LIST_PAGE = 50;
 
     /**
      * Setting Sherpa up is answering questions in a terminal — the provider,
@@ -63,7 +64,7 @@ final class AcpServer
      * authentication. The editor appends the arguments to the command it
      * starts Sherpa with, `sherpa acp`.
      */
-    private const SETUP = [
+    private const array SETUP = [
         'id'          => 'setup',
         'name'        => 'Set up Sherpa',
         'description' => 'Choose the model provider, its key and the model, in a terminal',
@@ -281,7 +282,7 @@ final class AcpServer
         $method = self::SETUP;
         if ($meta) {
             // The single executable is its own program; a checkout is PHP running bin/sherpa.
-            $argv = array_values(array_map('strval', (array) ($_SERVER['argv'] ?? [])));
+            $argv = array_values(array_map(strval(...), (array) ($_SERVER['argv'] ?? [])));
             $program = Phar::running(false);
             $args = $program !== '' ? array_slice($argv, 1) : [(string) realpath($argv[0] ?? ''), ...array_slice($argv, 1)];
 
@@ -359,7 +360,7 @@ final class AcpServer
         $this->open[$id] = $session;
         $this->makeCurrent($session);
 
-        (new Replay($this->connection, $id))->send($saved->messages);
+        new Replay($this->connection, $id)->send($saved->messages);
         $session->remembered = $bag->count();
         $this->then[] = fn() => $this->advertise($session);
         $this->then[] = fn() => $this->rememberFacts($session);
@@ -384,7 +385,7 @@ final class AcpServer
             } catch (AcpError) {
                 $project = null;
             }
-            $projects = $project === null ? [] : [$project];
+            $projects = $project instanceof Project ? [$project] : [];
         }
 
         $sessions = [];
@@ -403,7 +404,7 @@ final class AcpServer
             }
         }
 
-        usort($sessions, static fn(array $a, array $b) => $b['at'] <=> $a['at']);
+        usort($sessions, static fn(array $a, array $b): int => $b['at'] <=> $a['at']);
 
         $offset = is_string($params['cursor'] ?? null) && ctype_digit($params['cursor']) ? (int) $params['cursor'] : 0;
         $page = array_map(static function (array $session): array {
@@ -453,7 +454,7 @@ final class AcpServer
                 fwrite(STDERR, "sherpa acp: {$session->id}: {$summary}\n");
             }
         } finally {
-            if ($opened !== null) {
+            if ($opened instanceof AcpSession) {
                 $this->makeCurrent($opened);
             }
         }
@@ -551,7 +552,7 @@ final class AcpServer
 
     private function useModel(?ModelProfile $profile): void
     {
-        if ($profile !== null && $profile !== $this->model->profile()) {
+        if ($profile instanceof ModelProfile && $profile !== $this->model->profile()) {
             $this->model->apply($profile);
             $this->model->announce($profile);
         }
@@ -642,7 +643,7 @@ final class AcpServer
         $title = $this->sessions->cursor()[2];
         if (is_string($title) && $title !== '' && $title !== $session->title) {
             $session->title = $title;
-            $this->update($session, ['sessionUpdate' => 'session_info_update', 'title' => $title, 'updatedAt' => (new DateTimeImmutable())->format(DateTimeInterface::ATOM)]);
+            $this->update($session, ['sessionUpdate' => 'session_info_update', 'title' => $title, 'updatedAt' => new DateTimeImmutable()->format(DateTimeInterface::ATOM)]);
         }
 
         // A plan approved ends plan mode: the editor's menu follows.
@@ -752,7 +753,7 @@ final class AcpServer
         try {
             $this->connection->request('fs/write_text_file', ['sessionId' => $session, 'path' => $path, 'content' => $content]);
         } catch (AcpError $e) {
-            throw new RuntimeException('the editor could not write ' . $this->relative($path) . ': ' . $e->getMessage());
+            throw new RuntimeException('the editor could not write ' . $this->relative($path) . ': ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -860,7 +861,7 @@ final class AcpServer
         }
 
         $known = $this->projects->forDirectory($directory);
-        if ($known !== null) {
+        if ($known instanceof Project) {
             $this->working->open($known);
         } else {
             [$docker, $this->notes[$directory]] = $this->questions->guessDocker($directory);
@@ -889,7 +890,7 @@ final class AcpServer
 
         foreach (is_array($servers) ? $servers : [] as $server) {
             $config = self::serverConfig(is_array($server) ? $server : []);
-            if ($config === null) {
+            if (!$config instanceof ServerConfig) {
                 continue;
             }
 
@@ -939,7 +940,7 @@ final class AcpServer
             return null;
         }
 
-        $args = array_values(array_filter(is_array($server['args'] ?? null) ? $server['args'] : [], 'is_string'));
+        $args = array_values(array_filter(is_array($server['args'] ?? null) ? $server['args'] : [], is_string(...)));
 
         return new ServerConfig($name, command: $command, args: $args, env: $pairs($server['env'] ?? []));
     }

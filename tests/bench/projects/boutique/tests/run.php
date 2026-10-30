@@ -2,7 +2,7 @@
 
 // Lance chaque fonction test_* de tests/*Test.php.
 
-require dirname(__DIR__) . '/autoload.php';
+require __DIR__ . '/../autoload.php';
 require __DIR__ . '/assert.php';
 
 foreach (glob(__DIR__ . '/*Test.php') as $file) {

@@ -22,7 +22,7 @@ class FactExtractor
      * Below this there is no session to summarise, only a greeting: system,
      * one question, one answer.
      */
-    private const MIN_MESSAGES = 4;
+    private const int MIN_MESSAGES = 4;
 
     /**
      * How much of the tail to hand over. Overflowing the window is silent —
@@ -31,19 +31,19 @@ class FactExtractor
      * 32k and throws away most of a long session on anything larger, so it is
      * the floor of a share.
      */
-    private const MIN_TRANSCRIPT_CHARS = 24000;
+    private const int MIN_TRANSCRIPT_CHARS = 24000;
 
-    private const MAX_TRANSCRIPT_CHARS = 120000;
+    private const int MAX_TRANSCRIPT_CHARS = 120000;
 
     /** Share of the prompt window the transcript may occupy. */
-    private const TRANSCRIPT_SHARE = 0.5;
+    private const float TRANSCRIPT_SHARE = 0.5;
 
     /** A fact is a note to self, not a document. */
-    private const MAX_KEY_CHARS = 80;
+    private const int MAX_KEY_CHARS = 80;
 
-    private const MAX_VALUE_CHARS = 400;
+    private const int MAX_VALUE_CHARS = 400;
 
-    private const MAX_FACTS = 12;
+    private const int MAX_FACTS = 12;
 
     public function __construct(
         private readonly PlatformInterface $platform,
@@ -202,7 +202,7 @@ class FactExtractor
             $char = $content[$i];
 
             if ($inString) {
-                $inString = !($char === '"' && !$escaped);
+                $inString = $char !== '"' || $escaped;
                 $escaped = $char === '\\' && !$escaped;
                 continue;
             }

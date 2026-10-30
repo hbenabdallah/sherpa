@@ -11,12 +11,12 @@ use stdClass;
  * updates in the order it happened: what was asked, what was answered, the
  * tools in between with what they returned.
  */
-final class Replay
+final readonly class Replay
 {
     /** A tool's result, replayed: enough to recognise it, the model keeps the rest. */
-    private const RESULT_CHARS = 2_000;
+    private const int RESULT_CHARS = 2_000;
 
-    public function __construct(private readonly Connection $connection, private readonly string $sessionId) {}
+    public function __construct(private Connection $connection, private string $sessionId) {}
 
     /** @param list<array<string, mixed>> $messages */
     public function send(array $messages): void

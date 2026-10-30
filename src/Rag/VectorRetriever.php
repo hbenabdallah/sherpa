@@ -19,11 +19,11 @@ use App\Rag\Embedding\Vectors;
  * one configured: two models' vectors are not comparable, and a confident
  * wrong ranking is worse than none.
  */
-final class VectorRetriever implements Retriever
+final readonly class VectorRetriever implements Retriever
 {
     public function __construct(
-        private readonly DocIndex $index,
-        private readonly EmbeddingProvider $embeddings,
+        private DocIndex $index,
+        private EmbeddingProvider $embeddings,
     ) {}
 
     public function name(): string
@@ -57,7 +57,7 @@ final class VectorRetriever implements Retriever
         $hits = [];
         foreach (array_slice($scores, 0, $limit, preserve_keys: true) as $id => $score) {
             $chunk = $this->index->chunk((int) $id);
-            if ($chunk !== null) {
+            if ($chunk instanceof Chunk) {
                 $hits[] = new Hit((int) $id, $chunk, $score, count($hits) + 1);
             }
         }

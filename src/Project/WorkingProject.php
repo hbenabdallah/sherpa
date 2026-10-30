@@ -129,7 +129,7 @@ class WorkingProject
     {
         // A forgotten project stays forgotten: saving it again now would undo
         // what the user just asked for.
-        if ($this->saved || $this->forgotten || $this->project === null) {
+        if ($this->saved || $this->forgotten || !$this->project instanceof Project) {
             return false;
         }
 
@@ -154,7 +154,7 @@ class WorkingProject
      */
     public function forget(): bool
     {
-        if (!$this->saved || $this->project === null) {
+        if (!$this->saved || !$this->project instanceof Project) {
             return false;
         }
 

@@ -5,7 +5,7 @@
 // happens when the model changes or the provider fails. Whether vectors find
 // better passages is measured with a real model in tests/rag/eval_live.php.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Memory\MemoryStore;
 use App\Permission\ProjectPermissions;
@@ -100,7 +100,7 @@ $search = searcher($working, $other);
 $switched = $search->sync();
 check('a new model re-embeds everything: two models\' vectors are never compared', $switched->embedded === $search->counts()['chunks'], (string) $switched->embedded);
 
-$stale = new VectorRetriever((function () use ($working) {
+$stale = new VectorRetriever((function () use ($working): DocIndex {
     $i = new DocIndex();
     $i->open(DocSearch::databaseFor($working->project()));
 

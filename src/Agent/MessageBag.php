@@ -120,7 +120,7 @@ class MessageBag
     {
         return count(array_filter(
             $this->messages,
-            static fn(array $message) => ($message['role'] ?? '') !== 'system',
+            static fn(array $message): bool => ($message['role'] ?? '') !== 'system',
         ));
     }
 

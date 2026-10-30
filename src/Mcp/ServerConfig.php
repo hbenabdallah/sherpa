@@ -17,7 +17,7 @@ namespace App\Mcp;
  * `uvx` cannot be started at all — while the same server reached over HTTP
  * works without touching the image.
  */
-final class ServerConfig
+final readonly class ServerConfig
 {
     /**
      * @param array<int, string>    $args
@@ -26,13 +26,13 @@ final class ServerConfig
      *                                       where an Authorization goes
      */
     public function __construct(
-        public readonly string $name,
-        public readonly string $command = '',
-        public readonly array $args = [],
-        public readonly array $env = [],
-        public readonly bool $enabled = true,
-        public readonly string $url = '',
-        public readonly array $headers = [],
+        public string $name,
+        public string $command = '',
+        public array $args = [],
+        public array $env = [],
+        public bool $enabled = true,
+        public string $url = '',
+        public array $headers = [],
     ) {}
 
     /**
@@ -47,7 +47,7 @@ final class ServerConfig
             ? ['url' => $this->url, 'headers' => $this->headers]
             : ['command' => $this->command, 'args' => $this->args, 'env' => $this->env];
 
-        $entry = array_filter($entry, fn($value) => $value !== [] && $value !== '');
+        $entry = array_filter($entry, fn(string|array $value): bool => $value !== [] && $value !== '');
 
         return $this->enabled ? $entry : $entry + ['enabled' => false];
     }

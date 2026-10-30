@@ -18,9 +18,9 @@ final class Vectors
     /** @param list<float> $v @return list<float> */
     public static function normalize(array $v): array
     {
-        $norm = sqrt(array_sum(array_map(static fn(float $x) => $x * $x, $v)));
+        $norm = sqrt(array_sum(array_map(static fn(float $x): float => $x * $x, $v)));
 
-        return $norm > 0 ? array_map(static fn(float $x) => $x / $norm, $v) : $v;
+        return $norm > 0 ? array_map(static fn(float $x): float => $x / $norm, $v) : $v;
     }
 
     /** @param list<float> $a @param list<float> $b */

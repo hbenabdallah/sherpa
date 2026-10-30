@@ -3,7 +3,7 @@
 // web_fetch: a page read as text, bounded, confirmed first — against a fake
 // web, so nothing leaves the machine.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\Tool\Permission;
 use App\Agent\Tool\Toolbox;
@@ -27,7 +27,7 @@ function check(string $label, bool $ok, string $detail = ''): void
 $requests = 0;
 $web = new MockHttpClient(function (string $method, string $url) use (&$requests): MockResponse {
     $requests++;
-    $page = fn(string $body, string $type = 'text/html; charset=utf-8', int $code = 200) =>
+    $page = fn(string $body, string $type = 'text/html; charset=utf-8', int $code = 200): MockResponse =>
         new MockResponse($body, ['http_code' => $code, 'response_headers' => ['content-type' => $type]]);
 
     return match ($url) {
@@ -130,7 +130,7 @@ for ($i = 0; $i < 50 && @fsockopen('127.0.0.1', $port) === false; $i++) {
 
 $interrupt = new Interrupt();
 $ticks = 0;
-$interrupt->meanwhile(function () use (&$ticks) {
+$interrupt->meanwhile(function () use (&$ticks): void {
     $ticks++;
 });
 $slow = new WebFetchTool(interrupt: $interrupt);
@@ -140,7 +140,7 @@ check('and the pause was listened through', $ticks > 5, (string) $ticks);
 
 $interrupt->beginTurn();
 pcntl_async_signals(true);
-pcntl_signal(SIGALRM, fn() => $interrupt->request());
+pcntl_signal(SIGALRM, $interrupt->request(...));
 pcntl_alarm(1);
 $started = microtime(true);
 
@@ -156,7 +156,7 @@ $interrupt->endTurn();
 proc_terminate($server);
 
 // ---- asked for, every time ------------------------------------------------------
-$def = (new Toolbox([$fetch]))->find('web_fetch');
+$def = new Toolbox([$fetch])->find('web_fetch');
 check('web_fetch asks before it runs: the request leaves the machine', $def?->permission === Permission::CONFIRM);
 
 printf("\n%d passed, %d failed\n", $pass, $fail);

@@ -1,10 +1,12 @@
 <?php
 
+use App\Agent\Tool\ToolResult;
+
 // file_patch and file_write: placing an edit the way the model meant it, and
 // never breaking a file that parsed. Every case below is a failure the
 // benchmark actually recorded — file_patch was failing one call in two.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\Tool\Toolbox;
 use App\Agent\Tool\ToolCall;
@@ -160,7 +162,7 @@ file_put_contents("{$dir}/src/CartController.php", $controller);
 $paths = new ProjectPathResolver();
 $paths->setRoot($dir);
 $toolbox = new Toolbox([new FilePatchTool($paths), new FileWriteTool($paths)]);
-$patch = fn(string $search, string $replace, string $path = 'src/CartController.php') =>
+$patch = fn(string $search, string $replace, string $path = 'src/CartController.php'): ToolResult =>
     $toolbox->execute(new ToolCall('c', 'file_patch', ['path' => $path, 'search' => $search, 'replace' => $replace]));
 
 $result = $patch('use Boutique\\\\User\\\\UserRepo;', 'use Boutique\\\\User\\\\UserRepository;');
@@ -181,7 +183,7 @@ file_put_contents("{$dir}/src/Broken.php", "<?php\nfunction a( {\nfunction b( {\
 $result = $patch('function a( {', 'function a() {', 'src/Broken.php');
 check('a file that did not parse can still be patched', !$result->isError, $result->content);
 
-$write = fn(string $path, string $content) => $toolbox->execute(new ToolCall('w', 'file_write', ['path' => $path, 'content' => $content]));
+$write = fn(string $path, string $content): ToolResult => $toolbox->execute(new ToolCall('w', 'file_write', ['path' => $path, 'content' => $content]));
 $result = $write('src/New.php', "<?php\nclass New_ {\n");
 check('file_write refuses a new file that does not parse', $result->isError && !is_file("{$dir}/src/New.php"), $result->content);
 $result = $write('src/New.php', "<?php\nclass New_ {}\n");

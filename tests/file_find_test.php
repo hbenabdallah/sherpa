@@ -2,7 +2,7 @@
 
 // file_find: files by name pattern, confined to the project, newest first.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Project\PathOutsideProjectException;
 use App\Project\ProjectPathResolver;
@@ -21,7 +21,7 @@ function check(string $label, bool $ok, string $detail = ''): void
 }
 
 // ---- globs ------------------------------------------------------------------
-$matches = fn(string $glob, string $path) => preg_match(FileFindTool::toRegex($glob), $path) === 1;
+$matches = fn(string $glob, string $path): bool => preg_match(FileFindTool::toRegex($glob), $path) === 1;
 check('* stays within a directory', $matches('src/*.php', 'src/A.php') && !$matches('src/*.php', 'src/Billing/A.php'));
 check('** goes through them, none included', $matches('src/**/*.php', 'src/A.php') && $matches('src/**/*.php', 'src/Billing/Tax/A.php'));
 check('? is one character', $matches('a?.txt', 'ab.txt') && !$matches('a?.txt', 'abc.txt'));

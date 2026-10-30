@@ -96,7 +96,7 @@ class Kernel extends BaseKernel
                     // A stale container is still better than refusing to start,
                     // so a cache we cannot remove is not a fatal condition.
                     try {
-                        (new Filesystem())->remove($this->getCacheDir());
+                        new Filesystem()->remove($this->getCacheDir());
                     } catch (Throwable) {
                     }
 

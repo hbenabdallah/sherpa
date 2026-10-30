@@ -21,7 +21,7 @@ use stdClass;
  */
 final class Connection
 {
-    private const READ_BYTES = 65536;
+    private const int READ_BYTES = 65536;
 
     /** Read, and not yet a whole line. */
     private string $partial = '';
@@ -259,7 +259,7 @@ final class Connection
             return;
         }
 
-        if ($this->intercept !== null && ($this->intercept)($message)) {
+        if ($this->intercept instanceof Closure && ($this->intercept)($message)) {
             return;
         }
 

@@ -36,19 +36,19 @@ if ($url === '' || $model === '') {
     exit(2);
 }
 
-$corpus = $argv[1] ?? dirname(__DIR__) . '/fixtures/rag/boutique';
-$questionFile = $argv[2] ?? (isset($argv[1]) ? $corpus . '/.sherpa/rag-questions.json' : dirname(__DIR__) . '/fixtures/rag/questions.json');
+$corpus = $argv[1] ?? __DIR__ . '/../fixtures/rag/boutique';
+$questionFile = $argv[2] ?? (isset($argv[1]) ? $corpus . '/.sherpa/rag-questions.json' : __DIR__ . '/../fixtures/rag/questions.json');
 $questions = json_decode((string) file_get_contents($questionFile), true);
 
 $index = new DocIndex();
 $index->open(':memory:');
-$report = (new Ingestor(new DocSource(), new Chunker()))->sync($corpus, $index);
+$report = new Ingestor(new DocSource(), new Chunker())->sync($corpus, $index);
 $counts = $index->counts();
 
 $embeddings = new FixedEmbeddings(new OpenAiCompatiblePlatform(HttpClient::create(), $url, 'inutile-ici', $key), $model);
 
 $started = microtime(true);
-$embedded = (new ChunkEmbedder())->embed($index, $embeddings);
+$embedded = new ChunkEmbedder()->embed($index, $embeddings);
 $indexing = microtime(true) - $started;
 
 printf(

@@ -10,7 +10,7 @@ namespace App\Platform;
  * never calls anything, and Sherpa looks broken rather than misconfigured — and
  * a window wider than the model has.
  */
-final class ModelInfo
+final readonly class ModelInfo
 {
     /**
      * @param int|null            $contextLength the model's native ceiling, null when the
@@ -19,11 +19,11 @@ final class ModelInfo
      *                                           tools, vision, insert…
      */
     public function __construct(
-        public readonly string $name,
-        public readonly ?int $contextLength = null,
-        public readonly array $capabilities = [],
-        public readonly ?int $sizeBytes = null,
-        public readonly ?string $parameterSize = null,
+        public string $name,
+        public ?int $contextLength = null,
+        public array $capabilities = [],
+        public ?int $sizeBytes = null,
+        public ?string $parameterSize = null,
     ) {}
 
     /**

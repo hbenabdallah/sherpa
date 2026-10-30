@@ -1,10 +1,12 @@
 <?php
 
+use App\Agent\Tool\ToolResult;
+
 // list_dir: the one tool that shows how a project is laid out. Before it, the
 // model's only ways in were guessing grep patterns and guessing file names —
 // and a live run showed it calling file_read on the project root.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\Tool\Toolbox;
 use App\Agent\Tool\ToolCall;
@@ -39,7 +41,7 @@ $paths = new ProjectPathResolver();
 $paths->setRoot($root);
 $tool = new ListDirTool($paths);
 $toolbox = new Toolbox([$tool]);
-$list = fn(array $args = []) => $toolbox->execute(new ToolCall('c', 'list_dir', $args));
+$list = fn(array $args = []): ToolResult => $toolbox->execute(new ToolCall('c', 'list_dir', $args));
 
 $top = $list();
 check('the root lists without arguments', !$top->isError, $top->content);

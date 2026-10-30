@@ -28,7 +28,7 @@ class Sandbox
      * Under the home, where installs and test runs write what they download
      * and build: refusing them would fail `composer install` and `npm test`.
      */
-    private const CACHES = [
+    private const array CACHES = [
         '.cache', '.composer', '.config/composer', '.local/share/composer', '.npm', '.yarn',
         '.pnpm-store', '.local/share/pnpm', '.cargo/registry', '.cargo/git', 'go/pkg', '.gradle',
         '.m2', '.bundle', '.gem', '.nuget', 'Library/Caches',
@@ -118,10 +118,14 @@ class Sandbox
     {
         $args = ['bwrap', '--ro-bind', '/', '/', '--dev', '/dev', '--proc', '/proc'];
         foreach ([...$this->writable(), $root] as $path) {
-            array_push($args, '--bind', $path, $path);
+            $args[] = '--bind';
+            $args[] = $path;
+            $args[] = $path;
         }
         foreach ($this->secrets() as $secret) {
-            array_push($args, '--ro-bind', '/dev/null', $secret);
+            $args[] = '--ro-bind';
+            $args[] = '/dev/null';
+            $args[] = $secret;
         }
         if ($this->strict()) {
             $args[] = '--unshare-net';
@@ -215,12 +219,6 @@ class Sandbox
 
     private static function onPath(string $program): bool
     {
-        foreach (explode(PATH_SEPARATOR, (string) getenv('PATH')) as $dir) {
-            if ($dir !== '' && is_executable($dir . '/' . $program)) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any(explode(PATH_SEPARATOR, (string) getenv('PATH')), fn($dir): bool => $dir !== '' && is_executable($dir . '/' . $program));
     }
 }

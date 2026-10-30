@@ -1,9 +1,11 @@
 <?php
 
+use App\Agent\PlanMode;
+
 // Project memory: what gets kept, what gets found again, and what must never be
 // lost quietly.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\MessageBag;
 use App\Memory\Fact;
@@ -30,7 +32,7 @@ function check(string $label, bool $ok, string $detail = ''): void
 /** @return array<int, string> */
 function values(array $facts): array
 {
-    return array_map(fn(Fact $f) => $f->value, $facts);
+    return array_map(fn(Fact $f): string => $f->value, $facts);
 }
 
 $dir = sys_get_temp_dir() . '/sherpa-mem-' . bin2hex(random_bytes(4));
@@ -252,25 +254,25 @@ check('an interrupted extraction stores nothing', $result->skipped !== null && $
 // prompt already contains the memory summary, and feeding it back invites the
 // model to re-extract what it has just been told.
 $seen = '';
-$recorder = new MockHttpClient(function ($method, $url, $options) use (&$seen) {
+$recorder = new MockHttpClient(function ($method, $url, array $options) use (&$seen): MockResponse {
     $seen = $options['body'] ?? '';
 
     return new MockResponse(json_encode(['message' => ['content' => '[]'], 'done' => true]));
 });
 $bag = conversation();
 $bag->tool('file_read', 'CONTENU_DE_FICHIER_VOLUMINEUX');
-(new FactExtractor(new OllamaPlatform($recorder, 'http://x', 'm', 32768, -1.0, new Interrupt()), $fresh, new Interrupt()))->extract($bag);
+new FactExtractor(new OllamaPlatform($recorder, 'http://x', 'm', 32768, -1.0, new Interrupt()), $fresh, new Interrupt())->extract($bag);
 check('the system prompt is not fed back into the extractor', !str_contains($seen, 'the project memory digest lives here'), substr($seen, 0, 200));
 check('nor are tool results', !str_contains($seen, 'CONTENU_DE_FICHIER_VOLUMINEUX'), substr($seen, 0, 200));
 check('but the conversation itself is, labelled in the prompt\'s language', str_contains($seen, 'question 0') && str_contains($seen, '[USER]') && !str_contains($seen, 'UTILISATEUR'), substr($seen, 0, 300));
 
 // A request made in plan mode is handed over as it was typed.
-$planned = new App\Agent\PlanMode();
+$planned = new PlanMode();
 $planned->on();
 $bag = conversation();
 $bag->user($planned->frame('Planifie la migration'));
 $bag->assistant('Plan prêt.');
-(new FactExtractor(new OllamaPlatform($recorder, 'http://x', 'm', 32768, -1.0, new Interrupt()), $fresh, new Interrupt()))->extract($bag);
+new FactExtractor(new OllamaPlatform($recorder, 'http://x', 'm', 32768, -1.0, new Interrupt()), $fresh, new Interrupt())->extract($bag);
 check('without plan mode\'s reminder', str_contains($seen, 'Planifie la migration') && !str_contains($seen, 'Plan mode'), substr($seen, -400));
 
 // ---- ranking: the digest has more than recency to go on now ----------------
@@ -367,7 +369,7 @@ check(
     (string) $after?->recalledCount,
 );
 
-check('marking nothing is harmless', (function () use ($ranked) {
+check('marking nothing is harmless', (function () use ($ranked): true {
     $ranked->markRecalled([]);
 
     return true;

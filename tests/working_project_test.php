@@ -1,10 +1,14 @@
 <?php
 
+use App\Project\Project;
+use App\Project\ProjectQuestions;
+use App\TUI\LineEditor;
+
 // The project is the directory Sherpa is launched from. A known one opens at
 // once; a new one is asked about and held — nothing written — until the first
 // message. These are the rules that replaced the project menu.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Memory\MemoryStore;
 use App\Permission\ProjectPermissions;
@@ -63,14 +67,14 @@ check(
     implode(', ', glob($config . '/*') ?: []),
 );
 check('yet the file tools are already confined to it', $paths->root() === ProjectStore::canonical($dir), $paths->root());
-check('and shell_exec already knows its container', (new ReflectionProperty($shell, 'dockerContainer'))->getValue($shell) === 'atelier-app-1');
+check('and shell_exec already knows its container', new ReflectionProperty($shell, 'dockerContainer')->getValue($shell) === 'atelier-app-1');
 
 // Memory works while held — the prompt builder reads it — but in RAM.
 $memory->remember('trial', 'in RAM');
 check('a held project\'s memory lives in RAM, not in a file', !is_dir($config . '/projects'));
 
 // ---- the first message -------------------------------------------------------
-check('save() makes it real', $working->save() === true && $working->isSaved());
+check('save() makes it real', $working->save() && $working->isSaved());
 check('and says so only once', $working->save() === false);
 
 $reloaded = new ProjectStore(new StackDetector());
@@ -146,7 +150,7 @@ check('a Makefile that only starts the containers is no such wrapper', ($draft['
 file_put_contents($home . '/outil/Makefile', "test:\n\tdocker compose run --rm --no-deps app php tests/run.php\n");
 check('which can still be overridden', ($draft['docker'] ?? null) === true && ($draft['container'] ?? null) === 'outil-app-1', json_encode($draft));
 
-check('and answering never wrote a project', (new ProjectStore(new StackDetector()))->forDirectory($home . '/boutique') === null);
+check('and answering never wrote a project', !new ProjectStore(new StackDetector())->forDirectory($home . '/boutique') instanceof Project);
 
 // ---- forgetting a project -----------------------------------------------------
 // Before the menu went away, deleting was the "d" key. Now it is /project
@@ -164,8 +168,8 @@ check(
     is_file($working->project()->memoryDb) && glob($own . '/sessions/*.json') !== [],
 );
 
-check('forget() forgets it', $working->forget() === true && $working->isForgotten());
-check('its entry is gone', (new ProjectStore(new StackDetector()))->forDirectory($dir) === null);
+check('forget() forgets it', $working->forget() && $working->isForgotten());
+check('its entry is gone', !new ProjectStore(new StackDetector())->forDirectory($dir) instanceof Project);
 check('its memory and its conversations with it', !is_dir($own), $own);
 check('the directory itself is untouched', is_dir($dir) && is_dir($dir . '/src'));
 
@@ -209,7 +213,7 @@ putenv("PATH={$root}/bin:{$path}");
 mkdir("{$root}/shop");
 mkdir("{$root}/plain");
 file_put_contents("{$root}/plain/compose.yaml", "services: {}\n");
-$questions = new App\Project\ProjectQuestions(new App\TUI\LineEditor(), new ProjectStore(new StackDetector()));
+$questions = new ProjectQuestions(new LineEditor(), new ProjectStore(new StackDetector()));
 
 [$docker, $note] = $questions->guessDocker("{$root}/shop");
 check('its containers running, the app\'s is where commands run', $docker->enabled && $docker->container === 'shop-app-1' && $docker->dbContainer === 'shop-db-1', json_encode($docker));

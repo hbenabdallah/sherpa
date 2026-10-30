@@ -4,15 +4,16 @@ namespace Boutique\Controller;
 
 use Boutique\Billing\Invoice;
 use Boutique\Billing\InvoiceLine;
+use Boutique\Catalog\Product;
 use Boutique\Catalog\ProductRepository;
 use Boutique\Routing\Route;
 use Boutique\User\UserRepo;
 
-final class InvoiceController
+final readonly class InvoiceController
 {
     public function __construct(
-        private readonly UserRepo $users = new UserRepo(),
-        private readonly ProductRepository $products = new ProductRepository(),
+        private UserRepo $users = new UserRepo(),
+        private ProductRepository $products = new ProductRepository(),
     ) {}
 
     #[Route('/invoices/preview', method: 'POST')]
@@ -23,7 +24,7 @@ final class InvoiceController
 
         foreach ($items as $productId => $quantity) {
             $product = $this->products->find($productId);
-            if ($product !== null) {
+            if ($product instanceof Product) {
                 $invoice->add(new InvoiceLine($product, $quantity));
             }
         }

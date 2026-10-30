@@ -20,7 +20,7 @@ use Throwable;
  */
 final class DocIndex
 {
-    private const SCHEMA = 2;
+    private const int SCHEMA = 2;
 
     private ?Connection $conn = null;
 
@@ -48,7 +48,7 @@ final class DocIndex
 
     public function isOpen(): bool
     {
-        return $this->conn !== null;
+        return $this->conn instanceof Connection;
     }
 
     /** @return array{hash: string, size: int, mtime: int}|null */
@@ -109,7 +109,7 @@ final class DocIndex
     /** @return list<string> */
     public function paths(): array
     {
-        return array_map('strval', $this->db()->fetchFirstColumn('SELECT path FROM documents ORDER BY path'));
+        return array_map(strval(...), $this->db()->fetchFirstColumn('SELECT path FROM documents ORDER BY path'));
     }
 
     /** @return array{documents: int, chunks: int} */
@@ -147,7 +147,7 @@ final class DocIndex
     public function unembedded(int $limit): array
     {
         return array_map(
-            static fn(array $row) => ['id' => (int) $row['id'], 'text' => $row['context'] . "\n\n" . $row['text']],
+            static fn(array $row): array => ['id' => (int) $row['id'], 'text' => $row['context'] . "\n\n" . $row['text']],
             $this->db()->fetchAllAssociative(
                 'SELECT c.id, c.context, c.text FROM chunks c LEFT JOIN vectors v ON v.chunk_id = c.id
                  WHERE v.chunk_id IS NULL ORDER BY c.id LIMIT :limit',
@@ -218,7 +218,7 @@ final class DocIndex
 
         if ($this->fullText) {
             $expression = implode(' OR ', array_map(
-                static fn(string $t) => '"' . str_replace('"', '', $t) . '"' . ($prefix ? '*' : ''),
+                static fn(string $t): string => '"' . str_replace('"', '', $t) . '"' . ($prefix ? '*' : ''),
                 $terms,
             ));
 
@@ -260,7 +260,7 @@ final class DocIndex
      */
     private function like(array $terms, int $limit): array
     {
-        $score = implode(' + ', array_map(static fn(int $i) => "(CASE WHEN lower(context || ' ' || text) LIKE :t{$i} THEN 1 ELSE 0 END)", array_keys($terms)));
+        $score = implode(' + ', array_map(static fn(int $i): string => "(CASE WHEN lower(context || ' ' || text) LIKE :t{$i} THEN 1 ELSE 0 END)", array_keys($terms)));
         $params = ['limit' => $limit];
         foreach ($terms as $i => $term) {
             $params['t' . $i] = '%' . $term . '%';
@@ -281,7 +281,7 @@ final class DocIndex
         return new Chunk(
             path: (string) $row['path'],
             title: (string) $row['title'],
-            headings: is_array($headings) ? array_values(array_map('strval', $headings)) : [],
+            headings: is_array($headings) ? array_values(array_map(strval(...), $headings)) : [],
             text: (string) $row['text'],
             parent: (string) $row['parent'],
             startLine: (int) $row['start_line'],

@@ -21,7 +21,7 @@ final class InterruptibleHttpClient implements HttpClientInterface
         DecoratorTrait::__construct as private decorate;
     }
 
-    private const POLL_SECONDS = 0.1;
+    private const float POLL_SECONDS = 0.1;
 
     public function __construct(HttpClientInterface $client, private readonly Interrupt $interrupt)
     {

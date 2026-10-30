@@ -4,16 +4,16 @@ namespace App\Agent\Tool;
 
 use stdClass;
 
-final class ToolDefinition
+final readonly class ToolDefinition
 {
     public function __construct(
-        public readonly string $name,
-        public readonly string $description,
-        public readonly array $parameters,
-        public readonly Permission $permission,
-        public readonly object $handler,
+        public string $name,
+        public string $description,
+        public array $parameters,
+        public Permission $permission,
+        public object $handler,
         /** Brings text from outside the project and the user; see Provenance. */
-        public readonly bool $untrusted = false,
+        public bool $untrusted = false,
     ) {}
 
     public function toFunctionSchema(): array

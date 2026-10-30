@@ -22,23 +22,23 @@ class ListDirTool
      * code or generated output, and listing it would drown the project in it —
      * but saying they exist is still information: a vendor/ means Composer.
      */
-    private const NOT_EXPANDED = ['vendor', 'node_modules', '.git', 'var', '.idea', '.vscode', '.claude', '__pycache__', '.venv', 'target'];
+    private const array NOT_EXPANDED = ['vendor', 'node_modules', '.git', 'var', '.idea', '.vscode', '.claude', '__pycache__', '.venv', 'target'];
 
-    private const DEFAULT_DEPTH = 2;
+    private const int DEFAULT_DEPTH = 2;
 
-    private const MAX_DEPTH = 4;
+    private const int MAX_DEPTH = 4;
 
     /** Entries shown per directory before the rest are counted rather than named. */
-    private const PER_DIRECTORY = 40;
+    private const int PER_DIRECTORY = 40;
 
     /** Floors and ceiling on lines, scaled with the window like project_grep's. */
-    private const MIN_LINES = 150;
+    private const int MIN_LINES = 150;
 
-    private const MAX_LINES = 1200;
+    private const int MAX_LINES = 1200;
 
-    private const LINE_SHARE = 0.04;
+    private const float LINE_SHARE = 0.04;
 
-    private const CHARS_PER_LINE = 40;
+    private const int CHARS_PER_LINE = 40;
 
     private int $lines = 0;
 
@@ -205,7 +205,7 @@ class ListDirTool
 
     private function lineCap(): int
     {
-        if ($this->budget === null) {
+        if (!$this->budget instanceof ContextBudget) {
             return self::MIN_LINES;
         }
 

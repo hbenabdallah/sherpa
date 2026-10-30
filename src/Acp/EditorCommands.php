@@ -18,15 +18,15 @@ use App\TUI\Terminal;
  * message the model gets. A command that needs the keyboard cannot run — the
  * editor holds stdin — and says where its job is done instead.
  */
-final class EditorCommands
+final readonly class EditorCommands
 {
     /** The terminal's commands that run unchanged: none of them reads a key. */
-    private const RUN = ['compact', 'context', 'memory', 'remember', 'forget', 'todo', 'jobs', 'docs', 'permissions', 'skills', 'tools'];
+    private const array RUN = ['compact', 'context', 'memory', 'remember', 'forget', 'todo', 'jobs', 'docs', 'permissions', 'skills', 'tools'];
 
     /** Run with no argument only: theirs open questions in the terminal. */
-    private const BARE = ['mcp', 'project'];
+    private const array BARE = ['mcp', 'project'];
 
-    private const ELSEWHERE = [
+    private const array ELSEWHERE = [
         'model'    => 'The model is chosen in the menu beside the prompt box.',
         'backend'  => 'Moving between an online and a local model is done in a terminal: run sherpa there, then /backend. The editor follows once it starts Sherpa again.',
         'provider' => 'Providers are added and switched in a terminal: run sherpa there, then /provider. The editor follows once it starts Sherpa again.',
@@ -39,9 +39,9 @@ final class EditorCommands
     ];
 
     public function __construct(
-        private readonly SlashCommands $commands,
-        private readonly SkillRegistry $skills,
-        private readonly McpRegistry $mcp,
+        private SlashCommands $commands,
+        private SkillRegistry $skills,
+        private McpRegistry $mcp,
     ) {}
 
     /**
@@ -165,13 +165,7 @@ final class EditorCommands
             return true;
         }
 
-        foreach (SlashCommands::catalogue() as $entry) {
-            if ($entry['name'] === '/' . $name) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any(SlashCommands::catalogue(), fn(array $entry): bool => $entry['name'] === '/' . $name);
     }
 
     /** @return array<string, mixed> */

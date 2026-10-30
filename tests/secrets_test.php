@@ -5,7 +5,7 @@
 // command, and a credential in any tool's output goes as a marker, not as
 // itself — which no file write can then put back in place of the real one.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\Tool\Permission;
 use App\Agent\Tool\SecretMask;

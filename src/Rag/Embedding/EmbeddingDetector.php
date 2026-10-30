@@ -18,24 +18,24 @@ use Throwable;
  * read first, and where there is none (Cloudflare answers 405) the known names
  * are tried on one word each.
  */
-final class EmbeddingDetector
+final readonly class EmbeddingDetector
 {
     /** Known embedding models, preferred first: multilingual ones lead, since documentation often is. */
-    public const KNOWN = [
+    public const array KNOWN = [
         'text-embedding-3-small', 'text-embedding-3-large', 'mistral-embed', '@cf/baai/bge-m3',
         'text-embedding-004', 'bge-m3', 'nomic-embed-text', 'mxbai-embed-large',
         'snowflake-arctic-embed', 'text-embedding-ada-002',
     ];
 
     /** Tried one by one where the provider publishes no catalogue: OpenAI, Mistral, Cloudflare, Gemini. */
-    public const PROBES = ['text-embedding-3-small', 'mistral-embed', '@cf/baai/bge-m3', 'text-embedding-004'];
+    public const array PROBES = ['text-embedding-3-small', 'mistral-embed', '@cf/baai/bge-m3', 'text-embedding-004'];
 
-    public function __construct(private readonly PlatformInterface&EmbeddingBackend $platform) {}
+    public function __construct(private PlatformInterface&EmbeddingBackend $platform) {}
 
     public function detect(Backend $backend): EmbeddingDetection
     {
         try {
-            $offered = array_map(static fn(ModelInfo $m) => $m->name, $this->platform->catalogue());
+            $offered = array_map(static fn(ModelInfo $m): string => $m->name, $this->platform->catalogue());
         } catch (Throwable) {
             $offered = [];
         }

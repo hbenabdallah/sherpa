@@ -28,7 +28,7 @@ final class Lanes
     {
         $fiber = Fiber::getCurrent();
 
-        return $fiber === null ? null : self::$numbers[$fiber] ?? null;
+        return $fiber instanceof Fiber ? self::$numbers[$fiber] ?? null : null;
     }
 
     /** "[2] ", or nothing outside sub-agents running together. */

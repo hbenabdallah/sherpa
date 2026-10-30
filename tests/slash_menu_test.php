@@ -3,7 +3,7 @@
 // The prompt's two helpers: the menu under "/", and the scrollback Page Up
 // opens. Both are text in, text out, so neither needs a terminal here.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Command\SlashCommands;
 use App\TUI\Input\LineBuffer;
@@ -27,8 +27,8 @@ $entries = [
     ...SlashCommands::catalogue(),
     ['name' => '/review', 'hint' => '[request]', 'description' => 'skill · Review a change'],
 ];
-$menu = new SlashMenu(fn() => $entries);
-$names = fn() => array_map(fn($e) => $e['name'], array_filter([$menu->current()]));
+$menu = new SlashMenu(fn(): array => $entries);
+$names = fn(): array => array_map(fn(array $e): string => $e['name'], array_filter([$menu->current()]));
 
 // ---- when it opens -------------------------------------------------------------
 $menu->update('', true);
@@ -83,14 +83,14 @@ check('but waits for the required ones', !SlashMenu::runsAlone($byName['/remembe
 $menu->update('/re', true);
 $rows = $menu->rows(60);
 check('the selected row is highlighted', str_contains($rows[0], "\e[7m"), json_encode($rows));
-check('rows are cut to the width', max(array_map(fn($r) => mb_strwidth(Terminal::plain($r)), $rows)) <= 59);
+check('rows are cut to the width', max(array_map(fn(string $r): int => mb_strwidth(Terminal::plain($r)), $rows)) <= 59);
 check('and the keys are named under them', str_contains(Terminal::plain(end($rows)), 'Tab complete'));
 
 // ---- the list matches the commands -------------------------------------------------
-$help = (string) file_get_contents(dirname(__DIR__) . '/src/Command/SlashCommands.php');
+$help = (string) file_get_contents(__DIR__ . '/../src/Command/SlashCommands.php');
 $unhandled = array_filter(
     array_column(SlashCommands::catalogue(), 'name'),
-    fn($name) => $name !== '/exit' && !str_contains($help, "case '{$name}':"),
+    fn(string $name): bool => $name !== '/exit' && !str_contains($help, "case '{$name}':"),
 );
 check('every command in the menu is one that is handled', $unhandled === [], json_encode(array_values($unhandled)));
 preg_match_all("/case '(\/[a-z]+)':/", $help, $handled);
@@ -131,7 +131,7 @@ check('the line being written is included', end($lines) !== 'half a line' && (($
 $wrapped = Scrollback::wrap("\e[31m" . str_repeat('é', 25) . "\e[0m", 10);
 check('a long line is cut to the width', count($wrapped) === 3, json_encode($wrapped));
 check('its colour carries on to the next row', str_starts_with($wrapped[1], "\e[31m"), json_encode($wrapped));
-check('each row fits', max(array_map(fn($r) => mb_strwidth(Terminal::plain($r)), $wrapped)) === 10);
+check('each row fits', max(array_map(fn(string $r): int => mb_strwidth(Terminal::plain($r)), $wrapped)) === 10);
 check('an empty line is one empty row', Scrollback::wrap('', 10) === ['']);
 
 printf("\n%d passed, %d failed\n", $pass, $fail);

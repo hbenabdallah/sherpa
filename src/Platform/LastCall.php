@@ -23,13 +23,13 @@ trait LastCall
     {
         $fiber = Fiber::getCurrent();
 
-        return $fiber === null ? $this->mainCall[$key] ?? null : $this->fiberCalls[$fiber][$key] ?? null;
+        return $fiber instanceof Fiber ? $this->fiberCalls[$fiber][$key] ?? null : $this->mainCall[$key] ?? null;
     }
 
     private function keepLast(string $key, mixed $value): void
     {
         $fiber = Fiber::getCurrent();
-        if ($fiber === null) {
+        if (!$fiber instanceof Fiber) {
             $this->mainCall[$key] = $value;
 
             return;

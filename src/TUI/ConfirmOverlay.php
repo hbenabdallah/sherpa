@@ -15,7 +15,7 @@ use Throwable;
 class ConfirmOverlay implements Approver
 {
     /** Rows of preview the box holds; past them, it says how many it hid. */
-    private const PREVIEW_ROWS = 24;
+    private const int PREVIEW_ROWS = 24;
 
     public function __construct(
         private readonly Terminal $terminal,
@@ -128,14 +128,14 @@ class ConfirmOverlay implements Approver
         return $choice;
     }
 
-    private const QUESTION = '  '
+    private const string QUESTION = '  '
         . Terminal::GREEN . '[a]' . Terminal::RESET . ' Allow once  '
         . Terminal::CYAN . '[s]' . Terminal::RESET . ' This session  '
         . Terminal::BLUE . '[p]' . Terminal::RESET . ' Always (project)  '
         . Terminal::RED . '[r]' . Terminal::RESET . ' Refuse  '
         . Terminal::BOLD . '› ' . Terminal::RESET;
 
-    private const QUESTION_ONCE = '  '
+    private const string QUESTION_ONCE = '  '
         . Terminal::GREEN . '[a]' . Terminal::RESET . ' Allow once  '
         . Terminal::RED . '[r]' . Terminal::RESET . ' Refuse  '
         . Terminal::BOLD . '› ' . Terminal::RESET;

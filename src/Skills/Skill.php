@@ -2,13 +2,13 @@
 
 namespace App\Skills;
 
-final class Skill
+final readonly class Skill
 {
     public function __construct(
-        public readonly string $name,
-        public readonly string $description,
-        public readonly string $content,
-        public readonly string $path,
+        public string $name,
+        public string $description,
+        public string $content,
+        public string $path,
     ) {}
 
     /**

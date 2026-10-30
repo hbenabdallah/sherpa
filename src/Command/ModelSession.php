@@ -16,6 +16,7 @@ use App\Config\ModelProfile;
 use App\Config\ModelResolver;
 use App\Config\ProviderName;
 use App\Memory\ContextStore;
+use App\Platform\ModelInfo;
 use App\Platform\SwitchablePlatform;
 use App\Project\Project;
 use App\Rag\Embedding\EmbeddingDetector;
@@ -24,6 +25,7 @@ use App\TUI\ChatPane;
 use App\TUI\LineEditor;
 use App\TUI\ModelSelector;
 use App\TUI\Terminal;
+use App\Usage\UsageMeter;
 
 /**
  * The model this session runs on, and every way it changes: settled at boot
@@ -43,7 +45,7 @@ final class ModelSession
         private readonly ModelSelector $modelSelector,
         private readonly ContextBudget $budget,
         private readonly InferenceSpeed $speed,
-        private readonly \App\Usage\UsageMeter $usage,
+        private readonly UsageMeter $usage,
         private readonly ChatPane $chat,
         private readonly LineEditor $lineEditor,
         private readonly SystemPromptBuilder $promptBuilder,
@@ -67,12 +69,12 @@ final class ModelSession
     {
         $explicit = $this->models->fromCommandLine($model, $context, $backend);
 
-        if ($explicit !== null) {
+        if ($explicit instanceof ModelProfile) {
             return $this->verified($explicit);
         }
 
         $stored = $this->models->stored($backend);
-        if ($stored !== null) {
+        if ($stored instanceof ModelProfile) {
             return $this->verified($stored);
         }
 
@@ -91,7 +93,7 @@ final class ModelSession
         }
 
         $chosen = $this->modelSelector->run(firstRun: true, backend: $backend);
-        if ($chosen === null) {
+        if (!$chosen instanceof ModelProfile) {
             return null;
         }
 
@@ -132,7 +134,7 @@ final class ModelSession
         }
 
         $profile = $this->resolve(null, null, $backend, rememberAsDefault: true);
-        if ($profile === null || $profile->model === '') {
+        if (!$profile instanceof ModelProfile || $profile->model === '') {
             return false;
         }
 
@@ -152,7 +154,7 @@ final class ModelSession
     {
         $info = $this->platform->describeModel($profile->model);
 
-        if ($info === null) {
+        if (!$info instanceof ModelInfo) {
             echo Terminal::YELLOW . "⚠ " . $this->platform->name() . " does not know \"{$profile->model}\".\n" . Terminal::RESET;
             echo Terminal::GRAY . '  ' . $this->missingModelHint($profile->model, $profile->backend) . "\n"
                 . "  Or change it with /model once the session is open.\n" . Terminal::RESET;
@@ -247,7 +249,7 @@ final class ModelSession
             return;
         }
 
-        $found = (new EmbeddingDetector($this->platform))->detect($backend);
+        $found = new EmbeddingDetector($this->platform)->detect($backend);
 
         if (!$found->settled) {
             echo Terminal::GRAY . '  Documentation search: by keywords for now — could not check for an embedding model ('
@@ -419,7 +421,7 @@ final class ModelSession
         if ($args === '') {
             $chosen = $this->modelSelector->run($this->profile, backend: $this->platform->backend());
 
-            if ($chosen === null) {
+            if (!$chosen instanceof ModelProfile) {
                 $this->chat->showInfo('Model unchanged: ' . ($this->profile?->model ?? $this->platform->modelName()));
 
                 return;
@@ -432,7 +434,7 @@ final class ModelSession
 
         $info = $this->platform->describeModel($args);
 
-        if ($info === null) {
+        if (!$info instanceof ModelInfo) {
             echo Terminal::RED . $this->platform->name() . " does not know this model: {$args}\n" . Terminal::RESET;
             echo Terminal::GRAY . '  ' . $this->missingModelHint($args, $this->platform->backend()) . "\n"
                 . "  Or /model with no argument to pick from the list.\n" . Terminal::RESET;
@@ -450,7 +452,7 @@ final class ModelSession
         // Keep the window already tuned for this machine where the model is
         // unchanged; otherwise start from what this one can actually take.
         $backend = $this->platform->backend();
-        $profile = $this->profile !== null && $this->profile->backend === $backend && $this->profile->model === $info->name
+        $profile = $this->profile instanceof ModelProfile && $this->profile->backend === $backend && $this->profile->model === $info->name
             ? $this->profile
             : ModelProfile::suggestFor($info, 'chosen here', $backend);
 
@@ -529,7 +531,7 @@ final class ModelSession
         }
 
         $target = Backend::parse($args);
-        if ($target === null) {
+        if (!$target instanceof Backend) {
             echo Terminal::RED . "No such backend: {$args}. Either api or ollama.\n" . Terminal::RESET;
 
             return;
@@ -550,12 +552,12 @@ final class ModelSession
             $this->explainUnavailable($target);
         } else {
             $stored = $this->models->stored($target);
-            $profile = $stored !== null
+            $profile = $stored instanceof ModelProfile
                 ? $this->verified($stored)
                 : $this->modelSelector->run(backend: $target);
         }
 
-        if ($profile === null || $profile->model === '' || !$this->switchTo($profile, $bag, $project)) {
+        if (!$profile instanceof ModelProfile || $profile->model === '' || !$this->switchTo($profile, $bag, $project)) {
             $this->platform->switchTo($current);
             echo Terminal::GRAY . '  Still on ' . $this->whereItRuns($current) . ".\n" . Terminal::RESET;
 
@@ -599,7 +601,7 @@ final class ModelSession
 
         $active = $this->models->activeProvider();
         $onApi = !$this->platform->backend()->isLocal();
-        $width = max(array_map('strlen', array_keys($providers)));
+        $width = max(array_map(strlen(...), array_keys($providers)));
 
         echo Terminal::BOLD . "\nAPI providers:\n" . Terminal::RESET;
         foreach ($providers as $name => $provider) {
@@ -840,12 +842,12 @@ final class ModelSession
             echo Terminal::GRAY . "  /provider key {$name} to give it a key.\n" . Terminal::RESET;
         } else {
             $stored = $this->models->stored(Backend::Api);
-            $profile = $stored !== null
+            $profile = $stored instanceof ModelProfile
                 ? $this->verified($stored)
                 : $this->modelSelector->run(backend: Backend::Api);
         }
 
-        if ($profile === null || $profile->model === '' || !$this->switchTo($profile, $bag, $project)) {
+        if (!$profile instanceof ModelProfile || $profile->model === '' || !$this->switchTo($profile, $bag, $project)) {
             $this->models->useProvider($forRun);
             $this->platform->useApiEndpoint($url);
             $this->platform->useApiKey($key);

@@ -2,12 +2,12 @@
 
 namespace App\TUI;
 
+use App\Platform\RateLimits;
 use App\Project\Project;
+use App\Version;
 
 class StatusBar
 {
-    public function __construct(private readonly Terminal $terminal) {}
-
     /**
      * One-line status printed above the prompt.
      *
@@ -26,7 +26,7 @@ class StatusBar
         // before the first request.
         ?string $usage = null,
         // The provider's tightest limit, as it last reported it.
-        ?\App\Platform\RateLimits $limits = null,
+        ?RateLimits $limits = null,
         // Plan mode on: said where the eye goes before each message.
         bool $planning = false,
     ): void {
@@ -67,7 +67,7 @@ class StatusBar
             $parts[] = $usage;
         }
 
-        if ($limits !== null) {
+        if ($limits instanceof RateLimits) {
             $tight = $limits->tightest();
             $colour = match (true) {
                 $tight['percentLeft'] <= 5  => Terminal::RED,
@@ -115,7 +115,7 @@ EOT;
         echo Terminal::BOLD . $s . $wordmark . $r;
         echo "\n  {$l}›{$r} " . Terminal::GRAY . "Understand your code · Plan & reason · Build with you\n" . $r;
         // "v0.1.5" for a release; a checkout says "dev (…)" as it is.
-        $version ??= \App\Version::current();
+        $version ??= Version::current();
         echo Terminal::GRAY . '  ' . (ctype_digit($version[0] ?? '') ? 'v' : '') . $version . "\n\n" . $r;
     }
 }

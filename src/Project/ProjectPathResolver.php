@@ -109,7 +109,7 @@ final class ProjectPathResolver
     }
 
     /** As many links as Linux follows before it calls it a loop. */
-    private const MAX_LINKS = 40;
+    private const int MAX_LINKS = 40;
 
     /**
      * realpath() that tolerates a path whose tail does not exist yet: resolve

@@ -1,8 +1,13 @@
 <?php
 
+use App\Agent\Tool\Permission;
+use App\Agent\Tool\Toolbox;
+use App\Agent\Tool\ToolDefinition;
+use App\Kernel;
+
 // The plan the model keeps for a long task: written whole, read back, shown.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\TodoList;
 use App\Tool\TodoWriteTool;
@@ -73,12 +78,12 @@ $pane->showToolResult('todo_write', 'Plan cleared', isError: true);
 check('an error is shown like any tool error', str_contains(ob_get_clean(), '✗'));
 
 // ---- found by the container, like every tool --------------------------------
-$kernel = new App\Kernel('dev', true);
+$kernel = new Kernel('dev', true);
 $kernel->boot();
 $service = $kernel->getContainer()->get(TodoWriteTool::class);
-$def = (new App\Agent\Tool\Toolbox([$service]))->find('todo_write');
-check('todo_write is registered as a tool', $service instanceof TodoWriteTool && $def !== null);
-check('and runs without asking: it only writes the plan', $def?->permission === App\Agent\Tool\Permission::AUTO);
+$def = new Toolbox([$service])->find('todo_write');
+check('todo_write is registered as a tool', $service instanceof TodoWriteTool && $def instanceof ToolDefinition);
+check('and runs without asking: it only writes the plan', $def?->permission === Permission::AUTO);
 
 printf("\n%d passed, %d failed\n", $pass, $fail);
 exit($fail === 0 ? 0 : 1);

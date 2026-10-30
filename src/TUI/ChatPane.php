@@ -26,7 +26,7 @@ class ChatPane implements AgentOutput
     private float $lastWaitFrame = 0.0;
 
     /** Redraws of the waiting line, at most — reasoning can arrive fifty fragments a second. */
-    private const WAIT_FRAME_SECONDS = 0.1;
+    private const float WAIT_FRAME_SECONDS = 0.1;
 
     /**
      * Tokens printed nowhere yet because the reply may turn out to be a tool

@@ -1,10 +1,17 @@
 <?php
 
+use App\Platform\OllamaPlatform;
+use App\Platform\OpenAiCompatiblePlatform;
+use App\Platform\SwitchablePlatform;
+use App\Rag\Embedding\BackendEmbeddings;
+use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
+
 // Several API providers on one machine: recorded once, switched between at
 // will. Each names the variable its key is in, and the one thing that must
 // never happen is a provider receiving another one's key.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Config\Backend;
 use App\Config\MachineConfig;
@@ -83,7 +90,7 @@ check(
 // ---- each provider keeps its own choices --------------------------------------
 $flat->useProvider('groq');
 check('a provider named for this run is the one in force', $flat->activeProvider() === 'groq' && $flat->providerChosenForRun());
-check('a new provider has no model yet', $flat->read(Backend::Api) === null);
+check('a new provider has no model yet', !$flat->read(Backend::Api) instanceof ModelProfile);
 check(
     'its address and key variable are its own',
     $flat->apiUrl() === 'https://api.groq.com/openai/v1' && $flat->apiKeyVariable() === 'GROQ_API_KEY',
@@ -157,8 +164,8 @@ function twoProviders(string $path): string
 function keysSentTo(array $requests, string $host): array
 {
     return array_values(array_unique(array_map(
-        fn($r) => $r['auth'],
-        array_filter($requests, fn($r) => str_contains($r['url'], $host)),
+        fn(array $r): string => $r['auth'],
+        array_filter($requests, fn(array $r): bool => str_contains($r['url'], $host)),
     )));
 }
 
@@ -330,21 +337,21 @@ $embConfig = configAt($dir . '/emb/config.yaml');
 $embModels = new ModelResolver($embConfig, 'env:7b', 32768);
 
 $sent = [];
-$client = new Symfony\Component\HttpClient\MockHttpClient(function (string $method, string $url, array $options) use (&$sent) {
+$client = new MockHttpClient(function (string $method, string $url, array $options) use (&$sent): MockResponse {
     $body = json_decode($options['body'] ?? '{}', true);
-    $sent[] = ['url' => $url, 'auth' => implode(',', array_filter($options['headers'] ?? [], fn($h) => stripos($h, 'authorization') === 0)), 'model' => $body['model'] ?? null];
-    $rows = array_map(fn($i) => ['index' => $i, 'embedding' => [3.0, 4.0]], array_keys((array) ($body['input'] ?? [])));
+    $sent[] = ['url' => $url, 'auth' => implode(',', array_filter($options['headers'] ?? [], fn($h): bool => stripos($h, 'authorization') === 0)), 'model' => $body['model'] ?? null];
+    $rows = array_map(fn(int|string $i): array => ['index' => $i, 'embedding' => [3.0, 4.0]], array_keys((array) ($body['input'] ?? [])));
 
-    return new Symfony\Component\HttpClient\Response\MockResponse(json_encode(str_ends_with($url, '/api/embed')
-        ? ['embeddings' => array_map(fn() => [3.0, 4.0], (array) $body['input'])]
+    return new MockResponse(json_encode(str_ends_with($url, '/api/embed')
+        ? ['embeddings' => array_map(fn(): array => [3.0, 4.0], (array) $body['input'])]
         : ['data' => $rows]));
 });
-$chatPlatform = new App\Platform\SwitchablePlatform(
-    new App\Platform\OllamaPlatform($client, 'http://ollama.test', 'local'),
-    new App\Platform\OpenAiCompatiblePlatform($client, 'https://chat.test/v1', 'chat/model', 'k-chat'),
+$chatPlatform = new SwitchablePlatform(
+    new OllamaPlatform($client, 'http://ollama.test', 'local'),
+    new OpenAiCompatiblePlatform($client, 'https://chat.test/v1', 'chat/model', 'k-chat'),
 );
 $chatPlatform->switchTo(Backend::Api);
-$embeddings = new App\Rag\Embedding\BackendEmbeddings($chatPlatform, $embModels, $client);
+$embeddings = new BackendEmbeddings($chatPlatform, $embModels, $client);
 
 check('the embedding model named under embeddings: is the one in use', $embeddings->model() === 'text-embedding-3-small', $embeddings->model());
 check('and it settles the question: nothing is detected on the chat provider', $embModels->embeddingChosen(Backend::Api));

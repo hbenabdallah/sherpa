@@ -1,10 +1,13 @@
 <?php
 
+use App\Agent\Tool\ToolCall;
+use App\Agent\Tool\ToolDefinition;
+
 // A turn about to run out — of tokens or of steps — asks the model for its
 // answer first. Before, it ended on the stop notice: in the benchmark, two
 // sessions had named the right classes and never said so.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\AgentLoop;
 use App\Agent\ContextBudget;
@@ -55,7 +58,7 @@ final class AllowAll extends PermissionBroker
 {
     public function __construct() {}
 
-    public function check(App\Agent\Tool\ToolCall $call, ?App\Agent\Tool\ToolDefinition $def): bool
+    public function check(ToolCall $call, ?ToolDefinition $def): bool
     {
         return true;
     }

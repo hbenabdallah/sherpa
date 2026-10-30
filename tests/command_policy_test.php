@@ -5,7 +5,7 @@
 // for `make test; rm -rf ~`, and some commands are asked about every time.
 // Adversarial on purpose: a grant read too widely runs commands unasked.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Permission\CommandPolicy;
 use App\Permission\ShellCommand;
@@ -40,12 +40,12 @@ function onlyOnce(string $line): ?string
 /** @param list<string> $rules */
 function allows(string $line, array $rules): bool
 {
-    return CommandPolicy::allows(ShellCommand::parse($line), array_map(fn($r) => CommandPolicy::PREFIX . $r, $rules));
+    return CommandPolicy::allows(ShellCommand::parse($line), array_map(fn(string $r): string => CommandPolicy::PREFIX . $r, $rules));
 }
 
 function grants(string $line): array
 {
-    return array_map(fn($g) => substr($g, strlen(CommandPolicy::PREFIX)), CommandPolicy::grantsFor(ShellCommand::parse($line)));
+    return array_map(fn(string $g): string => substr($g, strlen(CommandPolicy::PREFIX)), CommandPolicy::grantsFor(ShellCommand::parse($line)));
 }
 
 // ---- reading a command line ------------------------------------------------

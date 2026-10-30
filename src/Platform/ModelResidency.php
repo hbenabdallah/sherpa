@@ -11,11 +11,11 @@ namespace App\Platform;
  * Ollama does not refuse: it spills onto the CPU and runs at a fraction of the
  * speed, and nothing in the reply says so. Measured here so Sherpa can.
  */
-final class ModelResidency
+final readonly class ModelResidency
 {
     public function __construct(
-        public readonly int $totalBytes,
-        public readonly int $vramBytes,
+        public int $totalBytes,
+        public int $vramBytes,
     ) {}
 
     /** False when the backend holds no copy of this model right now. */

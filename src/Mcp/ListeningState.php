@@ -18,13 +18,13 @@ use Mcp\Schema\JsonRpc\Response;
  *
  * The server is not told; it finishes, and its late answer goes nowhere.
  */
-final class ListeningState implements ClientStateInterface
+final readonly class ListeningState implements ClientStateInterface
 {
-    public const INTERRUPTED = 'Interrupted by the user.';
+    public const string INTERRUPTED = 'Interrupted by the user.';
 
     public function __construct(
-        private readonly ClientStateInterface $state,
-        private readonly Interrupt $interrupt,
+        private ClientStateInterface $state,
+        private Interrupt $interrupt,
     ) {}
 
     public function consumeResponse(int|string $requestId): Response|Error|null

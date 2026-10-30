@@ -15,13 +15,13 @@ namespace App\Rag;
  */
 final class Chunker
 {
-    public const TARGET = 1400;
+    public const int TARGET = 1400;
 
-    public const MAX = 2800;
+    public const int MAX = 2800;
 
-    public const OVERLAP = 170;
+    public const int OVERLAP = 170;
 
-    public const PARENT_MAX = 6000;
+    public const int PARENT_MAX = 6000;
 
     /** @return list<Chunk> */
     public function chunk(ParsedDocument $document): array
@@ -196,7 +196,7 @@ final class Chunker
                 }
 
                 $current = $carried;
-                $size = array_sum(array_map(static fn(array $b) => mb_strlen($b['text']), $carried));
+                $size = array_sum(array_map(static fn(array $b): int => mb_strlen($b['text']), $carried));
             }
 
             $current[] = $block;

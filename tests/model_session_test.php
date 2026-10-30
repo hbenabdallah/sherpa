@@ -4,7 +4,7 @@
 // It came out of the command in one piece, and what it does is exactly what
 // nothing could reach before: the boot decisions, /model and /backend.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\ContextBudget;
 use App\Agent\InferenceSpeed;
@@ -176,21 +176,21 @@ $platform->useApiKey(null);
 [$session] = sessionWith($root, [], 'jamais-choisi.yaml');
 $out = '';
 $resolved = null;
-$out = captured(function () use ($session, &$resolved) {
+$out = captured(function () use ($session, &$resolved): void {
     $resolved = $session->resolve(null, null, Backend::Api, rememberAsDefault: true);
 });
 check('with nothing chosen, the .env model is used', $resolved?->model === 'env/api', json_encode($resolved));
 check('and the user is told which, and where to choose', str_contains($out, 'No model chosen') && str_contains($out, 'jamais-choisi.yaml'), $out);
 
 $explicit = null;
-captured(function () use ($session, &$explicit) {
+captured(function () use ($session, &$explicit): void {
     $explicit = $session->resolve('un/modele', 8192, Backend::Api, rememberAsDefault: true);
 });
 check('-m and -c win over everything', $explicit?->model === 'un/modele' && $explicit->contextWindow === 8192, json_encode($explicit));
 
 // ---- a model the backend cannot confirm ------------------------------------
 $unknown = null;
-$out = captured(function () use ($root, &$unknown) {
+$out = captured(function () use ($root, &$unknown): void {
     // /models/{id} 404, then /models 200 listing something else: unknown.
     [$session] = sessionWith($root, [
         new MockResponse('', ['http_code' => 404]),
@@ -203,7 +203,7 @@ check('with what to do about it on an API', str_contains($out, 'provider') && !s
 
 // A window past the model's ceiling is not a preference; it is corrected.
 $capped = null;
-captured(function () use ($root, &$capped) {
+captured(function () use ($root, &$capped): void {
     [$session] = sessionWith($root, [
         new MockResponse(json_encode(['id' => 'distant/modele', 'context_length' => 16384]), ['response_headers' => ['content-type' => 'application/json']]),
     ], 'plafond.yaml');

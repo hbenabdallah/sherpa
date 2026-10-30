@@ -53,7 +53,7 @@ final class PromptArguments
     public static function usage(array $declared): string
     {
         return implode(' ', array_map(
-            static fn(array $argument) => $argument['required'] ? "<{$argument['name']}>" : "[{$argument['name']}]",
+            static fn(array $argument): string => $argument['required'] ? "<{$argument['name']}>" : "[{$argument['name']}]",
             $declared,
         ));
     }
@@ -67,11 +67,11 @@ final class PromptArguments
      */
     public static function asMessage(array $messages): string
     {
-        $messages = array_values(array_filter($messages, static fn(array $m) => trim($m['text']) !== ''));
-        $onlyUser = array_filter($messages, static fn(array $m) => $m['role'] !== 'user') === [];
+        $messages = array_values(array_filter($messages, static fn(array $m): bool => trim($m['text']) !== ''));
+        $onlyUser = array_filter($messages, static fn(array $m): bool => $m['role'] !== 'user') === [];
 
         return trim(implode("\n\n", array_map(
-            static fn(array $m) => $onlyUser ? trim($m['text']) : "[{$m['role']}]\n" . trim($m['text']),
+            static fn(array $m): string => $onlyUser ? trim($m['text']) : "[{$m['role']}]\n" . trim($m['text']),
             $messages,
         )));
     }

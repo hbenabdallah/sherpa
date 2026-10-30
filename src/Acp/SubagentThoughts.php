@@ -11,11 +11,11 @@ use App\TUI\Terminal;
  * uses, and nothing of what it writes — its report goes to the main agent,
  * which is who it is for.
  */
-final class SubagentThoughts implements AgentOutput
+final readonly class SubagentThoughts implements AgentOutput
 {
     private string $messageId;
 
-    public function __construct(private readonly Connection $connection, private readonly string $sessionId)
+    public function __construct(private Connection $connection, private string $sessionId)
     {
         $this->messageId = 'sub_' . bin2hex(random_bytes(6));
     }

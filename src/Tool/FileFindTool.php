@@ -25,16 +25,16 @@ use Throwable;
 class FileFindTool
 {
     /** Walked past when the project is not a git repository, as list_dir does. */
-    private const SKIPPED = ['vendor', 'node_modules', '.git', 'var', '.idea', '.vscode', '.claude', '__pycache__', '.venv', 'target'];
+    private const array SKIPPED = ['vendor', 'node_modules', '.git', 'var', '.idea', '.vscode', '.claude', '__pycache__', '.venv', 'target'];
 
     /** Floors and ceiling on paths listed, scaled with the window like list_dir's lines. */
-    private const MIN_PATHS = 100;
+    private const int MIN_PATHS = 100;
 
-    private const MAX_PATHS = 1000;
+    private const int MAX_PATHS = 1000;
 
-    private const SHARE = 0.04;
+    private const float SHARE = 0.04;
 
-    private const CHARS_PER_PATH = 50;
+    private const int CHARS_PER_PATH = 50;
 
     public function __construct(
         private readonly ProjectPathResolver $paths = new ProjectPathResolver(),
@@ -76,7 +76,7 @@ class FileFindTool
         }
 
         // Most recently changed first: what someone is working on.
-        uksort($found, fn(string $a, string $b) => [$found[$b], $a] <=> [$found[$a], $b]);
+        uksort($found, fn(string $a, string $b): int => [$found[$b], $a] <=> [$found[$a], $b]);
         $paths = array_keys($found);
 
         $cap = $this->cap();
@@ -111,7 +111,7 @@ class FileFindTool
                 $out .= '[^/]';
             } elseif ($char === '{' && ($close = strpos($glob, '}', $i)) !== false) {
                 $options = explode(',', substr($glob, $i + 1, $close - $i - 1));
-                $out .= '(?:' . implode('|', array_map(fn(string $o) => self::toRegexBody($o), $options)) . ')';
+                $out .= '(?:' . implode('|', array_map(self::toRegexBody(...), $options)) . ')';
                 $i = $close;
             } elseif ($char === '[' && ($close = strpos($glob, ']', $i + 1)) !== false) {
                 $class = substr($glob, $i + 1, $close - $i - 1);
@@ -144,7 +144,7 @@ class FileFindTool
             if ($git->isSuccessful()) {
                 return array_values(array_filter(
                     explode("\0", $git->getOutput()),
-                    fn(string $p) => $p !== '' && is_file("{$base}/{$p}"),
+                    fn(string $p): bool => $p !== '' && is_file("{$base}/{$p}"),
                 ));
             }
         } catch (Throwable) {
@@ -154,7 +154,7 @@ class FileFindTool
         $files = [];
         $directories = new RecursiveCallbackFilterIterator(
             new RecursiveDirectoryIterator($base, FilesystemIterator::SKIP_DOTS),
-            static fn(SplFileInfo $file) => !($file->isDir() && in_array($file->getFilename(), self::SKIPPED, true)),
+            static fn(SplFileInfo $file): bool => !$file->isDir() || !in_array($file->getFilename(), self::SKIPPED, true),
         );
         foreach (new RecursiveIteratorIterator($directories) as $file) {
             if ($file->isFile()) {
@@ -167,7 +167,7 @@ class FileFindTool
 
     private function cap(): int
     {
-        if ($this->budget === null) {
+        if (!$this->budget instanceof ContextBudget) {
             return self::MIN_PATHS;
         }
 

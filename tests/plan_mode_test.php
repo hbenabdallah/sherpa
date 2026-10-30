@@ -1,9 +1,13 @@
 <?php
 
+use App\Agent\Tool\ToolCall;
+use App\Agent\Tool\ToolDefinition;
+use App\Permission\Offer;
+
 // Plan mode: the model reads and proposes, nothing changes until the plan is
 // approved — and once it is, the work goes on in the same turn.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\AgentLoop;
 use App\Agent\ContextBudget;
@@ -75,12 +79,12 @@ final class PlanAnswer implements Approver
 
     public function __construct(private readonly bool $yes) {}
 
-    public function confirm(App\Agent\Tool\ToolCall $call, App\Agent\Tool\ToolDefinition $def, App\Permission\Offer $offer): ConfirmChoice
+    public function confirm(ToolCall $call, ToolDefinition $def, Offer $offer): ConfirmChoice
     {
         return ConfirmChoice::Once;
     }
 
-    public function approvePlan(string $plan): ?bool
+    public function approvePlan(string $plan): bool
     {
         $this->plans[] = $plan;
 
@@ -95,7 +99,7 @@ final class YesBroker extends PermissionBroker
 
     public function __construct() {}
 
-    public function check(App\Agent\Tool\ToolCall $call, ?App\Agent\Tool\ToolDefinition $def): bool
+    public function check(ToolCall $call, ?ToolDefinition $def): bool
     {
         if ($def?->permission === Permission::CONFIRM) {
             $this->asked++;
@@ -171,7 +175,7 @@ final class Scripted implements PlatformInterface
     }
 }
 
-$call = fn(string $name, array $args) => ['role' => 'assistant', 'content' => '', 'tool_calls' => [['id' => 'c' . random_int(1, 99999), 'function' => ['name' => $name, 'arguments' => $args]]]];
+$call = fn(string $name, array $args): array => ['role' => 'assistant', 'content' => '', 'tool_calls' => [['id' => 'c' . random_int(1, 99999), 'function' => ['name' => $name, 'arguments' => $args]]]];
 
 function run(PlatformInterface $model, array $tools, PlanMode $plan, PermissionBroker $broker): array
 {
@@ -253,7 +257,7 @@ $project = new Project(
     createdAt: new DateTimeImmutable(),
     lastUsedAt: new DateTimeImmutable(),
 );
-$bar = (new ReflectionClass(StatusBar::class))->newInstanceWithoutConstructor();
+$bar = new ReflectionClass(StatusBar::class)->newInstanceWithoutConstructor();
 ob_start();
 $bar->render($project, 'm', planning: true);
 check('the status bar says plan mode is on', str_contains(Terminal::plain(ob_get_clean()), 'plan mode'));

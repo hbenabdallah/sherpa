@@ -16,11 +16,11 @@ use App\Memory\ContextStore;
 class ContextRecallTool
 {
     /** Share of the prompt window one recall may occupy. */
-    private const SHARE = 0.08;
+    private const float SHARE = 0.08;
 
-    private const MIN_CHARS = 4000;
+    private const int MIN_CHARS = 4000;
 
-    private const MAX_CHARS = 40000;
+    private const int MAX_CHARS = 40000;
 
     public function __construct(
         private readonly ContextStore $store,

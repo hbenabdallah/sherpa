@@ -71,7 +71,7 @@ class FileWriteTool
 
         if (!file_exists($resolved)) {
             $lines = explode("\n", $newContent);
-            $added = array_map(fn($l) => "+ {$l}", $lines);
+            $added = array_map(fn($l): string => "+ {$l}", $lines);
 
             return "(new file)\n" . implode("\n", $added);
         }

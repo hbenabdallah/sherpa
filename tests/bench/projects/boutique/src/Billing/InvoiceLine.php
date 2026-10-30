@@ -4,10 +4,10 @@ namespace Boutique\Billing;
 
 use Boutique\Catalog\Product;
 
-final class InvoiceLine
+final readonly class InvoiceLine
 {
     public function __construct(
-        public readonly Product $product,
-        public readonly int $quantity,
+        public Product $product,
+        public int $quantity,
     ) {}
 }

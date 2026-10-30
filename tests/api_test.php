@@ -1,10 +1,18 @@
 <?php
 
+use App\Config\Backend;
+use App\Platform\ModelInfo;
+use App\Platform\ModelResidency;
+use App\Platform\OllamaPlatform;
+use App\Platform\SwitchablePlatform;
+use App\Usage\UsageMeter;
+use Symfony\Component\HttpClient\HttpClient;
+
 // The hosted-API backend: OpenAI's /chat/completions dialect, which is what
 // every provider but Ollama speaks. Nothing here reaches a network — the whole
 // point of testing a paid backend is that it stays free.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Platform\OpenAiCompatiblePlatform;
 use App\Platform\PlatformInterface;
@@ -42,7 +50,7 @@ function textChunk(string $text): string
  */
 function api(array $responses, array &$sent = [], ?Interrupt $interrupt = null): OpenAiCompatiblePlatform
 {
-    $client = new MockHttpClient(function ($method, $url, $options) use (&$responses, &$sent) {
+    $client = new MockHttpClient(function ($method, $url, array $options) use (&$responses, &$sent) {
         $sent[] = [
             'method'  => $method,
             'url'     => $url,
@@ -75,7 +83,7 @@ $msg = api([sse([
     'ces":[{"delta":{"content":"jour"}}]}' . "\n\n",
     textChunk(' !'),
     'data: [DONE]' . "\n\n",
-])])->stream([['role' => 'user', 'content' => 'salut']], [], function (string $t) use (&$tokens) {
+])])->stream([['role' => 'user', 'content' => 'salut']], [], function (string $t) use (&$tokens): void {
     $tokens[] = $t;
 });
 
@@ -222,7 +230,7 @@ check(
 // A server that wants no key at all — vLLM, LM Studio, llama.cpp.
 $sentOpen = [];
 $open = new OpenAiCompatiblePlatform(
-    new MockHttpClient(function ($method, $url, $options) use (&$sentOpen) {
+    new MockHttpClient(function ($method, $url, array $options) use (&$sentOpen): MockResponse {
         $sentOpen[] = $options['headers'] ?? [];
 
         return sse([textChunk('ok'), 'data: [DONE]' . "\n\n"]);
@@ -242,7 +250,7 @@ check('and the backend is named after its host', $open->name() === 'localhost', 
 // typed at the first-run question.
 $moved = [];
 $movable = new OpenAiCompatiblePlatform(
-    new MockHttpClient(function ($method, $url) use (&$moved) {
+    new MockHttpClient(function ($method, $url) use (&$moved): MockResponse {
         $moved[] = $url;
 
         return sse([textChunk('ok'), 'data: [DONE]' . "\n\n"]);
@@ -292,7 +300,7 @@ check(
     $silent->lastUsage() === null && $silent->lastTimings() === null,
 );
 
-check('residency means nothing on rented hardware, and says so', $platform->residency() === null);
+check('residency means nothing on rented hardware, and says so', !$platform->residency() instanceof ModelResidency);
 check(
     'the window is the one declared, since the API takes no such parameter',
     $platform->contextWindow() === 64000,
@@ -372,13 +380,13 @@ foreach ($cases as [$status, $body, $expected]) {
 
     try {
         // Three times: a 500 is retried, and explained once the attempts are spent.
-        api(array_map(fn() => new MockResponse($body, ['http_code' => $status, 'response_headers' => ['retry-after' => '1']]), range(1, 3)))->stream([]);
+        api(array_map(fn(): MockResponse => new MockResponse($body, ['http_code' => $status, 'response_headers' => ['retry-after' => '1']]), range(1, 3)))->stream([]);
     } catch (Throwable $e) {
         $thrown = $e;
     }
     check(
         "HTTP {$status} is explained rather than dumped",
-        $thrown !== null && str_contains($thrown->getMessage(), $expected),
+        $thrown instanceof \Throwable && str_contains($thrown->getMessage(), $expected),
         $thrown?->getMessage() ?? 'nothing',
     );
 }
@@ -461,7 +469,7 @@ function patient(array $responses, array &$sent, array &$waits, array &$said, ?I
         64000,
         30.0,
         $interrupt,
-        sleep: function (float $seconds) use (&$waits) {
+        sleep: function (float $seconds) use (&$waits): void {
             $waits[] = $seconds;
         },
     );
@@ -470,8 +478,8 @@ function patient(array $responses, array &$sent, array &$waits, array &$said, ?I
         return $platform->stream(
             [['role' => 'user', 'content' => 'x']],
             [],
-            fn() => null,
-            function (bool $reasoning, ?string $why = null) use (&$said) {
+            fn(): null => null,
+            function (bool $reasoning, ?string $why = null) use (&$said): void {
                 if ($why !== null) {
                     $said[] = $why;
                 }
@@ -481,8 +489,8 @@ function patient(array $responses, array &$sent, array &$waits, array &$said, ?I
         return ['error' => $e->getMessage()];
     }
 }
-$limit = fn(array $headers = []) => new MockResponse('{"error":{"message":"Too Many Requests"}}', ['http_code' => 429, 'response_headers' => $headers]);
-$ok = fn() => sse([textChunk('passé'), 'data: [DONE]' . "\n\n"]);
+$limit = fn(array $headers = []): MockResponse => new MockResponse('{"error":{"message":"Too Many Requests"}}', ['http_code' => 429, 'response_headers' => $headers]);
+$ok = fn(): MockResponse => sse([textChunk('passé'), 'data: [DONE]' . "\n\n"]);
 
 [$sent, $waits, $said] = [[], [], []];
 $reply = patient([$limit(), $limit(), $limit(), $limit(), $ok()], $sent, $waits, $said);
@@ -511,7 +519,7 @@ check('a rate limit asking for an hour is reported at once', count($sent) === 1 
 $interrupt = new Interrupt();
 $interrupt->beginTurn();
 [$sent, $waits, $said] = [[], [], []];
-$client = new MockHttpClient(function () use (&$sent) {
+$client = new MockHttpClient(function () use (&$sent): MockResponse {
     $sent[] = 1;
 
     return new MockResponse('{}', ['http_code' => 429, 'response_headers' => ['retry-after' => '60']]);
@@ -524,49 +532,49 @@ $platform = new OpenAiCompatiblePlatform(
     64000,
     30.0,
     $interrupt,
-    sleep: function (float $seconds) use (&$waits, $interrupt) {
+    sleep: function (float $seconds) use (&$waits, $interrupt): void {
         $waits[] = $seconds;
         if (count($waits) === 3) {
             $interrupt->request();
         }
     },
 );
-$reply = $platform->stream([['role' => 'user', 'content' => 'x']], [], fn() => null);
+$reply = $platform->stream([['role' => 'user', 'content' => 'x']], [], fn(): null => null);
 check('Ctrl+C during a rate-limit wait stops it there', count($waits) === 3 && count($sent) === 1 && ($reply['content'] ?? null) === '', json_encode([$waits, $reply]));
 $interrupt->endTurn();
 
 // A server error keeps its shorter patience: three tries, 20 s at most.
 [$sent, $waits, $said] = [[], [], []];
-$down = fn() => new MockResponse('{"error":{"message":"down"}}', ['http_code' => 503, 'response_headers' => ['retry-after' => '45']]);
+$down = fn(): MockResponse => new MockResponse('{"error":{"message":"down"}}', ['http_code' => 503, 'response_headers' => ['retry-after' => '45']]);
 $reply = patient([$down(), $down(), $down(), $ok()], $sent, $waits, $said);
 check('a 503 is still tried three times, each wait capped at 20 s', count($sent) === 3 && abs(array_sum($waits) - 40) < 0.01, json_encode([count($sent), array_sum($waits)]));
 
 // ---- how many requests at once ------------------------------------------------
 // Sub-agents asked for together run together, as many as the provider takes.
-$at = fn(string $url, array $responses = []) => new OpenAiCompatiblePlatform(
+$at = fn(string $url, array $responses = []): OpenAiCompatiblePlatform => new OpenAiCompatiblePlatform(
     new MockHttpClient($responses === [] ? [new MockResponse('')] : $responses),
     $url,
     'm',
     'k',
     64000,
     30.0,
-    sleep: fn() => null,
+    sleep: fn(): null => null,
 );
 check('a provider with room takes three at once', $at('https://api.example.com/v1')->concurrency() === 3);
 foreach (['http://localhost:8080/v1', 'http://127.0.0.1:1234/v1', 'http://192.168.1.20:8000/v1', 'http://host.docker.internal:11434/v1', 'http://llm/v1'] as $local) {
     check("a server on this machine or network takes one: {$local}", $at($local)->concurrency() === 1);
 }
-check('as does Ollama', (new App\Platform\OllamaPlatform(new MockHttpClient(), 'http://x', 'm'))->concurrency() === 1);
+check('as does Ollama', new OllamaPlatform(new MockHttpClient(), 'http://x', 'm')->concurrency() === 1);
 
 $limited = $at('https://api.example.com/v1', [$limit(['retry-after' => '1']), $ok(), $ok()]);
-$limited->stream([['role' => 'user', 'content' => 'x']], [], fn() => null);
+$limited->stream([['role' => 'user', 'content' => 'x']], [], fn(): null => null);
 check('after a rate limit, one at a time', $limited->concurrency() === 1);
 $said = [];
 $limited->stream(
     [['role' => 'user', 'content' => 'y']],
     [],
-    fn() => null,
-    function (bool $reasoning, ?string $why = null) use (&$said) {
+    fn(): null => null,
+    function (bool $reasoning, ?string $why = null) use (&$said): void {
         if ($why !== null) {
             $said[] = $why;
         }
@@ -581,17 +589,17 @@ check(
 $few = textChunk('ok') . 'data: [DONE]' . "\n\n";
 $tight = $at('https://api.example.com/v1', [new MockResponse($few, ['response_headers' => [
     'content-type' => 'text/event-stream', 'x-ratelimit-limit-requests' => '30', 'x-ratelimit-remaining-requests' => '4']])]);
-$tight->stream([['role' => 'user', 'content' => 'x']], [], fn() => null);
+$tight->stream([['role' => 'user', 'content' => 'x']], [], fn(): null => null);
 check('with few requests left in the window, one at a time', $tight->concurrency() === 1);
 
 $roomy = $at('https://api.example.com/v1', [new MockResponse($few, ['response_headers' => [
     'content-type' => 'text/event-stream', 'x-ratelimit-limit-requests' => '1000', 'x-ratelimit-remaining-requests' => '990']])]);
-$roomy->stream([['role' => 'user', 'content' => 'x']], [], fn() => null);
+$roomy->stream([['role' => 'user', 'content' => 'x']], [], fn(): null => null);
 check('with plenty left, three', $roomy->concurrency() === 3);
 
-$meter = new App\Usage\UsageMeter(1000);
-$capped = new App\Platform\SwitchablePlatform(new App\Platform\OllamaPlatform(new MockHttpClient(), 'http://x', 'm'), $roomy, $meter);
-$capped->switchTo(App\Config\Backend::Api);
+$meter = new UsageMeter(1000);
+$capped = new SwitchablePlatform(new OllamaPlatform(new MockHttpClient(), 'http://x', 'm'), $roomy, $meter);
+$capped->switchTo(Backend::Api);
 check('a session far from its token cap goes on three at a time', $capped->concurrency() === 3);
 $meter->record(['prompt' => 500, 'completion' => 100]);
 check('one near it, one at a time: three at once would each pass it', $capped->concurrency() === 1);
@@ -614,7 +622,7 @@ $catalogue = api([new MockResponse(json_encode(['data' => [
 ]]), ['response_headers' => ['content-type' => 'application/json']])]);
 
 $models = $catalogue->catalogue();
-check('the catalogue is read from /models', count($models) === 2, json_encode(array_map(fn($m) => $m->name, $models)));
+check('the catalogue is read from /models', count($models) === 2, json_encode(array_map(fn(ModelInfo $m): string => $m->name, $models)));
 check(
     'a window is read where the server carries one',
     ($models[0]->name === 'modele-a' && $models[0]->contextLength === 200000),
@@ -632,7 +640,7 @@ $unknown = api([
 ]);
 check(
     'a name the server does not serve is reported as unknown, not invented',
-    $unknown->describeModel('inexistant') === null,
+    !$unknown->describeModel('inexistant') instanceof ModelInfo,
 );
 
 $available = api([new MockResponse(json_encode(['data' => []]), ['response_headers' => ['content-type' => 'application/json']])]);
@@ -699,7 +707,7 @@ check(
 
 // A reasoning model is silent on screen, not idle: the caller hears about it.
 $waits = [];
-api([sse(str_split($recorded, 97))])->stream([], [], null, function (bool $reasoning) use (&$waits) {
+api([sse(str_split($recorded, 97))])->stream([], [], null, function (bool $reasoning) use (&$waits): void {
     $waits[] = $reasoning;
 });
 check('reasoning is reported to whoever is waiting', in_array(true, $waits, true), json_encode(array_values(array_unique($waits))));
@@ -715,7 +723,7 @@ $noListEither = api([
 $info = $noListEither->describeModel('@cf/zai-org/glm-4.7-flash');
 check(
     'and a model named there is taken on trust rather than called unknown',
-    $info !== null && $info->name === '@cf/zai-org/glm-4.7-flash' && $info->capabilitiesUnknown(),
+    $info instanceof ModelInfo && $info->name === '@cf/zai-org/glm-4.7-flash' && $info->capabilitiesUnknown(),
 );
 
 check('a refused key is still unavailable', !api([new MockResponse('', ['http_code' => 401])])->isAvailable());
@@ -743,7 +751,7 @@ $threw = null;
 
 try {
     api([sse([textChunk('Let me'), event(['error' => ['message' => 'upstream timed out', 'code' => 504]])])])
-        ->stream([['role' => 'user', 'content' => 'x']], [], fn() => null);
+        ->stream([['role' => 'user', 'content' => 'x']], [], fn(): null => null);
 } catch (RuntimeException $e) {
     $threw = $e->getMessage();
 }
@@ -758,7 +766,7 @@ $sentRetry = [];
 $retried = api([
     sse([event(['error' => ['message' => 'Service temporarily overloaded']])]),
     sse([textChunk('fine now'), 'data: [DONE]' . "\n\n"]),
-], $sentRetry)->stream([['role' => 'user', 'content' => 'x']], [], fn() => null);
+], $sentRetry)->stream([['role' => 'user', 'content' => 'x']], [], fn(): null => null);
 check('an overload before any text is retried', count($sentRetry) === 2 && $retried['content'] === 'fine now', json_encode($retried));
 
 // Nemotron opens its replies with line breaks. Blank, they put nothing on the
@@ -767,7 +775,7 @@ $sentBlank = [];
 $afterBlank = api([
     sse([textChunk("\n\n"), event(['error' => ['message' => 'Service temporarily overloaded']])]),
     sse([textChunk('fine now'), 'data: [DONE]' . "\n\n"]),
-], $sentBlank)->stream([['role' => 'user', 'content' => 'x']], [], fn() => null);
+], $sentBlank)->stream([['role' => 'user', 'content' => 'x']], [], fn(): null => null);
 check('an overload after blank text only is retried too', count($sentBlank) === 2 && $afterBlank['content'] === 'fine now', json_encode($afterBlank));
 
 // Once words are on the screen, a retry would print a second reply after them.
@@ -778,21 +786,21 @@ try {
     api([
         sse([textChunk('Let me look'), event(['error' => ['message' => 'Service temporarily overloaded']])]),
         sse([textChunk('fine now'), 'data: [DONE]' . "\n\n"]),
-    ], $sentWords)->stream([['role' => 'user', 'content' => 'x']], [], fn() => null);
+    ], $sentWords)->stream([['role' => 'user', 'content' => 'x']], [], fn(): null => null);
 } catch (RuntimeException $e) {
     $threw = $e->getMessage();
 }
 check('an overload after shown words is not retried', count($sentWords) === 1 && str_contains((string) $threw, 'overloaded'), (string) $threw);
 
 // Its wait is a rate limit's: said in the spinner, and Ctrl+C heard during it.
-$overload = fn() => sse([event(['error' => ['message' => 'Service temporarily overloaded']])]);
+$overload = fn(): MockResponse => sse([event(['error' => ['message' => 'Service temporarily overloaded']])]);
 [$sent, $waits, $said] = [[], [], []];
 $reply = patient([$overload(), sse([textChunk('fine now'), 'data: [DONE]' . "\n\n"])], $sent, $waits, $said);
 check('waiting out an overload says so', ($reply['content'] ?? '') === 'fine now' && str_starts_with($said[0] ?? '', 'api.example.com is overloaded, trying again in 2 s'), json_encode($said));
 $interrupt = new Interrupt();
 $interrupt->beginTurn();
 $sent = [];
-$client = new MockHttpClient(function () use (&$sent, $overload) {
+$client = new MockHttpClient(function () use (&$sent, $overload): MockResponse {
     $sent[] = 1;
 
     return $overload();
@@ -805,11 +813,11 @@ $platform = new OpenAiCompatiblePlatform(
     64000,
     30.0,
     $interrupt,
-    sleep: function () use ($interrupt) {
+    sleep: function () use ($interrupt): void {
         $interrupt->request();
     },
 );
-$reply = $platform->stream([['role' => 'user', 'content' => 'x']], [], fn() => null);
+$reply = $platform->stream([['role' => 'user', 'content' => 'x']], [], fn(): null => null);
 check('and Ctrl+C during that wait ends the turn, with no second request', count($sent) === 1 && ($reply['content'] ?? null) === '', json_encode([$sent, $reply]));
 $interrupt->endTurn();
 
@@ -818,7 +826,7 @@ $threw = null;
 
 try {
     api([sse([event(['error' => ['message' => 'invalid tool schema']])])], $sentOnce)
-        ->stream([['role' => 'user', 'content' => 'x']], [], fn() => null);
+        ->stream([['role' => 'user', 'content' => 'x']], [], fn(): null => null);
 } catch (RuntimeException $e) {
     $threw = $e->getMessage();
 }
@@ -833,18 +841,18 @@ for ($i = 0; $i < 50 && @fsockopen('127.0.0.1', $port) === false; $i++) {
     usleep(100_000);
 }
 
-$slow = new OpenAiCompatiblePlatform(Symfony\Component\HttpClient\HttpClient::create(), "http://127.0.0.1:{$port}/v1", 'm', 'k', 32000, 30.0);
+$slow = new OpenAiCompatiblePlatform(HttpClient::create(), "http://127.0.0.1:{$port}/v1", 'm', 'k', 32000, 30.0);
 $ticks = 0;
-$reply = $slow->stream([['role' => 'user', 'content' => 'x']], [], fn() => null, function () use (&$ticks) {
+$reply = $slow->stream([['role' => 'user', 'content' => 'x']], [], fn(): null => null, function () use (&$ticks): void {
     $ticks++;
 });
 check('the spinner keeps turning before the server sends its headers', $ticks >= 2, "{$ticks} tick(s)");
 check('and the reply still comes through', $reply['content'] === 'late but here', json_encode($reply));
 
 $interrupt = new Interrupt();
-$cut = new OpenAiCompatiblePlatform(Symfony\Component\HttpClient\HttpClient::create(), "http://127.0.0.1:{$port}/v1", 'm', 'k', 32000, 30.0, $interrupt);
+$cut = new OpenAiCompatiblePlatform(HttpClient::create(), "http://127.0.0.1:{$port}/v1", 'm', 'k', 32000, 30.0, $interrupt);
 $started = microtime(true);
-$cutReply = $cut->stream([['role' => 'user', 'content' => 'x']], [], fn() => null, function () use ($interrupt) {
+$cutReply = $cut->stream([['role' => 'user', 'content' => 'x']], [], fn(): null => null, function () use ($interrupt): void {
     $interrupt->request();
 });
 check(
@@ -861,7 +869,7 @@ $sent500 = [];
 $after500 = api([
     new MockResponse('{"title":"Internal Server Error","detail":"Inference connection error"}', ['http_code' => 500, 'response_headers' => ['retry-after' => '1']]),
     sse([textChunk('back up'), 'data: [DONE]' . "\n\n"]),
-], $sent500)->stream([['role' => 'user', 'content' => 'x']], [], fn() => null);
+], $sent500)->stream([['role' => 'user', 'content' => 'x']], [], fn(): null => null);
 check('a server error is retried', count($sent500) === 2 && $after500['content'] === 'back up', json_encode($after500));
 
 printf("\n%d passed, %d failed\n", $pass, $fail);

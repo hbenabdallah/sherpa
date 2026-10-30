@@ -16,7 +16,7 @@ namespace App\TUI;
  */
 final class Scrollback
 {
-    private const MAX_LINES = 5000;
+    private const int MAX_LINES = 5000;
 
     /** @var list<string> */
     private array $lines = [];

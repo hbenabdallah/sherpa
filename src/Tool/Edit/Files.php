@@ -36,7 +36,7 @@ class Files
     /** The text of the file at $resolved (absolute), or null when there is none to read. */
     public function read(string $resolved): ?string
     {
-        if ($this->reader !== null && ($text = ($this->reader)($resolved)) !== null) {
+        if ($this->reader instanceof Closure && ($text = ($this->reader)($resolved)) !== null) {
             return $text;
         }
 
@@ -56,7 +56,7 @@ class Files
      */
     public function write(string $resolved, string $path, string $content): void
     {
-        if ($this->writer !== null) {
+        if ($this->writer instanceof Closure) {
             ($this->writer)($resolved, $content);
 
             return;
@@ -82,6 +82,6 @@ class Files
             array_pop($lines);
         }
 
-        return array_map(static fn(string $line) => str_ends_with($line, "\r") ? substr($line, 0, -1) : $line, $lines);
+        return array_map(static fn(string $line): string => str_ends_with($line, "\r") ? substr($line, 0, -1) : $line, $lines);
     }
 }

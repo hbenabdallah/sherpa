@@ -1,10 +1,12 @@
 <?php
 
+use App\Agent\Tool\ToolDefinition;
+
 // Declaring MCP servers without opening mcp.json: /mcp add and its siblings in
 // a session, `sherpa mcp …` in the shell — the same file written either way,
 // and a session that takes the change at once.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\Tool\Toolbox;
 use App\Command\McpCommand;
@@ -114,7 +116,7 @@ $registry->load($toolbox);
 check('no server, no tool', $toolbox->getDefinitions() === [] && $registry->promptSection() === '');
 
 $line = $registry->connect(ServerConfig::fromArray('demo', ['command' => PHP_BINARY, 'args' => [$fixture, 'ok']]), $toolbox);
-$names = array_map(fn($d) => $d->name, $toolbox->getDefinitions());
+$names = array_map(fn(ToolDefinition $d): string => $d->name, $toolbox->getDefinitions());
 check('connected mid-session, its tools are there at once', in_array('mcp__demo__echo', $names, true), implode(',', $names));
 check('with its line in the report', str_contains($line, 'demo: 3 tools') && $registry->report() === [$line], json_encode($registry->report()));
 check('and its instructions in the prompt section', str_contains($registry->promptSection(), 'Call horloge'));
@@ -123,7 +125,7 @@ $registry->connect(ServerConfig::fromArray('demo', ['command' => PHP_BINARY, 'ar
 check('connecting it again replaces it rather than clashing', count($toolbox->getDefinitions()) === 3 && count($registry->report()) === 1);
 
 $registry->disconnect('demo', $toolbox, 'demo: disabled');
-check('let go, its tools leave the Toolbox', $toolbox->getDefinitions() === [], implode(',', array_map(fn($d) => $d->name, $toolbox->getDefinitions())));
+check('let go, its tools leave the Toolbox', $toolbox->getDefinitions() === [], implode(',', array_map(fn(ToolDefinition $d): string => $d->name, $toolbox->getDefinitions())));
 check('its instructions leave the prompt', $registry->promptSection() === '');
 check('and its line says why', $registry->report() === ['demo: disabled'] && !$registry->isConnected('demo'));
 
@@ -221,6 +223,6 @@ check('and again, an error: nothing by that name', $tester->getStatusCode() === 
 $tester->execute(['action' => 'frobnicate']);
 check('an unknown action is refused', $tester->getStatusCode() === 1);
 
-(new Process(['rm', '-rf', $dir]))->run();
+new Process(['rm', '-rf', $dir])->run();
 printf("\n%d passed, %d failed\n", $pass, $fail);
 exit($fail === 0 ? 0 : 1);

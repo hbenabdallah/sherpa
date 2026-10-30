@@ -18,7 +18,7 @@ use Closure;
  */
 final class SlashMenu
 {
-    private const ROWS = 8;
+    private const int ROWS = 8;
 
     /** @var list<array{name: string, hint: string, description: string}> */
     private array $matches = [];
@@ -118,7 +118,7 @@ final class SlashMenu
 
         $first = max(0, min($this->selected - intdiv(self::ROWS, 2), $count - self::ROWS));
         $shown = array_slice($this->matches, $first, self::ROWS, true);
-        $nameWidth = max(array_map(fn($e) => mb_strwidth($e['name'] . ($e['hint'] !== '' ? ' ' . $e['hint'] : '')), $shown));
+        $nameWidth = max(array_map(fn(array $e): int => mb_strwidth($e['name'] . ($e['hint'] !== '' ? ' ' . $e['hint'] : '')), $shown));
 
         $rows = [];
         foreach ($shown as $i => $entry) {

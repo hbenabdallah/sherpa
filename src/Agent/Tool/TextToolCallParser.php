@@ -83,7 +83,7 @@ final class TextToolCallParser
     {
         $named = array_filter(
             array_keys($signatures),
-            fn(string $tool) => preg_match('/(?<![\w-])' . preg_quote($tool, '/') . '(?![\w-])/', $content) === 1,
+            fn(string $tool): bool => preg_match('/(?<![\w-])' . preg_quote($tool, '/') . '(?![\w-])/', $content) === 1,
         );
         if ($named === []) {
             return [];
@@ -95,8 +95,8 @@ final class TextToolCallParser
                 continue;
             }
 
-            $keys = array_map('strval', array_keys($arguments));
-            $fits = array_values(array_filter($named, fn(string $tool) => array_diff($keys, $signatures[$tool]['params']) === []
+            $keys = array_map(strval(...), array_keys($arguments));
+            $fits = array_values(array_filter($named, fn(string $tool): bool => array_diff($keys, $signatures[$tool]['params']) === []
                 && array_diff($signatures[$tool]['required'], $keys) === []));
 
             if (count($fits) === 1) {

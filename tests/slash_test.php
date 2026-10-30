@@ -1,11 +1,14 @@
 <?php
 
+use App\Session\SavedSession;
+use App\Skills\Skill;
+
 // The slash commands: what a session is steered with. They were three hundred
 // lines inside the command that also boots the session and runs its loop, and
 // nothing exercised them. Apart, they answer without a terminal and without a
 // backend — so this is what that separation bought.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\ContextBudget;
 use App\Agent\HistoryCompactor;
@@ -181,7 +184,7 @@ function run(SlashCommands $commands, string $input, MessageBag $bag, Project $p
 
     return [$handled, Terminal::plain((string) ob_get_clean())];
 }
-$slash = fn(string $input) => run($commands, $input, $bag, $project);
+$slash = fn(string $input): array => run($commands, $input, $bag, $project);
 
 // ---- a word it does not know is not an answer ------------------------------
 [$handled, $out] = $slash('/madeup');
@@ -264,8 +267,8 @@ symlink($outsideSkill, $skillDir . '/aide.md');
 $confined = new SkillRegistry();
 $confined->setProjectPath($root . '/projet');
 $confined->load();
-check('a project skill is loaded', $confined->get('deploiement') !== null);
-check('but not a symlink in its skills pointing outside the project', $confined->get('aide') === null, (string) $confined->get('aide')?->content);
+check('a project skill is loaded', $confined->get('deploiement') instanceof Skill);
+check('but not a symlink in its skills pointing outside the project', !$confined->get('aide') instanceof Skill, (string) $confined->get('aide')?->content);
 unlink($skillDir . '/aide.md');
 
 // ---- permissions -----------------------------------------------------------
@@ -416,7 +419,7 @@ check('what is written next goes into the resumed conversation', $sessions->curr
 // Nothing was confirmed because nothing was lost: the one just left is there.
 check(
     'the conversation left behind is still listed',
-    count(array_filter($sessions->all(), fn($s) => $s->title === 'List the routes')) === 1,
+    count(array_filter($sessions->all(), fn(SavedSession $s): bool => $s->title === 'List the routes')) === 1,
 );
 
 [, $out] = $slash('/resume 1');
@@ -474,7 +477,7 @@ check(
 );
 check('and says how', str_contains($out, 'copied') && str_contains($out, 'pbcopy'), $out);
 
-[, $out] = run($commands, '/copy', (function () {
+[, $out] = run($commands, '/copy', (function (): MessageBag {
     $b = new MessageBag();
     $b->system('P');
     $b->user('q');

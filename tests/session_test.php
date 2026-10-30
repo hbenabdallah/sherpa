@@ -1,10 +1,13 @@
 <?php
 
+use App\Agent\PlanMode;
+use App\Session\SavedSession;
+
 // Conversations kept on disk: what is written, where, when, and what comes
 // back. Until these existed, closing the terminal was the end of a session —
 // every question asked, every file read, every half-finished change.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Memory\ContextStore;
 use App\Project\DockerConfig;
@@ -39,7 +42,7 @@ $store = new SessionStore();
 $store->bind($project);
 
 $system = ['role' => 'system', 'content' => 'SYSTEM PROMPT'];
-$files = fn() => glob($store->directory() . '/*.json') ?: [];
+$files = fn(): array => glob($store->directory() . '/*.json') ?: [];
 
 // ---- nothing to keep, nothing written --------------------------------------
 check(
@@ -122,7 +125,7 @@ check('the next save is a second conversation, beside the first', count($files()
 check(
     'the most recently active comes first',
     ($store->all()[0]->title ?? '') === 'Where is VAT calculated?',
-    json_encode(array_map(fn($s) => $s->title, $store->all())),
+    json_encode(array_map(fn(SavedSession $s): string => $s->title, $store->all())),
 );
 check(
     'and "the previous one" is never the one already open',
@@ -134,7 +137,7 @@ check(
 check('a session loads by its id', $store->load($firstId)?->id === $firstId);
 check(
     'an id shaped like a path is refused before it gets near one',
-    $store->load('../../projects') === null && $store->load('20260101-000000-abcd/../../x') === null,
+    !$store->load('../../projects') instanceof SavedSession && !$store->load('20260101-000000-abcd/../../x') instanceof SavedSession,
 );
 
 file_put_contents($store->directory() . '/20260101-000000-dead.json', '{ truncated');
@@ -151,7 +154,7 @@ file_put_contents(
     $store->directory() . '/20260101-000000-beef.json',
     json_encode(['id' => '../victime', 'messages' => [['role' => 'user', 'content' => 'x']]]),
 );
-check('a file whose id is not its own name is skipped', $store->load('20260101-000000-beef') === null && count($store->all()) === 2, (string) count($store->all()));
+check('a file whose id is not its own name is skipped', !$store->load('20260101-000000-beef') instanceof SavedSession && count($store->all()) === 2, (string) count($store->all()));
 unlink($store->directory() . '/20260101-000000-beef.json');
 
 // ---- only the most recent are kept -----------------------------------------
@@ -166,13 +169,13 @@ check(
 );
 check(
     'and the one being written is never among those removed',
-    $store->load((string) $store->currentId()) !== null,
+    $store->load((string) $store->currentId()) instanceof SavedSession,
 );
 
 // ---- a conversation started in plan mode -----------------------------------
 // The request reaches the model behind plan mode's reminder, and the reminder
 // became the title: every planned conversation listed under the same words.
-$planned = (new App\Agent\PlanMode());
+$planned = (new PlanMode());
 $planned->on();
 $store->startNew();
 $store->save([$system, ['role' => 'user', 'content' => $planned->frame('Migrer les factures vers Stripe')]], [], 'api', 'm');

@@ -9,6 +9,7 @@ use App\Project\Project;
 use App\Project\WorkingProject;
 use App\Rag\Embedding\ChunkEmbedder;
 use App\Rag\Embedding\EmbeddingProvider;
+use App\Rag\Eval\RetrievalEval;
 use Throwable;
 
 /**
@@ -27,11 +28,11 @@ class DocSearch
     public const PASSAGES = 5;
 
     /** Share of the prompt window one search may take. */
-    private const SHARE = 0.10;
+    private const float SHARE = 0.10;
 
-    private const MIN_CHARS = 6000;
+    private const int MIN_CHARS = 6000;
 
-    private const MAX_CHARS = 24000;
+    private const int MAX_CHARS = 24000;
 
     private ?string $openFor = null;
 
@@ -65,7 +66,7 @@ class DocSearch
 
         $report = $this->ingestor->sync($project->path, $this->index);
 
-        if ($this->embeddings !== null && $this->embeddings->model() !== '') {
+        if ($this->embeddings instanceof EmbeddingProvider && $this->embeddings->model() !== '') {
             try {
                 $report->embedded = $this->embedder->embed($this->index, $this->embeddings);
             } catch (Throwable $e) {
@@ -145,7 +146,7 @@ class DocSearch
     {
         $keywords = new FusedRetriever([new Bm25Retriever($this->index), new Bm25Retriever($this->index, stemmed: true)]);
 
-        return $this->vectorsReady() && $this->embeddings !== null
+        return $this->vectorsReady() && $this->embeddings instanceof EmbeddingProvider
             ? new FallbackRetriever(new FusedRetriever([new VectorRetriever($this->index, $this->embeddings), $keywords]), $keywords)
             : $keywords;
     }
@@ -179,12 +180,12 @@ class DocSearch
     public function evaluate(array $questions): array
     {
         $this->sync();
-        $eval = new Eval\RetrievalEval();
+        $eval = new RetrievalEval();
         $keywords = new FusedRetriever([new Bm25Retriever($this->index), new Bm25Retriever($this->index, stemmed: true)]);
 
         $results = ['keywords' => $eval->run($keywords, $questions)];
 
-        if ($this->vectorsReady() && $this->embeddings !== null) {
+        if ($this->vectorsReady() && $this->embeddings instanceof EmbeddingProvider) {
             $meaning = new VectorRetriever($this->index, $this->embeddings);
             $results['meaning'] = $eval->run($meaning, $questions);
             $results['meaning + keywords'] = $eval->run(new FusedRetriever([$meaning, $keywords]), $questions);

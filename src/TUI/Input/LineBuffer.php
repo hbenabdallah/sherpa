@@ -22,9 +22,9 @@ namespace App\TUI\Input;
  */
 final class LineBuffer
 {
-    public const SUBMIT = 'submit';
+    public const string SUBMIT = 'submit';
 
-    public const EOF = 'eof';
+    public const string EOF = 'eof';
 
     /** @var list<string> one entry per character, so the cursor never splits one */
     private array $chars = [];
@@ -50,24 +50,24 @@ final class LineBuffer
     private array $pastes = [];
 
     /** Past this many lines, or characters, a paste is shown as a label. */
-    public const PASTE_LINES_SHOWN = 5;
+    public const int PASTE_LINES_SHOWN = 5;
 
-    public const PASTE_CHARS_SHOWN = 1000;
+    public const int PASTE_CHARS_SHOWN = 1000;
 
     /**
      * Enter with a modifier, as terminals that tell it apart send it: Alt
      * (ESC then CR), and Shift/Ctrl/Alt in the xterm "modifyOtherKeys" and
      * kitty "CSI u" encodings.
      */
-    private const NEWLINE_KEYS = [
+    private const array NEWLINE_KEYS = [
         "\e\r", "\e\n",
         "\e[13;2u", "\e[13;3u", "\e[13;5u", "\e[13;6u",
         "\e[27;2;13~", "\e[27;3;13~", "\e[27;5;13~", "\e[27;6;13~",
     ];
 
-    public const PASTE_START = "\e[200~";
+    public const string PASTE_START = "\e[200~";
 
-    public const PASTE_END = "\e[201~";
+    public const string PASTE_END = "\e[201~";
 
     /** @param list<string> $history oldest first */
     public function __construct(private readonly array $history = []) {}

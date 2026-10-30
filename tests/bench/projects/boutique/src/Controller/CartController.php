@@ -5,9 +5,9 @@ namespace Boutique\Controller;
 use Boutique\Routing\Route;
 use Boutique\User\UserRepo;
 
-final class CartController
+final readonly class CartController
 {
-    public function __construct(private readonly UserRepo $users = new UserRepo()) {}
+    public function __construct(private UserRepo $users = new UserRepo()) {}
 
     #[Route('/cart/items', method: 'POST')]
     public function add(int $userId, int $productId, int $quantity): array

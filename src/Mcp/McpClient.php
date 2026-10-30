@@ -4,6 +4,7 @@ namespace App\Mcp;
 
 use App\Runtime\Interrupt;
 use App\Runtime\InterruptibleHttpClient;
+use App\Version;
 use Closure;
 use Mcp\Client as Sdk;
 use Mcp\Client\Transport\TransportInterface;
@@ -16,6 +17,14 @@ use Mcp\Schema\Content\ResourceLink;
 use Mcp\Schema\Content\TextContent;
 use Mcp\Schema\Content\TextResourceContents;
 use Mcp\Schema\Enum\ProtocolVersion;
+use Mcp\Schema\PromptArgument;
+use Mcp\Schema\Result\CallToolResult;
+use Mcp\Schema\Result\GetPromptResult;
+use Mcp\Schema\Result\ListPromptsResult;
+use Mcp\Schema\Result\ListResourcesResult;
+use Mcp\Schema\Result\ListResourceTemplatesResult;
+use Mcp\Schema\Result\ListToolsResult;
+use Mcp\Schema\Result\ReadResourceResult;
 use Nyholm\Psr7\Factory\Psr17Factory;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Component\HttpClient\Psr18Client;
@@ -41,11 +50,11 @@ final class McpClient
     private const PROTOCOL_VERSION = ProtocolVersion::V2025_06_18;
 
     /** A server that pages forever does not get to page forever. */
-    private const MAX_TOOLS = 500;
+    private const int MAX_TOOLS = 500;
 
-    private const MAX_RESOURCES = 500;
+    private const int MAX_RESOURCES = 500;
 
-    private const MAX_PROMPTS = 200;
+    private const int MAX_PROMPTS = 200;
 
     private ?Sdk $client = null;
 
@@ -75,14 +84,14 @@ final class McpClient
 
     public function connect(): void
     {
-        if ($this->client !== null) {
+        if ($this->client instanceof Sdk) {
             return;
         }
 
         $transport = $this->config->isHttp() ? $this->http() : $this->stdio();
 
         $client = Sdk::builder()
-            ->setClientInfo('sherpa', \App\Version::current())
+            ->setClientInfo('sherpa', Version::current())
             ->setProtocolVersion(self::PROTOCOL_VERSION)
             ->setInitTimeout($this->seconds($this->handshakeTimeout))
             ->setRequestTimeout($this->seconds($this->callTimeout))
@@ -118,7 +127,7 @@ final class McpClient
         // and stopping at the first page would hide the rest without saying so.
         do {
             try {
-                $page = $this->request(fn(Sdk $client) => $client->listTools($cursor));
+                $page = $this->request(fn(Sdk $client): ListToolsResult => $client->listTools($cursor));
             } catch (SdkException $e) {
                 throw $this->failure('listing the tools failed', $e);
             }
@@ -147,7 +156,7 @@ final class McpClient
         $this->connect();
 
         try {
-            $result = $this->request(fn(Sdk $client) => $client->callTool($name, $arguments));
+            $result = $this->request(fn(Sdk $client): CallToolResult => $client->callTool($name, $arguments));
         } catch (SdkException $e) {
             // A protocol-level error is not an answer: the tool never ran, and
             // saying otherwise would have the model act on a result that does
@@ -176,7 +185,7 @@ final class McpClient
 
         do {
             try {
-                $page = $this->request(fn(Sdk $client) => $client->listResources($cursor));
+                $page = $this->request(fn(Sdk $client): ListResourcesResult => $client->listResources($cursor));
             } catch (SdkException) {
                 return $resources;
             }
@@ -212,7 +221,7 @@ final class McpClient
 
         do {
             try {
-                $page = $this->request(fn(Sdk $client) => $client->listResourceTemplates($cursor));
+                $page = $this->request(fn(Sdk $client): ListResourceTemplatesResult => $client->listResourceTemplates($cursor));
             } catch (Throwable) {
                 // Unknown method, or a template the SDK refuses to parse:
                 // either way there is nothing usable to offer.
@@ -243,7 +252,7 @@ final class McpClient
         $this->connect();
 
         try {
-            $result = $this->request(fn(Sdk $client) => $client->readResource($uri));
+            $result = $this->request(fn(Sdk $client): ReadResourceResult => $client->readResource($uri));
         } catch (SdkException $e) {
             throw $this->failure("reading {$uri} failed", $e, quoteLog: false);
         }
@@ -258,7 +267,7 @@ final class McpClient
             };
         }
 
-        return trim(implode("\n\n", array_filter($parts, fn(string $p) => $p !== '')));
+        return trim(implode("\n\n", array_filter($parts, fn(string $p): bool => $p !== '')));
     }
 
     /**
@@ -275,7 +284,7 @@ final class McpClient
 
         do {
             try {
-                $page = $this->request(fn(Sdk $client) => $client->listPrompts($cursor));
+                $page = $this->request(fn(Sdk $client): ListPromptsResult => $client->listPrompts($cursor));
             } catch (SdkException) {
                 return $prompts;
             }
@@ -284,9 +293,9 @@ final class McpClient
                 $prompts[] = [
                     'name'        => $prompt->name,
                     'description' => (string) ($prompt->description ?? $prompt->title ?? ''),
-                    'arguments'   => array_map(static fn($argument) => [
+                    'arguments'   => array_map(static fn(PromptArgument $argument): array => [
                         'name'        => $argument->name,
-                        'description' => (string) ($argument->description ?? ''),
+                        'description' => $argument->description ?? '',
                         'required'    => (bool) $argument->required,
                     ], $prompt->arguments ?? []),
                 ];
@@ -310,7 +319,7 @@ final class McpClient
         $this->connect();
 
         try {
-            $result = $this->request(fn(Sdk $client) => $client->getPrompt($name, $arguments));
+            $result = $this->request(fn(Sdk $client): GetPromptResult => $client->getPrompt($name, $arguments));
         } catch (SdkException $e) {
             throw $this->failure("getting the prompt {$name} failed", $e);
         }
@@ -392,13 +401,12 @@ final class McpClient
             );
         }
 
-        return (new ServerProcess(
+        return new ServerProcess(
             command: $this->config->command,
             args: $this->config->args,
-            cwd: null,
             env: $this->config->env + $this->inheritedEnv(),
             logger: $this->log,
-        ))->listenTo($this->interrupt);
+        )->listenTo($this->interrupt);
     }
 
     /**
@@ -411,16 +419,16 @@ final class McpClient
         $factory = new Psr17Factory();
         // The SDK sends and waits for the answer in one call: the client
         // itself has to listen while the server takes its time.
-        $client = $this->interrupt === null ? HttpClient::create() : new InterruptibleHttpClient(HttpClient::create(), $this->interrupt);
+        $client = $this->interrupt instanceof Interrupt ? new InterruptibleHttpClient(HttpClient::create(), $this->interrupt) : HttpClient::create();
 
-        return (new RemoteServer(
+        return new RemoteServer(
             endpoint: $this->config->url,
             headers: $this->config->headers,
             httpClient: new Psr18Client($client, $factory, $factory),
             requestFactory: $factory,
             streamFactory: $factory,
             logger: $this->log,
-        ))->listenTo($this->interrupt);
+        )->listenTo($this->interrupt);
     }
 
     /**
@@ -470,7 +478,7 @@ final class McpClient
     {
         return array_filter(
             getenv(),
-            static fn(string $key) => !str_starts_with($key, 'SHERPA_'),
+            static fn(string $key): bool => !str_starts_with($key, 'SHERPA_'),
             ARRAY_FILTER_USE_KEY,
         );
     }
@@ -499,7 +507,7 @@ final class McpClient
             };
         }
 
-        return trim(implode("\n", array_filter($parts, fn(string $p) => $p !== '')));
+        return trim(implode("\n", array_filter($parts, fn(string $p): bool => $p !== '')));
     }
 
     private function which(string $command): ?string

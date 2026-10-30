@@ -15,7 +15,7 @@ namespace App\Rag;
  */
 final class QueryTerms
 {
-    private const STOPWORDS = [
+    private const array STOPWORDS = [
         // French
         'le', 'la', 'les', 'un', 'une', 'des', 'du', 'de', 'd', 'l', 'au', 'aux', 'et', 'ou', 'où', 'en', 'dans',
         'sur', 'sous', 'par', 'pour', 'avec', 'sans', 'ce', 'cet', 'cette', 'ces', 'qui', 'que', 'qu', 'quoi',

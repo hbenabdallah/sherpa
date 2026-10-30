@@ -7,7 +7,7 @@
 // request was refused for exceeding the model's window. file_read had no bound
 // at all. Both are now bounded in characters, not only in lines.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\ContextBudget;
 use App\Project\ProjectPathResolver;
@@ -76,7 +76,7 @@ $minified = $read('fixtures/devis.json');
 check('reading a minified file sends back a bounded line', strlen($minified) < 3000, (string) strlen($minified));
 check('that says it was cut', str_contains($minified, '[line of'), substr($minified, 0, 200));
 
-$big = implode("\n", array_map(static fn(int $n) => sprintf('// ligne %05d %s', $n, str_repeat('-', 80)), range(1, 5000)));
+$big = implode("\n", array_map(static fn(int $n): string => sprintf('// ligne %05d %s', $n, str_repeat('-', 80)), range(1, 5000)));
 file_put_contents($root . '/src/Big.php', $big);
 $first = $read('src/Big.php');
 check('a large file is cut to the read\'s share of the window', strlen($first) < 60000, (string) strlen($first));

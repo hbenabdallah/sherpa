@@ -1,12 +1,15 @@
 <?php
 
+use App\Memory\Recorded;
+use App\Project\DockerConfig;
+
 // Files written by an earlier Sherpa, read by this one. The fixtures under
 // fixtures/compat-v0.1.0 were written by v0.1.0's own code — config.yaml,
 // projects.yaml, a memory database and a saved conversation — and an upgrade
 // must find every one of them as it was left: the model chosen, the project
 // and its grants, the facts, the conversation to resume.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Config\Backend;
 use App\Config\MachineConfig;
@@ -92,13 +95,13 @@ $project = $projects->forDirectory($root . '/projet');
 check('projects.yaml: the project is found from its directory', $project?->slug === 'projet-ete', (string) $project?->slug);
 check('under its name', $project?->name === 'Projet Été', (string) $project?->name);
 check('with its container', $project?->docker->enabled === true && $project->docker->container === 'app' && $project->docker->dbContainer === 'db');
-check('which runs commands as the user, the default since', $project?->docker->user === App\Project\DockerConfig::USER_HOST, (string) $project?->docker->user);
+check('which runs commands as the user, the default since', $project?->docker->user === DockerConfig::USER_HOST, (string) $project?->docker->user);
 // Its one grant was shell_exec itself, which let any command run unasked:
 // grants name commands now, and that one is not carried over.
 check('and not its grant of shell_exec itself', $project?->allowedTools === [], json_encode($project?->allowedTools));
 
 $projects->touch($project);
-$again = (new ProjectStore(new StackDetector()))->forDirectory($root . '/projet');
+$again = new ProjectStore(new StackDetector())->forDirectory($root . '/projet');
 check('saved again, nothing of it is lost', $again?->allowedTools === [] && $again->docker->container === 'app' && $again->name === 'Projet Été');
 
 // ---- the memory database ---------------------------------------------------
@@ -111,7 +114,7 @@ foreach ($memory->recall() as $fact) {
 check('memory.db: the facts are there', ($facts['tests'] ?? null) === 'make test runs the suites in Docker', json_encode($facts));
 check('with the one superseded no longer current', ($facts['db'] ?? null) === 'PostgreSQL 17' && count($memory->history('db')) === 2, json_encode($facts));
 check('and searchable', ($memory->recall('postgresql')[0]->key ?? null) === 'db');
-check('it still takes new facts', $memory->remember('ci', 'GitHub Actions') !== null && count($memory->recall()) === 3);
+check('it still takes new facts', $memory->remember('ci', 'GitHub Actions') instanceof Recorded && count($memory->recall()) === 3);
 
 // ---- a saved conversation --------------------------------------------------
 $sessions = new SessionStore();

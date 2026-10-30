@@ -29,7 +29,7 @@ class MemoryRecallTool
             $this->store->noteRecall($facts !== []);
         }
 
-        if (empty($facts)) {
+        if ($facts === []) {
             return $search
                 ? "No fact found for: {$search}"
                 : "Nothing remembered for this project.";

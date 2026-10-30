@@ -14,11 +14,11 @@ use Throwable;
  * then a rename over the old one — whole or not at all, never half a file
  * where Sherpa was.
  */
-final class SelfUpdater
+final readonly class SelfUpdater
 {
     public function __construct(
-        private readonly HttpClientInterface $client,
-        private readonly Releases $releases,
+        private HttpClientInterface $client,
+        private Releases $releases,
     ) {}
 
     /**
@@ -59,7 +59,7 @@ final class SelfUpdater
             throw new UpdateFailed("could not write in {$dir}");
         }
 
-        if ($beforeReplace !== null) {
+        if ($beforeReplace instanceof Closure) {
             $beforeReplace($notes);
         }
 
@@ -82,7 +82,7 @@ final class SelfUpdater
         } catch (UpdateFailed $e) {
             throw $e;
         } catch (Throwable $e) {
-            throw new UpdateFailed("{$missing}: {$e->getMessage()}");
+            throw new UpdateFailed("{$missing}: {$e->getMessage()}", $e->getCode(), $e);
         }
     }
 }

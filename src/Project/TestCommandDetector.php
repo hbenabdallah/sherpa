@@ -17,7 +17,7 @@ namespace App\Project;
 class TestCommandDetector
 {
     /** The first word of a line in a README that can be a test command. */
-    private const COMMAND_STARTS = [
+    private const array COMMAND_STARTS = [
         'php', 'composer', 'make', 'vendor/bin/', 'bin/', './', 'npm', 'npx', 'yarn', 'pnpm', 'bun',
         'pytest', 'python', 'tox', 'go', 'cargo', 'bundle', 'rake', 'rspec', 'mix', 'dotnet',
         'mvn', 'gradle', './gradlew', 'deno',
@@ -28,17 +28,17 @@ class TestCommandDetector
         $path = rtrim($projectPath, '/');
 
         foreach ([
-            fn() => $this->composer($path),
-            fn() => $this->make($path),
-            fn() => $this->node($path),
-            fn() => $this->phpunit($path),
-            fn() => is_file("{$path}/go.mod") ? new TestCommand('go test ./...', 'go.mod') : null,
-            fn() => is_file("{$path}/Cargo.toml") ? new TestCommand('cargo test', 'Cargo.toml') : null,
-            fn() => $this->pytest($path),
-            fn() => $this->readme($path),
+            fn(): ?TestCommand => $this->composer($path),
+            fn(): ?TestCommand => $this->make($path),
+            fn(): ?TestCommand => $this->node($path),
+            fn(): ?TestCommand => $this->phpunit($path),
+            fn(): ?TestCommand => is_file("{$path}/go.mod") ? new TestCommand('go test ./...', 'go.mod') : null,
+            fn(): ?TestCommand => is_file("{$path}/Cargo.toml") ? new TestCommand('cargo test', 'Cargo.toml') : null,
+            fn(): ?TestCommand => $this->pytest($path),
+            fn(): ?TestCommand => $this->readme($path),
         ] as $probe) {
             $command = $probe();
-            if ($command !== null) {
+            if ($command instanceof TestCommand) {
                 return $command;
             }
         }

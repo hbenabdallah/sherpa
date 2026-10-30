@@ -23,13 +23,19 @@ use Symfony\Component\Console\Output\OutputInterface;
  * done behind the user's back — a tool that changes under a session, or on
  * the say-so of whoever controls the release, is not one to trust with code.
  */
-#[AsCommand(name: 'update', description: 'Install the latest Sherpa, or the version named')]
+#[AsCommand(name: 'update', description: 'Install the latest Sherpa, or the version named', help: <<<'TXT'
+Downloads the executable for this machine from the GitHub release, checks it
+against the release's SHA-256, and puts it in place of this one. Nothing is
+touched when anything fails.
+
+From the source, update with git pull instead.
+TXT)]
 final class UpdateCommand extends Command
 {
     /** Asked for, so worth waiting for longer than the start-up notice does. */
-    private const LATEST_TIMEOUT = 15.0;
+    private const float LATEST_TIMEOUT = 15.0;
 
-    private const NOTES_LINES = 40;
+    private const int NOTES_LINES = 40;
 
     public function __construct(
         private readonly Releases $releases,
@@ -46,14 +52,7 @@ final class UpdateCommand extends Command
     protected function configure(): void
     {
         $this
-            ->addArgument('version', InputArgument::OPTIONAL, 'A release to install instead of the latest, to go back to one: 1.0.1')
-            ->setHelp(<<<'HELP'
-                Downloads the executable for this machine from the GitHub release, checks it
-                against the release's SHA-256, and puts it in place of this one. Nothing is
-                touched when anything fails.
-
-                From the source, update with git pull instead.
-                HELP);
+            ->addArgument('version', InputArgument::OPTIONAL, 'A release to install instead of the latest, to go back to one: 1.0.1');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -103,7 +102,7 @@ final class UpdateCommand extends Command
                 if ($notes !== null) {
                     $lines = [...$lines, '', ...self::shown($notes)];
                 }
-                $said = array_map(fn(string $line) => $formatter->format($line) . "\n", $lines);
+                $said = array_map(fn(string $line): string => $formatter->format($line) . "\n", $lines);
             });
         } catch (UpdateFailed $e) {
             return $this->fail($output, $e->getMessage() . '. Nothing was changed.');
@@ -129,7 +128,7 @@ final class UpdateCommand extends Command
     private static function shown(string $notes): array
     {
         $lines = array_map(
-            fn(string $line) => OutputFormatter::escape(Terminal::plain($line, singleLine: true)),
+            fn(string $line): string => OutputFormatter::escape(Terminal::plain($line, singleLine: true)),
             explode("\n", trim($notes)),
         );
 

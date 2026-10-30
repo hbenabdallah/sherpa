@@ -1,8 +1,10 @@
 <?php
 
+use Symfony\Component\Yaml\Yaml;
+
 // Verification of model selection: the precedence chain, what gets written down,
 // and the two things that must happen when the model changes under a session.
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\ContextBudget;
 use App\Agent\MessageBag;
@@ -48,7 +50,7 @@ function configAt(string $path): MachineConfig
 
 // ---- 1. Never chosen ⇒ null, which is what triggers the question -----------
 $config = configAt($dir . '/absent.yaml');
-check('no file means no stored choice', $config->read() === null);
+check('no file means no stored choice', !$config->read() instanceof ModelProfile);
 
 // ---- 2. Round trip ---------------------------------------------------------
 $config = configAt($dir . '/config.yaml');
@@ -75,7 +77,7 @@ check(
 // Otherwise the setup screen never appears and the session runs against "".
 foreach (['', "model: ''\n", "context: 4096\n", "{{ not yaml\n"] as $i => $content) {
     file_put_contents($dir . '/broken.yaml', $content);
-    check("unusable file #{$i} reads as no choice", configAt($dir . '/broken.yaml')->read() === null);
+    check("unusable file #{$i} reads as no choice", !configAt($dir . '/broken.yaml')->read() instanceof ModelProfile);
 }
 
 // ---- 4. The precedence chain ----------------------------------------------
@@ -85,7 +87,7 @@ $resolver = new ModelResolver(configAt($dir . '/config.yaml'), 'env:7b', 32768);
 check('the command line wins', $resolver->fromCommandLine('cli:70b', null)?->model === 'cli:70b');
 check('config.yaml beats .env', $resolver->stored()?->model === 'stored:7b');
 check('.env is the last resort', $resolver->fallback()->model === 'env:7b');
-check('no flags means no command-line profile', $resolver->fromCommandLine(null, null) === null);
+check('no flags means no command-line profile', !$resolver->fromCommandLine(null, null) instanceof ModelProfile);
 
 // --ctx alone retunes what is already in force rather than dragging .env along.
 $retuned = $resolver->fromCommandLine(null, 4096);
@@ -105,11 +107,11 @@ check('with nothing said anywhere, the API is the backend', $fresh->backend() ==
 check('a flag wins over everything', $fresh->backend(Backend::Ollama) === Backend::Ollama);
 check(
     '.env can say otherwise',
-    (new ModelResolver(configAt($dir . '/absent.yaml'), 'env:7b', 32768, 'ollama'))->backend() === Backend::Ollama,
+    new ModelResolver(configAt($dir . '/absent.yaml'), 'env:7b', 32768, 'ollama')->backend() === Backend::Ollama,
 );
 check(
     'and an unreadable .env value falls back to the default',
-    (new ModelResolver(configAt($dir . '/absent.yaml'), 'env:7b', 32768, 'n-importe-quoi'))->backend() === Backend::Api,
+    new ModelResolver(configAt($dir . '/absent.yaml'), 'env:7b', 32768, 'n-importe-quoi')->backend() === Backend::Api,
 );
 
 // No provider's model can be guessed, so an unconfigured API has none — and
@@ -145,10 +147,10 @@ check('without losing the API model', $both->read(Backend::Api)?->model === 'dis
 
 check(
     'a backend chosen but never given a model reads as never chosen',
-    (function () use ($dir) {
+    (function () use ($dir): bool {
         file_put_contents($dir . '/half.yaml', "backend: api\nollama:\n  model: local:7b\n");
 
-        return configAt($dir . '/half.yaml')->read() === null;
+        return !configAt($dir . '/half.yaml')->read() instanceof ModelProfile;
     })(),
 );
 
@@ -159,10 +161,10 @@ file_put_contents($dir . '/legacy.yaml', "model: ancien:7b\ncontext: 8192\n");
 $legacy = configAt($dir . '/legacy.yaml');
 check('a file from before backends is read as Ollama', $legacy->backend() === Backend::Ollama);
 check('with its model intact', $legacy->read()?->model === 'ancien:7b' && $legacy->read()?->contextWindow === 8192);
-check('and it has no API model', $legacy->read(Backend::Api) === null);
+check('and it has no API model', !$legacy->read(Backend::Api) instanceof ModelProfile);
 
 $legacy->save(new ModelProfile('distant', 32768, '', Backend::Api), asDefault: false);
-$migrated = Symfony\Component\Yaml\Yaml::parseFile($dir . '/legacy.yaml');
+$migrated = Yaml::parseFile($dir . '/legacy.yaml');
 check(
     'saving folds the old shape into its section',
     ($migrated['ollama']['model'] ?? null) === 'ancien:7b' && !isset($migrated['model']),
@@ -217,7 +219,7 @@ check(
     'an address in the environment wins — it ships empty, so it was chosen',
     $urlResolver->apiUrl('https://ailleurs.example/v1') === 'https://ailleurs.example/v1',
 );
-check('and with neither there is none', (new ModelResolver(configAt($dir . '/absent.yaml'), 'env:7b', 32768))->apiUrl('') === null);
+check('and with neither there is none', new ModelResolver(configAt($dir . '/absent.yaml'), 'env:7b', 32768)->apiUrl('') === null);
 
 // ---- 5. A suggested window never exceeds what the model has ----------------
 $big = new ModelInfo('qwen3-coder:30b', 262144, ['completion', 'tools']);
@@ -231,7 +233,7 @@ check('an unknown window falls back to the safe one', ModelProfile::suggestFor($
 
 // ---- 6. Tool support is the one disqualifying fact -------------------------
 check('a tool-calling model passes', $small->supportsTools());
-check('a model without tools is refused', !(new ModelInfo('vision-only:7b', 8192, ['completion', 'vision']))->supportsTools());
+check('a model without tools is refused', !new ModelInfo('vision-only:7b', 8192, ['completion', 'vision'])->supportsTools());
 check('silence about capabilities is not evidence against', $unknown->supportsTools());
 check('and silence is reported as silence', $unknown->capabilitiesUnknown());
 
@@ -293,19 +295,19 @@ $show = json_encode([
     ],
 ]);
 
-$named = (new OllamaPlatform(new MockHttpClient(new MockResponse($show)), 'http://x', 'm'))
+$named = new OllamaPlatform(new MockHttpClient(new MockResponse($show)), 'http://x', 'm')
     ->describeModel('devstral-small-2:24b');
 
-check('an arbitrary name can be described', $named !== null);
+check('an arbitrary name can be described', $named instanceof ModelInfo);
 check('the architecture-prefixed window is found', $named?->contextLength === 393216, (string) $named?->contextLength);
 check('the rope-scaling window is not mistaken for it', $named?->contextLength !== 8192);
 
-$missing = (new OllamaPlatform(
+$missing = new OllamaPlatform(
     new MockHttpClient(new MockResponse('{"error":"model not found"}', ['http_code' => 404])),
     'http://x',
     'm',
-))->describeModel('jamais-pull:1b');
-check('a model the server lacks reports absence, not failure', $missing === null);
+)->describeModel('jamais-pull:1b');
+check('a model the server lacks reports absence, not failure', !$missing instanceof ModelInfo);
 
 // ---- 10. The platform follows the switch ----------------------------------
 $platform = new OllamaPlatform(new MockHttpClient(new MockResponse($tags)), 'http://x', 'depart:7b', 32768);
@@ -391,7 +393,7 @@ $project = new Project(
 
 function promptFor(MemoryStore $memory, ?ContextBudget $budget): string
 {
-    return (new SystemPromptBuilder($memory, new SkillRegistry(), new StackDetector(), $budget))
+    return new SystemPromptBuilder($memory, new SkillRegistry(), new StackDetector(), $budget)
         ->build($GLOBALS['project']);
 }
 $GLOBALS['project'] = $project;
@@ -426,9 +428,9 @@ check(
     str_contains($small, 'memory_recall') && str_contains($large, 'memory_recall'),
 );
 
-array_map('unlink', glob($dir . '/projet/*') ?: []);
+array_map(unlink(...), glob($dir . '/projet/*') ?: []);
 @rmdir($dir . '/projet');
-array_map('unlink', glob($dir . '/*') ?: []);
+array_map(unlink(...), glob($dir . '/*') ?: []);
 @rmdir($dir);
 
 printf("\n%d passed, %d failed\n", $pass, $fail);

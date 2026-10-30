@@ -19,9 +19,9 @@ use App\Agent\Tool\ToolDefinition;
  */
 final class PlanMode
 {
-    public const BLOCKED = 'Plan mode: nothing is changed until the user approves a plan. Keep investigating, then present the plan with plan_ready.';
+    public const string BLOCKED = 'Plan mode: nothing is changed until the user approves a plan. Keep investigating, then present the plan with plan_ready.';
 
-    private const REMINDER = "[Plan mode — change nothing yet: read and investigate what this needs, then present your plan with plan_ready. The user approves it before anything is changed.]\n\n";
+    private const string REMINDER = "[Plan mode — change nothing yet: read and investigate what this needs, then present your plan with plan_ready. The user approves it before anything is changed.]\n\n";
 
     private bool $active = false;
 
@@ -42,7 +42,7 @@ final class PlanMode
 
     public function blocks(?ToolDefinition $def): bool
     {
-        return $this->active && $def !== null && $def->permission === Permission::CONFIRM && $def->name !== 'web_fetch';
+        return $this->active && $def instanceof ToolDefinition && $def->permission === Permission::CONFIRM && $def->name !== 'web_fetch';
     }
 
     /** The request as the model reads it while planning: with the reminder of what plan mode is. */

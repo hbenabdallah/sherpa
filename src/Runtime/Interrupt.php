@@ -25,10 +25,10 @@ class Interrupt
 
     private int $requestsThisTurn = 0;
 
-    private const LISTEN_SECONDS = 0.02;
+    private const float LISTEN_SECONDS = 0.02;
 
     /** The longest a wait holds on in a Fiber: every other one waits as long. */
-    private const FIBER_POLL_SECONDS = 0.05;
+    private const float FIBER_POLL_SECONDS = 0.05;
 
     /** @var (Closure(): void)|null */
     private ?Closure $quit = null;
@@ -107,13 +107,13 @@ class Interrupt
             Fiber::suspend();
         }
 
-        if (!$this->requested && $this->meanwhile !== null) {
+        if (!$this->requested && $this->meanwhile instanceof Closure) {
             ($this->meanwhile)();
         }
 
         // Every chunk of a reply asks: at most fifty times a second is heard
         // soon enough, and costs nothing.
-        if (!$this->requested && $this->listen !== null && microtime(true) - $this->listenedAt >= self::LISTEN_SECONDS) {
+        if (!$this->requested && $this->listen instanceof Closure && microtime(true) - $this->listenedAt >= self::LISTEN_SECONDS) {
             $this->listenedAt = microtime(true);
             ($this->listen)();
         }
@@ -155,7 +155,7 @@ class Interrupt
 
     private function quitNow(): void
     {
-        if ($this->quit !== null) {
+        if ($this->quit instanceof Closure) {
             ($this->quit)();
         }
     }

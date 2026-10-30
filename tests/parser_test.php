@@ -3,7 +3,7 @@
 // Verification of TextToolCallParser: recovering tool calls a model emitted as
 // prose, without firing on models that merely talk about JSON.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\Tool\TextToolCallParser;
 
@@ -23,8 +23,8 @@ function check(string $label, $expected, $actual): void
 
 $p = new TextToolCallParser();
 $known = ['file_read', 'project_grep', 'shell_exec'];
-$names = fn(array $calls) => array_map(fn($c) => $c['function']['name'], $calls);
-$args = fn(array $calls) => array_map(fn($c) => $c['function']['arguments'], $calls);
+$names = fn(array $calls): array => array_map(fn(array $c) => $c['function']['name'], $calls);
+$args = fn(array $calls): array => array_map(fn(array $c) => $c['function']['arguments'], $calls);
 
 // ---- THE ACTUAL FAILURE: bare JSON, no wrapper tags -----------------------
 $real = '{

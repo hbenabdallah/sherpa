@@ -4,7 +4,7 @@
 // variable may hold another provider's key, and must not reach this one
 // unless the person says so.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use Symfony\Component\Process\Process;
 

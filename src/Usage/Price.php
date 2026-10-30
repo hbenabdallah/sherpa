@@ -11,14 +11,14 @@ namespace App\Usage;
  * month and differ by provider, plan and currency, and a number Sherpa made up
  * would be a wrong number presented as a fact.
  */
-final class Price
+final readonly class Price
 {
     public function __construct(
-        public readonly float $input,
-        public readonly float $output,
+        public float $input,
+        public float $output,
         /** Prompt tokens served from the provider's cache; billed as input when null. */
-        public readonly ?float $cachedInput = null,
-        public readonly string $currency = '$',
+        public ?float $cachedInput = null,
+        public string $currency = '$',
     ) {}
 
     public function of(int $prompt, int $completion, int $cached = 0): float

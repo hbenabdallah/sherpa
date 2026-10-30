@@ -28,17 +28,17 @@ use Throwable;
 final class EditorFrontend implements AgentOutput, Approver
 {
     /** Tool output sent to the editor, at most: it shows it, the model has it all. */
-    private const MAX_RESULT_CHARS = 20_000;
+    private const int MAX_RESULT_CHARS = 20_000;
 
     /** Allowed for the session, or for good: both are an "always" to an editor. */
-    private const OPTIONS = [
+    private const array OPTIONS = [
         ['optionId' => 'allow-once', 'name' => 'Allow once', 'kind' => 'allow_once'],
         ['optionId' => 'allow-session', 'name' => 'Allow for this session', 'kind' => 'allow_always'],
         ['optionId' => 'allow-project', 'name' => 'Always allow in this project', 'kind' => 'allow_always'],
         ['optionId' => 'reject', 'name' => 'Refuse', 'kind' => 'reject_once'],
     ];
 
-    private const PLAN_OPTIONS = [
+    private const array PLAN_OPTIONS = [
         ['optionId' => 'plan-go', 'name' => 'Carry out this plan', 'kind' => 'allow_once'],
         ['optionId' => 'plan-keep', 'name' => 'Keep planning', 'kind' => 'reject_once'],
     ];
@@ -399,7 +399,7 @@ final class EditorFrontend implements AgentOutput, Approver
 
     private function sendPlan(): void
     {
-        $entries = array_map(static fn(array $task) => [
+        $entries = array_map(static fn(array $task): array => [
             'content'  => (string) $task['text'],
             'priority' => 'medium',
             'status'   => match ($task['status']) {
@@ -422,7 +422,7 @@ final class EditorFrontend implements AgentOutput, Approver
      */
     private function preview(string $toolName, array $args, ?ProposedEdit $edit): array
     {
-        if ($edit !== null) {
+        if ($edit instanceof ProposedEdit) {
             return [self::diff($edit)];
         }
 
@@ -444,7 +444,7 @@ final class EditorFrontend implements AgentOutput, Approver
      */
     private function locations(array $args, ?ProposedEdit $edit): array
     {
-        if ($edit !== null) {
+        if ($edit instanceof ProposedEdit) {
             return [['path' => $edit->path]];
         }
 

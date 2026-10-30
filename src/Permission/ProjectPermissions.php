@@ -26,7 +26,7 @@ class ProjectPermissions
 
     public function isAllowed(string $toolName): bool
     {
-        return $this->project !== null
+        return $this->project instanceof Project
             && in_array($toolName, $this->project->allowedTools, true);
     }
 
@@ -35,7 +35,7 @@ class ProjectPermissions
         // No project bound means no file to write to. Silently keeping the grant
         // in memory would be the old bug in a new place: the user is told the
         // permission is permanent, so it either persists or it is not granted.
-        if ($this->project === null) {
+        if (!$this->project instanceof Project) {
             return;
         }
 
@@ -44,13 +44,13 @@ class ProjectPermissions
 
     public function revoke(string $toolName): bool
     {
-        return $this->project !== null
+        return $this->project instanceof Project
             && $this->store->revokeTool($this->project, $toolName);
     }
 
     public function revokeAll(): int
     {
-        return $this->project === null ? 0 : $this->store->revokeAllTools($this->project);
+        return $this->project instanceof Project ? $this->store->revokeAllTools($this->project) : 0;
     }
 
     /** @return array<int, string> */

@@ -5,7 +5,7 @@
 // a bare fgets(): arrow keys typed "^[[A" into the line, and a Ctrl+C at the
 // prompt waited for Enter. Keys in, state out: no terminal needed to test it.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\TUI\Input\KeyReader;
 use App\TUI\Input\LineBuffer;
@@ -58,7 +58,7 @@ check('so is half an escape sequence', $keys === [] && $rest === "\e[");
 check(
     'a broken character is dropped alone, and the key after it survives',
     $keys === ['é', "\n"],
-    json_encode(array_map('bin2hex', $keys)),
+    json_encode(array_map(bin2hex(...), $keys)),
 );
 
 // ---- editing -----------------------------------------------------------------
@@ -104,11 +104,11 @@ check('Down past the newest gives back what was being typed', $b->text() === 'br
 // The last line sent is often /exit, from the session before. The "/" menu
 // opened on it and Up moved in the menu, stuck there until the line was cleared.
 $editor = new LineEditor();
-$editor->useCompletions(fn() => [
+$editor->useCompletions(fn(): array => [
     ['name' => '/exit', 'hint' => '', 'description' => 'Leave'],
     ['name' => '/model', 'hint' => '[name]', 'description' => 'Change model'],
 ]);
-$menu = (new ReflectionProperty($editor, 'menu'))->getValue($editor);
+$menu = new ReflectionProperty($editor, 'menu')->getValue($editor);
 $key = new ReflectionMethod($editor, 'handleKey');
 $refresh = new ReflectionMethod($editor, 'updateMenu');
 $press = function (LineBuffer $b, string $k) use ($editor, $key, $refresh, $menu): void {
@@ -170,7 +170,7 @@ check('and Enter after that sends it all', $b->feed("\r") === LineBuffer::SUBMIT
 
 // A paste: its line breaks, whichever the system, are text.
 $b = new LineBuffer();
-$results = array_map(fn(string $k) => $b->feed($k), [LineBuffer::PASTE_START, 'l', 'i', 'n', 'e', ' ', '1', "\r", "\n", 'l', '2', "\r", 'l', '3', "\t", 'x', LineBuffer::PASTE_END]);
+$results = array_map($b->feed(...), [LineBuffer::PASTE_START, 'l', 'i', 'n', 'e', ' ', '1', "\r", "\n", 'l', '2', "\r", 'l', '3', "\t", 'x', LineBuffer::PASTE_END]);
 check('a pasted text is taken whole, never sent line by line', array_filter($results) === [], json_encode($results));
 check('its line breaks kept, CRLF and CR alike, tabs as spaces', $b->text() === "line 1\nl2\nl3    x", json_encode($b->text()));
 check('and Enter sends it, once', $b->feed("\r") === LineBuffer::SUBMIT);
@@ -221,7 +221,7 @@ $b = new LineBuffer();
 foreach (str_split('explain: ') as $key) {
     $b->feed($key);
 }
-$log = implode("\n", array_map(fn(int $n) => "line {$n}", range(1, 25)));
+$log = implode("\n", array_map(fn(int $n): string => "line {$n}", range(1, 25)));
 $b->paste($log);
 $b->feed(' ');
 $b->feed('?');
@@ -264,13 +264,13 @@ check('a bracketed paste is folded the same way', $b->text() === '[Pasted text #
 // had typed was gone. And the file holds everything ever typed at the prompt.
 $realHome = $_SERVER['HOME'] ?? null;
 $_SERVER['HOME'] = sys_get_temp_dir() . '/sherpa-hist-' . bin2hex(random_bytes(4));
-$editor = function (): App\TUI\LineEditor {
-    $e = new App\TUI\LineEditor();
-    (new ReflectionMethod($e, 'loadPlainHistory'))->invoke($e);
+$editor = function (): LineEditor {
+    $e = new LineEditor();
+    new ReflectionMethod($e, 'loadPlainHistory')->invoke($e);
 
     return $e;
 };
-$type = function (App\TUI\LineEditor $e, string $line): void {
+$type = function (LineEditor $e, string $line): void {
     $p = new ReflectionProperty($e, 'history');
     $p->setValue($e, [...$p->getValue($e), $line]);
 };
@@ -287,7 +287,7 @@ check('a message of several lines is still one entry', substr_count(trim($kept),
 check('the history is readable by its owner only', (fileperms($file) & 0777) === 0600, sprintf('%o', fileperms($file) & 0777));
 $second->saveHistory();
 check('saving twice adds nothing twice', substr_count((string) file_get_contents($file), 'dit dans le second') === 1, (string) file_get_contents($file));
-check('a third terminal reads both back', in_array('dit dans le premier', (new ReflectionProperty(App\TUI\LineEditor::class, 'history'))->getValue($editor()), true));
+check('a third terminal reads both back', in_array('dit dans le premier', new ReflectionProperty(LineEditor::class, 'history')->getValue($editor()), true));
 exec('rm -rf ' . escapeshellarg($_SERVER['HOME']));
 if ($realHome !== null) {
     $_SERVER['HOME'] = $realHome;

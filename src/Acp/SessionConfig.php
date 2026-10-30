@@ -15,11 +15,11 @@ use Throwable;
  */
 final class SessionConfig
 {
-    public const MODE = 'mode';
+    public const string MODE = 'mode';
 
-    public const MODEL = 'model';
+    public const string MODEL = 'model';
 
-    private const MODES = [
+    private const array MODES = [
         'default' => ['Default', 'Reads freely; asks before anything that writes or runs'],
         'plan'    => ['Plan', 'Reads and proposes a plan; nothing is changed until you approve it'],
     ];
@@ -75,7 +75,7 @@ final class SessionConfig
             'options'      => $modes,
         ]];
 
-        if ($model !== null) {
+        if ($model instanceof ModelProfile) {
             $options[] = [
                 'id'           => self::MODEL,
                 'name'         => 'Model',
@@ -100,7 +100,7 @@ final class SessionConfig
             throw AcpError::invalidParams('The model is missing.');
         }
 
-        if ($current !== null && $current->model === $name) {
+        if ($current instanceof ModelProfile && $current->model === $name) {
             return $current;
         }
 
@@ -160,7 +160,7 @@ final class SessionConfig
      */
     public function seesImages(?ModelProfile $model): bool
     {
-        if ($model === null) {
+        if (!$model instanceof ModelProfile) {
             return true;
         }
 

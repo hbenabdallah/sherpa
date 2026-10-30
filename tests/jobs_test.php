@@ -2,7 +2,7 @@
 
 // Background jobs: left running, read as they go, stopped with what they started.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\Tool\Permission;
 use App\Agent\Tool\Toolbox;
@@ -114,7 +114,7 @@ check('/jobs has every job, with its command', count($listed) >= 4 && str_contai
 // Sherpa exits: nothing left running behind it.
 $pids = array_filter(array_map(fn(array $j) => $j['running'] ? $j['id'] : null, $jobs->all()));
 $jobs->stopAll();
-check('stopAll leaves nothing running', array_filter($jobs->all(), fn(array $j) => $j['running']) === [], json_encode($jobs->all()));
+check('stopAll leaves nothing running', array_filter($jobs->all(), fn(array $j): bool => $j['running']) === [], json_encode($jobs->all()));
 
 // ---- a job in the project's container ---------------------------------------------
 // It is stopped in the container it was started in. /project edit can change the
@@ -123,12 +123,12 @@ check('stopAll leaves nothing running', array_filter($jobs->all(), fn(array $j) 
 
 final class RunningContainer extends ContainerInspector
 {
-    public function inspect(string $container): ?array
+    public function inspect(string $container): array
     {
         return ['workdir' => '/srv/app', 'mounts' => []];
     }
 
-    public function home(string $container, string $user): ?string
+    public function home(string $container, string $user): string
     {
         return '/home/dev';
     }

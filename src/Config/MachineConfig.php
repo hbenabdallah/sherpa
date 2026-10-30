@@ -92,7 +92,7 @@ class MachineConfig
         }
 
         $backend ??= $this->backend();
-        if ($backend === null) {
+        if (!$backend instanceof Backend) {
             return null;
         }
 
@@ -138,7 +138,7 @@ class MachineConfig
         if ($legacy !== null) {
             $data[Backend::Ollama->value] ??= array_filter(
                 ['model' => $legacy, 'context' => $data['context'] ?? null],
-                fn($v) => $v !== null,
+                fn($v): bool => $v !== null,
             );
             $data['backend'] ??= Backend::Ollama->value;
         }
@@ -325,7 +325,7 @@ class MachineConfig
 
         $data['api']['providers'][$name] = array_filter(
             ['url' => $url, 'key_env' => $keyVariable],
-            fn($v) => $v !== null && $v !== '',
+            fn(?string $v): bool => $v !== null && $v !== '',
         ) + $section;
         $data['api']['provider'] ??= $name;
 

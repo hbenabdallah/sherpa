@@ -1,10 +1,16 @@
 <?php
 
+use App\Agent\Tool\Toolbox;
+use App\Agent\Tool\ToolCall;
+use App\Project\ProjectPathResolver;
+use App\Tool\FileReadTool;
+use App\Tool\ProjectGrepTool;
+
 // Retrieval that does not cost a turn: what compaction takes out of the window
 // and can hand back, and the situational signals that rank the memory block
 // before anyone has asked anything.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\ContextBudget;
 use App\Agent\SearchTrace;
@@ -275,11 +281,11 @@ file_put_contents(
     $grepDir . '/src/User.php',
     "<?php\nclass User\n{\n    public function createUser() {}\n    public function registerUser() {}\n}\n",
 );
-$grepPaths = new App\Project\ProjectPathResolver();
+$grepPaths = new ProjectPathResolver();
 $grepPaths->setRoot($grepDir);
 $grepStore = new MemoryStore();
 $grepStore->open($statDir . '-grep/memory.db');
-$grep = new App\Tool\ProjectGrepTool($grepPaths, null, $grepStore);
+$grep = new ProjectGrepTool($grepPaths, null, $grepStore);
 
 $both = $grep('createUser|registerUser');
 check('an alternation finds both sides', str_contains($both, 'createUser') && str_contains($both, 'registerUser'), $both);
@@ -313,28 +319,28 @@ check(
 // file_read used to return its errors as ordinary text, so SearchTrace could
 // not tell a path that does not exist from one that did: a groping turn was
 // recorded as direct the moment the model guessed a file name.
-$missing = (new App\Agent\Tool\Toolbox([new App\Tool\FileReadTool($grepPaths)]))
-    ->execute(new App\Agent\Tool\ToolCall('c1', 'file_read', ['path' => 'src/Absent.php']));
+$missing = new Toolbox([new FileReadTool($grepPaths)])
+    ->execute(new ToolCall('c1', 'file_read', ['path' => 'src/Absent.php']));
 check('a missing file comes back flagged as an error', $missing->isError, $missing->content);
 check('with the same text as before', $missing->content === 'Error: file not found: src/Absent.php', $missing->content);
 
 // A guessed name next to the real one: `.env` beside `.env.example`, or a bare
 // file name for one in a subdirectory.
 file_put_contents($grepDir . '/.env.example', "APP_ENV=prod\n");
-$reader = new App\Agent\Tool\Toolbox([new App\Tool\FileReadTool($grepPaths)]);
-$dotenv = $reader->execute(new App\Agent\Tool\ToolCall('c3', 'file_read', ['path' => '.env']));
+$reader = new Toolbox([new FileReadTool($grepPaths)]);
+$dotenv = $reader->execute(new ToolCall('c3', 'file_read', ['path' => '.env']));
 check(
     'a missing .env points to the .env.example that exists',
     $dotenv->isError && str_contains($dotenv->content, 'did you mean .env.example?'),
     $dotenv->content,
 );
-$bare = $reader->execute(new App\Agent\Tool\ToolCall('c4', 'file_read', ['path' => 'User.php']));
+$bare = $reader->execute(new ToolCall('c4', 'file_read', ['path' => 'User.php']));
 check('a bare file name points to its directory', str_contains($bare->content, 'did you mean src/User.php?'), $bare->content);
 
 // Seen live: a model asked to read the project root. file() on a directory
 // printed a PHP notice into the terminal and came back empty, as a success.
-$directory = (new App\Agent\Tool\Toolbox([new App\Tool\FileReadTool($grepPaths)]))
-    ->execute(new App\Agent\Tool\ToolCall('c2', 'file_read', ['path' => 'src']));
+$directory = new Toolbox([new FileReadTool($grepPaths)])
+    ->execute(new ToolCall('c2', 'file_read', ['path' => 'src']));
 check(
     'reading a directory is an error, not an empty file',
     $directory->isError && str_contains($directory->content, 'is a directory'),
@@ -345,15 +351,15 @@ check(
 // was in it. Said with the refusal, the next call can be the right read.
 mkdir($grepDir . '/src/Routes');
 file_put_contents($grepDir . '/src/Routes/courses.yaml', "courses: ~\n");
-$listed = (new App\Agent\Tool\Toolbox([new App\Tool\FileReadTool($grepPaths)]))
-    ->execute(new App\Agent\Tool\ToolCall('c5', 'file_read', ['path' => 'src']))->content;
+$listed = new Toolbox([new FileReadTool($grepPaths)])
+    ->execute(new ToolCall('c5', 'file_read', ['path' => 'src']))->content;
 check('and it names what the directory holds, as paths to read', str_contains($listed, '  src/User.php') && str_contains($listed, '  src/Routes/'), $listed);
 check('subdirectories first', strpos($listed, 'src/Routes/') < strpos($listed, 'src/User.php'), $listed);
 for ($i = 0; $i < 45; $i++) {
     touch(sprintf('%s/src/Routes/r%02d.yaml', $grepDir, $i));
 }
-$crowded = (new App\Agent\Tool\Toolbox([new App\Tool\FileReadTool($grepPaths)]))
-    ->execute(new App\Agent\Tool\ToolCall('c6', 'file_read', ['path' => 'src/Routes/']))->content;
+$crowded = new Toolbox([new FileReadTool($grepPaths)])
+    ->execute(new ToolCall('c6', 'file_read', ['path' => 'src/Routes/']))->content;
 check('a crowded directory is cut and the rest counted', str_contains($crowded, '… and 6 more') && !str_contains($crowded, 'r44.yaml'), $crowded);
 exec('rm -rf ' . escapeshellarg($grepDir . '/src/Routes'));
 

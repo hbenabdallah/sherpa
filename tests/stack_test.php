@@ -1,9 +1,12 @@
 <?php
 
+use App\Project\DockerWrapper;
+use App\Project\TestCommand;
+
 // What a project is written in. The prompt says "a PHP development agent"
 // {langue}", so getting this wrong is not a display problem.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\SystemPromptBuilder;
 use App\Mcp\McpConfig;
@@ -194,12 +197,12 @@ check('and states the stack it actually found', str_contains($goPrompt, 'Stack d
 // reach docker; what the target runs still works there.
 $wrapped = project($root, 'enveloppe', ['composer.json' => '{}', 'compose.yaml' => "services: {}\n",
     'Makefile' => "test:\n\tdocker compose run --rm --no-deps app php tests/run.php\n"]);
-check('a Makefile that runs docker itself is recognised', App\Project\DockerWrapper::in($wrapped) === 'Makefile');
+check('a Makefile that runs docker itself is recognised', DockerWrapper::in($wrapped) === 'Makefile');
 check(
     'one that only starts the containers is not',
-    App\Project\DockerWrapper::in(project($root, 'demarre', ['Makefile' => "up:\n\tdocker compose up -d && npm run dev\n"])) === null,
+    DockerWrapper::in(project($root, 'demarre', ['Makefile' => "up:\n\tdocker compose up -d && npm run dev\n"])) === null,
 );
-check('nor is a project with no task file', App\Project\DockerWrapper::in(project($root, 'nu', ['README.md' => 'x'])) === null);
+check('nor is a project with no task file', DockerWrapper::in(project($root, 'nu', ['README.md' => 'x'])) === null);
 
 $inContainer = new Project(
     slug: 'x',
@@ -224,7 +227,7 @@ check('and not told so with Docker off', !str_contains($builder->build(projectAt
 // `php tests/StrTest.php`, which prints nothing, took the silence for a pass,
 // and left a failing test behind. The README said `php tests/run.php`.
 $tests = new TestCommandDetector();
-$found = fn(array $files) => $tests->detect(project($root, 'tests-' . bin2hex(random_bytes(3)), $files));
+$found = fn(array $files): ?TestCommand => $tests->detect(project($root, 'tests-' . bin2hex(random_bytes(3)), $files));
 
 $readme = $found(['README.md' => "# Boutique\n\nCatalogue et facturation.\n\n    php tests/run.php    # lance les tests\n"]);
 check('a command in an indented README block is found', $readme?->command === 'php tests/run.php', json_encode($readme));
@@ -235,11 +238,11 @@ check('a fenced block works too, prompt sign dropped', $fenced?->command === 'ma
 
 check(
     'prose that merely mentions tests is not a command',
-    $found(['README.md' => "Les tests sont dans tests/, lancez-les avant de pousser.\n"]) === null,
+    !$found(['README.md' => "Les tests sont dans tests/, lancez-les avant de pousser.\n"]) instanceof TestCommand,
 );
 check(
     'a code line that is not about tests is not one either',
-    $found(['README.md' => "    composer install\n    php bin/console serve\n"]) === null,
+    !$found(['README.md' => "    composer install\n    php bin/console serve\n"]) instanceof TestCommand,
 );
 
 check(
@@ -254,13 +257,13 @@ check(
 check('plain PHPUnit gets vendor/bin/phpunit', $found(['phpunit.xml' => '<phpunit/>'])?->command === 'vendor/bin/phpunit');
 check(
     'npm\'s placeholder test script is not a test command',
-    $found(['package.json' => '{"scripts": {"test": "echo \\"Error: no test specified\\" && exit 1"}}']) === null,
+    !$found(['package.json' => '{"scripts": {"test": "echo \\"Error: no test specified\\" && exit 1"}}']) instanceof TestCommand,
 );
 check('a real one is', $found(['package.json' => '{"scripts": {"test": "vitest run"}}'])?->command === 'npm test');
 check('Go and Rust have their own', $found(['go.mod' => "module x\n"])?->command === 'go test ./...'
     && $found(['Cargo.toml' => "[package]\n"])?->command === 'cargo test');
 check('pytest is recognised from pyproject', $found(['pyproject.toml' => "[tool.pytest.ini_options]\n"])?->command === 'pytest');
-check('nothing declared means no command, not a guess', $found(['src/a.php' => '<?php']) === null);
+check('nothing declared means no command, not a guess', !$found(['src/a.php' => '<?php']) instanceof TestCommand);
 
 $withTests = new SystemPromptBuilder($memory, new SkillRegistry(), $detector, null, null, $tests);
 $boutique = project($root, 'boutique', ['composer.json' => '{"require": {"php": ">=8.3"}}', 'README.md' => "    php tests/run.php    # lance les tests\n"]);
@@ -284,7 +287,7 @@ $mcp = new class (new McpConfig()) extends McpRegistry {
         return "# MCP servers\n## graphe\nCall overview first.";
     }
 };
-$withMcp = (new SystemPromptBuilder($memory, new SkillRegistry(), $detector, null, null, null, $mcp))->build(projectAt($boutique));
+$withMcp = new SystemPromptBuilder($memory, new SkillRegistry(), $detector, null, null, null, $mcp)->build(projectAt($boutique));
 check("the MCP servers' instructions are in the prompt", str_contains($withMcp, "## graphe\nCall overview first."), $withMcp);
 check(
     'before the rules, which they do not replace',

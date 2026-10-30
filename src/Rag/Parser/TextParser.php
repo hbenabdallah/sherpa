@@ -27,9 +27,9 @@ final class TextParser implements DocumentParser
         $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
 
         [$type, $headingAt, $verbatim] = match ($extension) {
-            'adoc', 'asciidoc' => ['asciidoc', self::asciidoc(...), static fn(string $l) => preg_match('/^(----|\.\.\.\.)\s*$/', $l) === 1],
+            'adoc', 'asciidoc' => ['asciidoc', self::asciidoc(...), static fn(string $l): bool => preg_match('/^(----|\.\.\.\.)\s*$/', $l) === 1],
             'rst'              => ['rst', self::restructured(), null],
-            default            => ['text', static fn() => null, null],
+            default            => ['text', static fn(): null => null, null],
         };
 
         $sections = SectionBuilder::build($lines, $headingAt, $verbatim);
@@ -74,9 +74,7 @@ final class TextParser implements DocumentParser
             }
 
             $char = $m[1];
-            if (!isset($levels[$char])) {
-                $levels[$char] = count($levels) + 1;
-            }
+            $levels[$char] ??= count($levels) + 1;
 
             return ['level' => $levels[$char], 'text' => trim($text), 'lines' => 2];
         };

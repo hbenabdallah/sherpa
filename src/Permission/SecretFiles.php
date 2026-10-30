@@ -11,25 +11,25 @@ namespace App\Permission;
 final class SecretFiles
 {
     /** The forms of .env that are committed as examples, without values. */
-    private const TEMPLATES = ['example', 'sample', 'dist', 'template', 'defaults'];
+    private const array TEMPLATES = ['example', 'sample', 'dist', 'template', 'defaults'];
 
-    private const NAMES = [
+    private const array NAMES = [
         '.envrc', '.netrc', '_netrc', '.npmrc', '.pypirc', '.git-credentials', '.htpasswd', '.pgpass',
         'id_rsa', 'id_dsa', 'id_ecdsa', 'id_ed25519', 'credentials', 'credentials.json', 'auth.json',
         'keys.yaml', 'secring.gpg', '.vault-token',
     ];
 
-    private const EXTENSIONS = ['pem', 'key', 'p12', 'pfx', 'jks', 'keystore', 'kdbx', 'ovpn'];
+    private const array EXTENSIONS = ['pem', 'key', 'p12', 'pfx', 'jks', 'keystore', 'kdbx', 'ovpn'];
 
     /** Directories whose files are all secrets. */
-    private const DIRECTORIES = ['.ssh', '.aws', '.gnupg', '.kube', '.docker'];
+    private const array DIRECTORIES = ['.ssh', '.aws', '.gnupg', '.kube', '.docker'];
 
     /** Why reading this path is asked about every time, or null for an ordinary file. */
     public static function reason(string $path): ?string
     {
         $path = str_replace('\\', '/', trim($path));
         $name = basename($path);
-        if ($name === '' || $name === '.' || $name === '..') {
+        if (in_array($name, ['', '.', '..'], true)) {
             return null;
         }
 

@@ -12,9 +12,9 @@ namespace App\TUI;
  * since nothing was drawn over it. q, Escape, Enter — or Page Down past the
  * end — go back.
  */
-final class ScrollView
+final readonly class ScrollView
 {
-    public function __construct(private readonly Terminal $terminal) {}
+    public function __construct(private Terminal $terminal) {}
 
     /** @param list<string> $lines */
     public function show(array $lines): void
@@ -36,7 +36,7 @@ final class ScrollView
 
         try {
             while (true) {
-                $this->render($rows, $top, $page, $cols, $last);
+                $this->render($rows, $top, $page, $cols);
 
                 $key = $this->terminal->readKey();
                 $top = match ($key) {
@@ -61,7 +61,7 @@ final class ScrollView
     }
 
     /** @param list<string> $rows */
-    private function render(array $rows, int $top, int $page, int $cols, int $last): void
+    private function render(array $rows, int $top, int $page, int $cols): void
     {
         $out = "\e[H";
         for ($i = 0; $i < $page; $i++) {

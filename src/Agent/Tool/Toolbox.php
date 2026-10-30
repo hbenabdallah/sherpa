@@ -33,7 +33,7 @@ class Toolbox
         $ref = new ReflectionClass($tool);
         $attrs = $ref->getAttributes(AsTool::class);
 
-        if (empty($attrs)) {
+        if ($attrs === []) {
             throw new LogicException(sprintf('Tool %s must declare #[AsTool]', $ref->getName()));
         }
 
@@ -125,7 +125,7 @@ class Toolbox
      */
     public function schemas(): array
     {
-        return array_map(fn(ToolDefinition $def) => $def->toFunctionSchema(), $this->getDefinitions());
+        return array_map(fn(ToolDefinition $def): array => $def->toFunctionSchema(), $this->getDefinitions());
     }
 
     public function find(string $name): ?ToolDefinition
@@ -163,7 +163,7 @@ class Toolbox
     }
 
     /** Tools that write a file from what the model sends. */
-    private const WRITERS = ['file_write', 'file_patch'];
+    private const array WRITERS = ['file_write', 'file_patch'];
 
     public function execute(ToolCall $call): ToolResult
     {
@@ -172,7 +172,7 @@ class Toolbox
         // Named with what does exist. Seen in the benchmark: a model called
         // `file_grep` twice, was told only that it was not found, and had to
         // guess again — the list is what lets the next call be the right one.
-        if ($def === null) {
+        if (!$def instanceof ToolDefinition) {
             return new ToolResult(
                 $call->id,
                 "Tool '{$call->name}' not found. Available tools: " . implode(', ', array_keys($this->definitions)) . '.',
@@ -199,7 +199,7 @@ class Toolbox
 
             $content = SecretMask::mask((string) $content);
             // From outside the project and the user: marked as data.
-            if ($def->untrusted && $this->provenance !== null) {
+            if ($def->untrusted && $this->provenance instanceof Provenance) {
                 $content = $this->provenance->wrap($call->name, $call->arguments, $content);
             }
 

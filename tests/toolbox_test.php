@@ -2,7 +2,7 @@
 
 // The bridge between what a model writes and what a PHP handler will accept.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\Tool\AsTool;
 use App\Agent\Tool\Param;
@@ -97,7 +97,7 @@ final class NoArgsTool
     }
 }
 
-$schema = (new Toolbox([new NoArgsTool()]))->getDefinitions()[0]->toFunctionSchema();
+$schema = new Toolbox([new NoArgsTool()])->getDefinitions()[0]->toFunctionSchema();
 $json = json_encode($schema);
 
 // An empty PHP array encodes as [], and JSON Schema says "properties" is an
@@ -112,7 +112,7 @@ check(
 );
 check('and required stays a list', str_contains($json, '"required":[]'), $json);
 
-$withArgs = (new Toolbox([new TypedTool()]))->getDefinitions()[0]->toFunctionSchema();
+$withArgs = new Toolbox([new TypedTool()])->getDefinitions()[0]->toFunctionSchema();
 check(
     'a tool with arguments is unaffected',
     ($withArgs['function']['parameters']['properties']['count']['type'] ?? null) === 'integer',

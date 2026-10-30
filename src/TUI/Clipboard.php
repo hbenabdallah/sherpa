@@ -12,15 +12,15 @@ use Symfony\Component\Process\Process;
  * do it, which also crosses SSH and a Docker container, where no clipboard
  * tool can reach the desktop.
  */
-final class Clipboard
+final readonly class Clipboard
 {
     /** OSC 52 payloads past this are cut off by common terminals. */
-    private const OSC52_LIMIT = 100_000;
+    private const int OSC52_LIMIT = 100_000;
 
     /**
      * @param (callable(string): ?string)|null $which finds a command on PATH; injectable for tests
      */
-    public function __construct(private readonly mixed $which = null) {}
+    public function __construct(private mixed $which = null) {}
 
     /**
      * @return string how it was copied, to say so; null when it could not be

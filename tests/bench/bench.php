@@ -1,5 +1,8 @@
 <?php
 
+use Symfony\Component\Process\Exception\ProcessTimedOutException;
+use Symfony\Component\Yaml\Yaml;
+
 // Sherpa's benchmark: realistic tasks on throwaway projects, run end to end
 // against a real model and scored automatically — how "good enough" gets a
 // number. Not part of `make test`: it needs an API and costs a little. Run
@@ -50,8 +53,8 @@ final class BenchRun
         $base = "{$root}/{$name}-{$attempt}";
         $run = new self($name, "{$base}/project", "{$base}/home");
 
-        (new Process(['mkdir', '-p', $base]))->mustRun();
-        (new Process(['cp', '-a', $template, $run->dir]))->mustRun();
+        new Process(['mkdir', '-p', $base])->mustRun();
+        new Process(['cp', '-a', $template, $run->dir])->mustRun();
         mkdir($run->home . '/.config/sherpa', 0777, true);
 
         return $run;
@@ -69,14 +72,14 @@ final class BenchRun
         $now = date('c');
         $config = $this->home . '/.config/sherpa';
 
-        file_put_contents("{$config}/config.yaml", Symfony\Component\Yaml\Yaml::dump([
+        file_put_contents("{$config}/config.yaml", Yaml::dump([
             'backend' => 'api',
             'api'     => ['model' => $model, 'context' => 32768],
         ], 4, 2));
 
         // Standing grants, so writing and running commands never stop on a
         // confirmation nobody is there to give.
-        file_put_contents("{$config}/projects.yaml", Symfony\Component\Yaml\Yaml::dump(['projects' => ['bench' => [
+        file_put_contents("{$config}/projects.yaml", Yaml::dump(['projects' => ['bench' => [
             'name'          => $project,
             'path'          => $this->dir,
             'memory_db'     => "{$config}/projects/bench/memory.db",
@@ -134,7 +137,7 @@ final class BenchRun
         try {
             $process->run();
             $this->exitCode = $process->getExitCode();
-        } catch (Symfony\Component\Process\Exception\ProcessTimedOutException) {
+        } catch (ProcessTimedOutException) {
             $this->exitCode = null;
         }
         $this->seconds = microtime(true) - $started;
@@ -209,18 +212,12 @@ final class BenchRun
 
     public function calls(string $tool): int
     {
-        return count(array_filter($this->toolCalls(), fn($c) => $c['name'] === $tool));
+        return count(array_filter($this->toolCalls(), fn(array $c): bool => $c['name'] === $tool));
     }
 
     public function ranCommand(string $fragment): bool
     {
-        foreach ($this->toolCalls() as $call) {
-            if ($call['name'] === 'shell_exec' && str_contains((string) ($call['arguments']['command'] ?? ''), $fragment)) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any($this->toolCalls(), fn(array $call): bool => $call['name'] === 'shell_exec' && str_contains((string) ($call['arguments']['command'] ?? ''), $fragment));
     }
 
     /** @return array{requests: int, prompt: int, completion: int, cached: int, cost: ?float} */
@@ -240,7 +237,7 @@ final class BenchRun
         try {
             $pdo = new PDO('sqlite:' . $db);
 
-            return array_map('intval', $pdo->query('SELECT key, value FROM project_stats')->fetchAll(PDO::FETCH_KEY_PAIR));
+            return array_map(intval(...), $pdo->query('SELECT key, value FROM project_stats')->fetchAll(PDO::FETCH_KEY_PAIR));
         } catch (Throwable) {
             return [];
         }
@@ -521,10 +518,10 @@ Gap with %s (%s)
         );
     }
 
-    $rate = fn(array $s) => $s['total'] > 0 ? $s['passed'] / $s['total'] : 0.0;
-    $avg = fn(array $s, string $key) => $s['total'] > 0 ? $s[$key] / $s['total'] : 0.0;
+    $rate = fn(array $s): int|float => $s['total'] > 0 ? $s['passed'] / $s['total'] : 0.0;
+    $avg = fn(array $s, string $key): int|float => $s['total'] > 0 ? $s[$key] / $s['total'] : 0.0;
     $summary = [
-        'passed'   => count(array_filter($rows, fn($r) => $r['passed'])),
+        'passed'   => count(array_filter($rows, fn(array $r): mixed => $r['passed'])),
         'total'    => count($rows),
         'requests' => array_sum(array_column($rows, 'requests')),
         'tokens'   => array_sum(array_column($rows, 'tokens')),
@@ -552,7 +549,7 @@ if (!is_file($suiteFile)) {
 }
 $scenarios = require $suiteFile;
 if ($only !== null) {
-    $scenarios = array_values(array_filter($scenarios, fn($s) => in_array($s['name'], $only, true)));
+    $scenarios = array_values(array_filter($scenarios, fn(array $s): bool => in_array($s['name'], $only, true)));
 }
 
 /**
@@ -576,9 +573,9 @@ function projectSource(string $repo, string|array $project): string
         return $dir;
     }
 
-    (new Process(['rm', '-rf', "{$dir}.tmp"]))->mustRun();
-    (new Process(['git', 'clone', '--quiet', $project['repository'], "{$dir}.tmp"], timeout: 600))->mustRun();
-    (new Process(['git', '-c', 'advice.detachedHead=false', 'checkout', '--quiet', $project['commit']], "{$dir}.tmp"))->mustRun();
+    new Process(['rm', '-rf', "{$dir}.tmp"])->mustRun();
+    new Process(['git', 'clone', '--quiet', $project['repository'], "{$dir}.tmp"], timeout: 600)->mustRun();
+    new Process(['git', '-c', 'advice.detachedHead=false', 'checkout', '--quiet', $project['commit']], "{$dir}.tmp")->mustRun();
     rename("{$dir}.tmp", $dir);
 
     return $dir;
@@ -667,7 +664,7 @@ if (isset($options['dry-run'])) {
             : "\033[31mwon in advance\033[0m: " . implode(', ', $held));
     }
 
-    (new Process(['rm', '-rf', $root]))->run();
+    new Process(['rm', '-rf', $root])->run();
     printf("\n%s\n", $wrong === 0 ? 'Every scenario measures something.' : "{$wrong} scenario(s) to look at.");
 
     exit($wrong === 0 ? 0 : 1);
@@ -685,7 +682,7 @@ $root = "{$repo}/var/bench/{$runId}";
 
 $commit = new Process(['git', '-c', 'safe.directory=*', 'rev-parse', '--short', 'HEAD'], $repo);
 $commit->run();
-$commit = trim($commit->getOutput()) . (trim((new Process(['git', '-c', 'safe.directory=*', 'status', '--porcelain'], $repo))->mustRun()->getOutput()) !== '' ? '+modifs' : '');
+$commit = trim($commit->getOutput()) . (trim(new Process(['git', '-c', 'safe.directory=*', 'status', '--porcelain'], $repo)->mustRun()->getOutput()) !== '' ? '+modifs' : '');
 
 $mcp = $mcpName === '' ? null : loadMcp($repo, $mcpName);
 
@@ -723,7 +720,7 @@ foreach ($scenarios as $scenario) {
 
         $failed = [];
         $checks = $scenario['checks'] + [
-            'the PHP it changed is still valid' => fn(BenchRun $r) => $r->invalidPhp() === [],
+            'the PHP it changed is still valid' => fn(BenchRun $r): bool => $r->invalidPhp() === [],
         ];
         foreach ($checks as $check => $holds) {
             try {
@@ -769,8 +766,8 @@ foreach ($scenarios as $scenario) {
 // ---- the verdict ---------------------------------------------------------------
 
 $n = count($rows);
-$passed = count(array_filter($rows, fn($r) => $r['passed']));
-$sum = fn(string $key) => array_sum(array_column($rows, $key));
+$passed = count(array_filter($rows, fn(array $r): bool => $r['passed']));
+$sum = fn(string $key): float|int => array_sum(array_column($rows, $key));
 $tools = [];
 $errors = [];
 foreach ($rows as $row) {
@@ -793,9 +790,9 @@ printf(
     number_format($n > 0 ? $sum('tokens') / $n : 0, 0, ',', ' '),
 );
 printf("Searches            %d greps, %d with no result · %d groping turn(s)\n", $sum('greps'), $sum('grep_miss'), $sum('groping'));
-printf("Tools               %s\n", implode(' · ', array_map(fn($t, $c) => "{$t} {$c}", array_keys($tools), $tools)));
+printf("Tools               %s\n", implode(' · ', array_map(fn($t, $c): string => "{$t} {$c}", array_keys($tools), $tools)));
 printf("Failing calls       %s\n", $errors === [] ? 'none' : implode(' · ', array_map(
-    fn($t, $c) => "{$t} {$c}/" . ($tools[$t] ?? 0),
+    fn($t, $c): string => "{$t} {$c}/" . ($tools[$t] ?? 0),
     array_keys($errors),
     $errors,
 )));

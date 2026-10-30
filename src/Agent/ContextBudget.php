@@ -22,13 +22,13 @@ final class ContextBudget
      * Conservative starting point. Prose runs ~4 chars/token, source code and
      * JSON are denser at ~3; tool-heavy agent traffic sits between the two.
      */
-    private const INITIAL_CHARS_PER_TOKEN = 3.4;
+    private const float INITIAL_CHARS_PER_TOKEN = 3.4;
 
     /** Per-message overhead for chat-template markers (<|im_start|>role etc.). */
-    private const MESSAGE_OVERHEAD_TOKENS = 5;
+    private const int MESSAGE_OVERHEAD_TOKENS = 5;
 
     /** What an image costs, as providers bill a screenshot: its base64 is no measure of it. */
-    private const IMAGE_TOKENS = 1600;
+    private const int IMAGE_TOKENS = 1600;
 
     private float $charsPerToken = self::INITIAL_CHARS_PER_TOKEN;
 
@@ -89,7 +89,7 @@ final class ContextBudget
      */
     public function shareInChars(float $share, int $minChars, int $maxChars): int
     {
-        $chars = (int) ($this->promptLimit() * $share * $this->charsPerToken());
+        $chars = (int) ($this->promptLimit() * $share * $this->charsPerToken);
 
         return max($minChars, min($maxChars, $chars));
     }

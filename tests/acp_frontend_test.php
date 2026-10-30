@@ -1,9 +1,12 @@
 <?php
 
+use App\Acp\SessionConfig;
+use App\Permission\Offer;
+
 // The pieces of `sherpa acp` that turn Sherpa's turn into what an editor
 // draws, and an editor's prompt into what the model reads.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Acp\Connection;
 use App\Acp\EditorFrontend;
@@ -112,12 +115,12 @@ function out($editor): array
         $raw .= $chunk;
     }
 
-    return array_map(fn(string $l) => json_decode($l, true), array_values(array_filter(explode("\n", $raw))));
+    return array_map(fn(string $l): mixed => json_decode($l, true), array_values(array_filter(explode("\n", $raw))));
 }
 
 function updates(array $messages): array
 {
-    return array_values(array_map(fn(array $m) => $m['params']['update'], array_filter($messages, fn(array $m) => ($m['method'] ?? '') === 'session/update')));
+    return array_values(array_map(fn(array $m) => $m['params']['update'], array_filter($messages, fn(array $m): bool => ($m['method'] ?? '') === 'session/update')));
 }
 
 // A reply that turns out to be a tool call written as prose is never sent.
@@ -209,17 +212,17 @@ $answers = [
 ];
 [$front, $editor] = frontend($paths, $todos, $answers);
 $front->showToolCall('file_patch', $call->arguments, 'p1');
-check('"for this session" is the session grant', $front->confirm($call, $def, new App\Permission\Offer()) === ConfirmChoice::Session);
-$asked = array_values(array_filter(out($editor), fn(array $m) => ($m['method'] ?? '') === 'session/request_permission'))[0]['params'] ?? [];
+check('"for this session" is the session grant', $front->confirm($call, $def, new Offer()) === ConfirmChoice::Session);
+$asked = array_values(array_filter(out($editor), fn(array $m): bool => ($m['method'] ?? '') === 'session/request_permission'))[0]['params'] ?? [];
 check('the question names the session and the call, with the diff', $asked['sessionId'] === 's1' && $asked['toolCall']['toolCallId'] === 'p1'
     && $asked['toolCall']['content'][0]['type'] === 'diff' && str_contains($asked['toolCall']['content'][0]['newText'], 'return 1;'), json_encode($asked));
-check('a cancelled question is a refusal', $front->confirm($call, $def, new App\Permission\Offer()) === ConfirmChoice::Deny);
-check('so is an answer naming no option offered', $front->confirm($call, $def, new App\Permission\Offer()) === ConfirmChoice::Deny);
+check('a cancelled question is a refusal', $front->confirm($call, $def, new Offer()) === ConfirmChoice::Deny);
+check('so is an answer naming no option offered', $front->confirm($call, $def, new Offer()) === ConfirmChoice::Deny);
 
 $front->showToolCall('plan_ready', ['plan' => '1. Fix'], 'r1');
 check('a plan carried out on "go"', $front->approvePlan('1. Fix') === true);
 check('and kept on "keep planning"', $front->approvePlan('1. Fix') === false);
-$planned = array_values(array_filter(out($editor), fn(array $m) => ($m['method'] ?? '') === 'session/request_permission' && $m['params']['options'][0]['optionId'] === 'plan-go'));
+$planned = array_values(array_filter(out($editor), fn(array $m): bool => ($m['method'] ?? '') === 'session/request_permission' && $m['params']['options'][0]['optionId'] === 'plan-go'));
 check('asked under the plan_ready call', ($planned[0]['params']['toolCall']['toolCallId'] ?? '') === 'r1' && str_contains(json_encode($planned[0]), '1. Fix'), json_encode($planned[0] ?? null));
 
 // A command: the longer answers name what they grant, and what is asked
@@ -231,13 +234,13 @@ $shellCall = new ToolCall('x1', 'shell_exec', ['command' => 'make test']);
     ['outcome' => ['outcome' => 'selected', 'optionId' => 'allow-session']],
 ]);
 $front->showToolCall('shell_exec', $shellCall->arguments, 'x1');
-check('a command granted for the project', $front->confirm($shellCall, $shellDef, new App\Permission\Offer(['shell_exec: make test *'])) === ConfirmChoice::Project);
+check('a command granted for the project', $front->confirm($shellCall, $shellDef, new Offer(['shell_exec: make test *'])) === ConfirmChoice::Project);
 $front->showToolCall('shell_exec', ['command' => 'git push'], 'x2');
 check(
     '"for this session" is no answer where only once is offered',
-    $front->confirm(new ToolCall('x2', 'shell_exec', ['command' => 'git push']), $shellDef, new App\Permission\Offer([], 'it pushes to a remote')) === ConfirmChoice::Deny,
+    $front->confirm(new ToolCall('x2', 'shell_exec', ['command' => 'git push']), $shellDef, new Offer([], 'it pushes to a remote')) === ConfirmChoice::Deny,
 );
-$asked = array_values(array_map(fn(array $m) => $m['params'], array_filter(out($editor), fn(array $m) => ($m['method'] ?? '') === 'session/request_permission')));
+$asked = array_values(array_map(fn(array $m) => $m['params'], array_filter(out($editor), fn(array $m): bool => ($m['method'] ?? '') === 'session/request_permission')));
 check('the grant offered names the command', str_contains(json_encode($asked[0]['options'] ?? []), 'Always allow make test * in this project'), json_encode($asked[0]['options'] ?? []));
 check('only once or refuse for what is asked every time', array_column($asked[1]['options'] ?? [], 'optionId') === ['allow-once', 'reject'], json_encode($asked[1]['options'] ?? []));
 check('with the reason', str_contains(json_encode($asked[1]['toolCall']['content'] ?? []), 'Asked every time: it pushes to a remote'));
@@ -246,11 +249,11 @@ check('with the reason', str_contains(json_encode($asked[1]['toolCall']['content
 [$sherpa, $gone] = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
 fclose($gone);
 $orphan = new EditorFrontend(new Connection($sherpa, $sherpa), new EditPreview(new FileWriteTool($paths), new FilePatchTool($paths)), $paths, new ShellExecTool($paths), $todos);
-check('no editor to answer: refused', $orphan->confirm($call, $def, new App\Permission\Offer()) === ConfirmChoice::Deny);
+check('no editor to answer: refused', $orphan->confirm($call, $def, new Offer()) === ConfirmChoice::Deny);
 check('and no plan approved', $orphan->approvePlan('x') === null);
 
 // ---- the model menu ------------------------------------------------------------------
-$menu = App\Acp\SessionConfig::grouped([
+$menu = SessionConfig::grouped([
     ['value' => 'meta/llama-3.3-70b-instruct', 'name' => 'meta/llama-3.3-70b-instruct'],
     ['value' => 'qwen/qwen3-coder', 'name' => 'qwen/qwen3-coder', 'description' => '256k context'],
     ['value' => 'meta/llama-3.1-8b-instruct', 'name' => 'meta/llama-3.1-8b-instruct'],
@@ -259,7 +262,7 @@ check('a provider\'s models are grouped under their vendor', array_column($menu,
 check('each shown without it, chosen by its whole id', ($menu[0]['options'][1] ?? []) === ['name' => 'llama-3.1-8b-instruct', 'value' => 'meta/llama-3.1-8b-instruct'], json_encode($menu[0]));
 check('its details kept', ($menu[1]['options'][0]['description'] ?? '') === '256k context');
 $flat = [['value' => 'fake-chat', 'name' => 'fake-chat'], ['value' => 'acme/x', 'name' => 'acme/x']];
-check('a list with ids that name no vendor stays flat', App\Acp\SessionConfig::grouped($flat) === $flat);
+check('a list with ids that name no vendor stays flat', SessionConfig::grouped($flat) === $flat);
 
 exec('rm -rf ' . escapeshellarg($project));
 

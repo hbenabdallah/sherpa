@@ -1,10 +1,12 @@
 <?php
 
+use Symfony\Component\Console\Command\LazyCommand;
+
 // A new release, told and installed. Before, a release reached nobody who did
 // not go and look, and updating meant finding install.sh again. Every request
 // to GitHub here is a fake; the executable replaced is a file of this test's.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Command\UpdateCommand;
 use App\Kernel;
@@ -34,7 +36,7 @@ mkdir($root, 0777, true);
 /** GitHub as install.sh sees it: /releases/latest redirects to the tag. */
 function latestIs(?string $tag, int &$asked = 0): Releases
 {
-    return new Releases(new MockHttpClient(function (string $method, string $url) use ($tag, &$asked) {
+    return new Releases(new MockHttpClient(function (string $method, string $url) use ($tag, &$asked): MockResponse {
         $asked++;
 
         return $tag === null
@@ -69,11 +71,11 @@ check('and again the next day', $asked === 2, (string) $asked);
 
 check(
     'nothing is said when this is the latest',
-    (new UpdateNotice(latestIs('v1.0.1'), $root . '/same.json', '1.0.1'))->message($now) === null,
+    new UpdateNotice(latestIs('v1.0.1'), $root . '/same.json', '1.0.1')->message($now) === null,
 );
 check(
     'nor when this is newer than the latest, a release not yet tagged',
-    (new UpdateNotice(latestIs('v1.0.1'), $root . '/ahead.json', '1.0.2'))->message($now) === null,
+    new UpdateNotice(latestIs('v1.0.1'), $root . '/ahead.json', '1.0.2')->message($now) === null,
 );
 
 $asked = 0;
@@ -90,7 +92,7 @@ putenv('SHERPA_UPDATE_CHECK=off');
 $asked = 0;
 check(
     'SHERPA_UPDATE_CHECK=off turns it off, request included',
-    (new UpdateNotice(latestIs('v1.0.2', $asked), $root . '/off.json', '1.0.1'))->message($now) === null && $asked === 0,
+    new UpdateNotice(latestIs('v1.0.2', $asked), $root . '/off.json', '1.0.1')->message($now) === null && $asked === 0,
 );
 putenv('SHERPA_UPDATE_CHECK');
 
@@ -101,7 +103,7 @@ $sum = hash('sha256', $binary) . "  sherpa-1.0.2-linux-x86_64\n";
 /** The release's files as GitHub serves them, by URL. */
 function serving(array $files, array &$requested = []): MockHttpClient
 {
-    return new MockHttpClient(function (string $method, string $url) use ($files, &$requested) {
+    return new MockHttpClient(function (string $method, string $url) use ($files, &$requested): MockResponse {
         $requested[] = $url;
 
         return isset($files[$url]) ? new MockResponse($files[$url]) : new MockResponse('Not Found', ['http_code' => 404]);
@@ -116,7 +118,7 @@ chmod($target, 0755);
 
 $requested = [];
 $client = serving([$base => $binary, $base . '.sha256' => $sum], $requested);
-(new SelfUpdater($client, new Releases($client)))->install('1.0.2', 'linux-x86_64', $target);
+new SelfUpdater($client, new Releases($client))->install('1.0.2', 'linux-x86_64', $target);
 clearstatcache();
 check('the release takes the executable\'s place', file_get_contents($target) === $binary);
 check('executable', (fileperms($target) & 0777) === 0755, decoct(fileperms($target) & 0777));
@@ -132,7 +134,7 @@ check('and nothing is left beside it', glob(dirname($target) . '/.sherpa-update-
 file_put_contents($target, "old sherpa\n");
 $client = serving([$base => $binary, $base . '.sha256' => $sum, Releases::URL . '/download/v1.0.2/release-notes.md' => "- notes\n"]);
 $seen = null;
-(new SelfUpdater($client, new Releases($client)))->install('1.0.2', 'linux-x86_64', $target, function (?string $notes) use (&$seen, $target) {
+new SelfUpdater($client, new Releases($client))->install('1.0.2', 'linux-x86_64', $target, function (?string $notes) use (&$seen, $target): void {
     $seen = [$notes, file_get_contents($target)];
 });
 check('the notes are handed over while the old executable is still in place', $seen === ["- notes\n", "old sherpa\n"], json_encode($seen));
@@ -141,7 +143,7 @@ check('the notes are handed over while the old executable is still in place', $s
 function refused(MockHttpClient $client, string $target): ?string
 {
     try {
-        (new SelfUpdater($client, new Releases($client)))->install('1.0.2', 'linux-x86_64', $target);
+        new SelfUpdater($client, new Releases($client))->install('1.0.2', 'linux-x86_64', $target);
 
         return null;
     } catch (UpdateFailed $e) {
@@ -183,14 +185,12 @@ function update(array $args, ?string $executable, string $current, MockHttpClien
 
 $latest = Releases::URL . '/latest';
 $notesUrl = Releases::URL . '/download/v1.0.2/release-notes.md';
-$github = fn(?string $notes = null) => new MockHttpClient(function (string $method, string $url) use ($latest, $base, $binary, $sum, $notesUrl, $notes) {
-    return match ($url) {
-        $latest          => new MockResponse('', ['http_code' => 302, 'response_headers' => ['Location: ' . Releases::URL . '/tag/v1.0.2']]),
-        $base            => new MockResponse($binary),
-        $base . '.sha256' => new MockResponse($sum),
-        $notesUrl        => $notes === null ? new MockResponse('', ['http_code' => 404]) : new MockResponse($notes),
-        default          => new MockResponse('', ['http_code' => 404]),
-    };
+$github = fn(?string $notes = null): MockHttpClient => new MockHttpClient(fn(string $method, string $url): MockResponse => match ($url) {
+    $latest          => new MockResponse('', ['http_code' => 302, 'response_headers' => ['Location: ' . Releases::URL . '/tag/v1.0.2']]),
+    $base            => new MockResponse($binary),
+    $base . '.sha256' => new MockResponse($sum),
+    $notesUrl        => $notes === null ? new MockResponse('', ['http_code' => 404]) : new MockResponse($notes),
+    default          => new MockResponse('', ['http_code' => 404]),
 });
 
 file_put_contents($target, "old sherpa\n");
@@ -204,7 +204,7 @@ $run = update([], $target, '1.0.1', $github("## What changed in Sherpa 1.0.2\n\n
 check('once installed, what the release changed is shown', str_contains($run->getDisplay(), 'What changed in Sherpa 1.0.2') && str_contains($run->getDisplay(), '- Faster'), $run->getDisplay());
 check('as text: no escape sequence, no console tag of its own', !str_contains($run->getDisplay(), "\e[2J") && str_contains($run->getDisplay(), '<error>tag</error>'), $run->getDisplay());
 file_put_contents($target, "old sherpa\n");
-$run = update([], $target, '1.0.1', $github(implode("\n", array_map(fn($i) => "- change {$i}", range(1, 100)))));
+$run = update([], $target, '1.0.1', $github(implode("\n", array_map(fn($i): string => "- change {$i}", range(1, 100)))));
 check('a screenful at most, with where the rest is', !str_contains($run->getDisplay(), 'change 41') && str_contains($run->getDisplay(), 'the rest at'), $run->getDisplay());
 file_put_contents($target, "old sherpa\n");
 $run = update([], $target, '1.0.1', $github());
@@ -247,15 +247,15 @@ $kernel = new Kernel('dev', true);
 $kernel->boot();
 $loader = $kernel->getContainer()->get('console.command_loader');
 $command = $loader->has('update') ? $loader->get('update') : null;
-$command = $command instanceof Symfony\Component\Console\Command\LazyCommand ? $command->getCommand() : $command;
+$command = $command instanceof LazyCommand ? $command->getCommand() : $command;
 check('sherpa update is a command of the application, its parts wired', $command instanceof UpdateCommand);
 $session = $loader->get('sherpa');
-$session = $session instanceof Symfony\Component\Console\Command\LazyCommand ? $session->getCommand() : $session;
-check('and the session is handed the notice', (new ReflectionProperty($session, 'updates'))->getValue($session) instanceof UpdateNotice);
+$session = $session instanceof LazyCommand ? $session->getCommand() : $session;
+check('and the session is handed the notice', new ReflectionProperty($session, 'updates')->getValue($session) instanceof UpdateNotice);
 foreach (['bin/sherpa', 'bin/sherpa-release.php'] as $entry) {
     check(
         "and {$entry} does not read it as the session's options",
-        preg_match("/in_array\\(\\\$_SERVER\\['argv'\\]\\[1\\] \\?\\? '', \\[[^]]*'update'/", (string) file_get_contents(dirname(__DIR__) . '/' . $entry)) === 1,
+        preg_match("/in_array\\(\\\$_SERVER\\['argv'\\]\\[1\\] \\?\\? '', \\[[^]]*'update'/", (string) file_get_contents(__DIR__ . '/../' . $entry)) === 1,
     );
 }
 

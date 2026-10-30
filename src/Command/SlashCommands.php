@@ -16,14 +16,17 @@ use App\Agent\Tool\Toolbox;
 use App\Mcp\McpRegistry;
 use App\Memory\ContextStore;
 use App\Memory\MemoryStore;
+use App\Memory\Recorded;
 use App\Permission\CommandPolicy;
 use App\Permission\ProjectPermissions;
 use App\Permission\SessionPermissions;
+use App\Platform\RateLimits;
 use App\Platform\SwitchablePlatform;
 use App\Project\Project;
 use App\Project\ProjectQuestions;
 use App\Project\WorkingProject;
 use App\Rag\DocSearch;
+use App\Rag\Eval\RetrievalEval;
 use App\Session\SavedSession;
 use App\Session\SessionStore;
 use App\Skills\SkillRegistry;
@@ -48,35 +51,35 @@ use RuntimeException;
  * handle() answers false for a word it does not know, and the caller says so:
  * an unknown slash command must not be sent to the model as a question.
  */
-final class SlashCommands
+final readonly class SlashCommands
 {
     public function __construct(
-        private readonly ChatPane $chat,
-        private readonly MemoryStore $memoryStore,
-        private readonly ContextStore $contextStore,
-        private readonly SkillRegistry $skillRegistry,
-        private readonly McpRegistry $mcp,
-        private readonly Toolbox $toolbox,
-        private readonly ContextBudget $budget,
-        private readonly InferenceSpeed $speed,
-        private readonly UsageMeter $usage,
-        private readonly SwitchablePlatform $platform,
-        private readonly ModelSession $model,
-        private readonly ProjectPermissions $projectPermissions,
-        private readonly SessionPermissions $sessionPermissions,
-        private readonly HistoryCompactor $compactor,
-        private readonly SystemPromptBuilder $promptBuilder,
-        private readonly SessionStore $sessions,
-        private readonly WorkingProject $working,
-        private readonly ProjectQuestions $questions,
-        private readonly DocSearch $docs,
-        private readonly Clipboard $clipboard = new Clipboard(),
-        private readonly TodoList $todos = new TodoList(),
-        private readonly BackgroundJobs $jobs = new BackgroundJobs(),
-        private readonly PlanMode $planMode = new PlanMode(),
+        private ChatPane $chat,
+        private MemoryStore $memoryStore,
+        private ContextStore $contextStore,
+        private SkillRegistry $skillRegistry,
+        private McpRegistry $mcp,
+        private Toolbox $toolbox,
+        private ContextBudget $budget,
+        private InferenceSpeed $speed,
+        private UsageMeter $usage,
+        private SwitchablePlatform $platform,
+        private ModelSession $model,
+        private ProjectPermissions $projectPermissions,
+        private SessionPermissions $sessionPermissions,
+        private HistoryCompactor $compactor,
+        private SystemPromptBuilder $promptBuilder,
+        private SessionStore $sessions,
+        private WorkingProject $working,
+        private ProjectQuestions $questions,
+        private DocSearch $docs,
+        private Clipboard $clipboard = new Clipboard(),
+        private TodoList $todos = new TodoList(),
+        private BackgroundJobs $jobs = new BackgroundJobs(),
+        private PlanMode $planMode = new PlanMode(),
         // Optional so the tests that build this class by hand need not build
         // it too; absent, one is made from what is already here.
-        private readonly ?McpCommands $mcpCommands = null,
+        private ?McpCommands $mcpCommands = null,
     ) {}
 
     /**
@@ -114,7 +117,7 @@ final class SlashCommands
             ['/exit', '', 'Leave Sherpa'],
         ];
 
-        return array_map(fn(array $e) => ['name' => $e[0], 'hint' => $e[1], 'description' => $e[2]], $entries);
+        return array_map(fn(array $e): array => ['name' => $e[0], 'hint' => $e[1], 'description' => $e[2]], $entries);
     }
 
     public function handle(string $cmd, MessageBag $bag, Project $project): bool
@@ -162,7 +165,7 @@ HELP . Terminal::RESET;
 
             case '/memory':
                 $facts = $this->memoryStore->recall(limit: 30);
-                if (empty($facts)) {
+                if ($facts === []) {
                     $this->chat->showInfo('Nothing remembered yet.');
                 } else {
                     echo Terminal::BOLD . "\nRemembered facts:\n" . Terminal::RESET;
@@ -233,9 +236,9 @@ HELP . Terminal::RESET;
                     $this->working->save();
                     $recorded = $this->memoryStore->remember($kv[0], $kv[1], 'you, with /remember');
                     echo Terminal::GREEN . match ($recorded) {
-                        \App\Memory\Recorded::Created    => "✓ Remembered: {$kv[0]}\n",
-                        \App\Memory\Recorded::Unchanged  => "✓ Already known: {$kv[0]}\n",
-                        \App\Memory\Recorded::Superseded => "✓ Corrected: {$kv[0]}\n",
+                        Recorded::Created    => "✓ Remembered: {$kv[0]}\n",
+                        Recorded::Unchanged  => "✓ Already known: {$kv[0]}\n",
+                        Recorded::Superseded => "✓ Corrected: {$kv[0]}\n",
                     } . Terminal::RESET;
                 }
 
@@ -269,7 +272,7 @@ HELP . Terminal::RESET;
 
             case '/skills':
                 $skills = $this->skillRegistry->all();
-                if (empty($skills)) {
+                if ($skills === []) {
                     $this->chat->showInfo('No skills available. Add .md files in ~/.config/sherpa/skills/');
                 } else {
                     echo Terminal::BOLD . "\nAvailable skills:\n" . Terminal::RESET;
@@ -401,7 +404,7 @@ HELP . Terminal::RESET;
 
                 $limits = $this->platform->rateLimits();
                 echo Terminal::BOLD . "\nProvider limits:\n" . Terminal::RESET;
-                if ($limits === null) {
+                if (!$limits instanceof RateLimits) {
                     echo Terminal::GRAY . "  (none reported: this provider sends no rate-limit headers)\n" . Terminal::RESET;
                 } else {
                     foreach ($limits->windows as $name => $window) {
@@ -675,11 +678,11 @@ HELP . Terminal::RESET;
             return;
         }
 
-        $questions = array_map(static fn(array $q) => ['kind' => (string) ($q['kind'] ?? 'question')] + $q, $questions);
+        $questions = array_map(static fn(array $q): array => ['kind' => (string) ($q['kind'] ?? 'question')] + $q, $questions);
         $results = $this->docs->evaluate($questions);
 
         echo Terminal::BOLD . "\nDocumentation search, measured on " . count($questions) . " questions:\n\n" . Terminal::RESET;
-        echo \App\Rag\Eval\RetrievalEval::table($results) . "\n\n";
+        echo RetrievalEval::table($results) . "\n\n";
 
         foreach ($results as $name => $result) {
             foreach ($result['misses'] as $miss) {
@@ -810,7 +813,7 @@ HELP . Terminal::RESET;
     {
         $session = $this->pick($which);
 
-        if ($session === null) {
+        if (!$session instanceof SavedSession) {
             $this->chat->showInfo($which === ''
                 ? 'No other conversation saved for this project.'
                 : "No conversation \"{$which}\". /sessions lists them.");
@@ -915,7 +918,7 @@ HELP . Terminal::RESET;
     {
         return "\n\n# Resumed conversation\n"
             . 'This conversation was started on ' . $session->startedAt->format('Y-m-d H:i')
-            . ' and resumed on ' . (new DateTimeImmutable())->format('Y-m-d H:i') . ".\n"
+            . ' and resumed on ' . new DateTimeImmutable()->format('Y-m-d H:i') . ".\n"
             . "The project's files may have changed since: read a file again before relying on\n"
             . "what you read of it, and always before changing it.";
     }

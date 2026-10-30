@@ -8,6 +8,7 @@ use App\Project\DockerWrapper;
 use App\Project\Project;
 use App\Project\RecentActivity;
 use App\Project\StackDetector;
+use App\Project\TestCommand;
 use App\Project\TestCommandDetector;
 use App\Skills\SkillRegistry;
 
@@ -18,7 +19,7 @@ class SystemPromptBuilder
      * 1600 characters was a percentage written down as a constant: a model
      * addressing 256k got the same dozen facts as one addressing 32k.
      */
-    private const MEMORY_BUDGET_SHARE = 0.015;
+    private const float MEMORY_BUDGET_SHARE = 0.015;
 
     /**
      * The floor keeps small windows as they were. The ceiling is there because
@@ -26,9 +27,9 @@ class SystemPromptBuilder
      * a point it spends context on facts nobody needed; memory_recall is the
      * targeted lookup that replaces it.
      */
-    private const MEMORY_BUDGET_MIN_CHARS = 1600;
+    private const int MEMORY_BUDGET_MIN_CHARS = 1600;
 
-    private const MEMORY_BUDGET_MAX_CHARS = 24000;
+    private const int MEMORY_BUDGET_MAX_CHARS = 24000;
 
     public function __construct(
         private readonly MemoryStore $memory,
@@ -59,9 +60,9 @@ class SystemPromptBuilder
     {
         $command = $this->tests?->detect($project->path);
 
-        return $command === null
-            ? 'unknown — find it (README, composer.json, Makefile) before concluding a change works'
-            : "`{$command->command}` (from {$command->source})";
+        return $command instanceof TestCommand
+            ? "`{$command->command}` (from {$command->source})"
+            : 'unknown — find it (README, composer.json, Makefile) before concluding a change works';
     }
 
     /**
@@ -73,7 +74,7 @@ class SystemPromptBuilder
      */
     private function situationTerms(Project $project): array
     {
-        if ($this->activity === null) {
+        if (!$this->activity instanceof RecentActivity) {
             return [];
         }
 
@@ -90,7 +91,7 @@ class SystemPromptBuilder
      */
     private function memoryBudget(): int
     {
-        if ($this->budget === null) {
+        if (!$this->budget instanceof ContextBudget) {
             return self::MEMORY_BUDGET_MIN_CHARS;
         }
 

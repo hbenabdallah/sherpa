@@ -4,7 +4,7 @@
 // within a budget — and the index kept where the project's files are, created
 // only once the project is, and gone when it is forgotten.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\ContextBudget;
 use App\Memory\MemoryStore;
@@ -86,7 +86,7 @@ check('and no more than five passages come back', count($sources[1]) <= DocSearc
 
 // ---- within a budget ------------------------------------------------------------
 [$small, $smallWorking] = searchFor(new ContextBudget(contextWindow: 4096));
-$smallWorking->open((new ProjectStore(new StackDetector()))->forDirectory($home . '/boutique'));
+$smallWorking->open(new ProjectStore(new StackDetector())->forDirectory($home . '/boutique'));
 $tight = $small->search('delivery time price zone carrier refund');
 $body = preg_replace('/^.*?:\n\n/s', '', $tight);
 check('a small window gets a reply that fits it', mb_strlen((string) $body) < 7000, (string) mb_strlen((string) $body));

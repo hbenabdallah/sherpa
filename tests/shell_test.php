@@ -3,7 +3,7 @@
 // shell_exec: the tool that runs arbitrary commands, and the one with no test
 // until now.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Project\DockerConfig;
 use App\Project\PathOutsideProjectException;
@@ -203,18 +203,18 @@ final class HomelessInspector extends ContainerInspector
 {
     public function __construct(private readonly string $home) {}
 
-    public function inspect(string $container): ?array
+    public function inspect(string $container): array
     {
         return ['workdir' => '/srv/app', 'mounts' => []];
     }
 
-    public function home(string $container, string $user): ?string
+    public function home(string $container, string $user): string
     {
         return $this->home;
     }
 }
 
-$command = fn(ShellExecTool $tool): array => (new ReflectionMethod($tool, 'buildCommand'))->invoke($tool, 'ls', $project);
+$command = fn(ShellExecTool $tool): array => new ReflectionMethod($tool, 'buildCommand')->invoke($tool, 'ls', $project);
 
 $explicit = new ShellExecTool($paths, new HomelessInspector('/home/www'));
 $explicit->setDockerContainer('c', 'www-data');

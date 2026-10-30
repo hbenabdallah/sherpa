@@ -26,21 +26,21 @@ class ShellExecTool
      * test run occupy, and cutting the verdict off costs a whole turn to rerun
      * the suite. They scale with the window, and a small one is unaffected.
      */
-    private const MIN_OUTPUT_LINES = 100;
+    private const int MIN_OUTPUT_LINES = 100;
 
-    private const MIN_OUTPUT_BYTES = 24000;
+    private const int MIN_OUTPUT_BYTES = 24000;
 
-    private const MAX_OUTPUT_BYTES = 200000;
+    private const int MAX_OUTPUT_BYTES = 200000;
 
     /** Share of the prompt window one command's output may occupy. */
-    private const OUTPUT_SHARE = 0.10;
+    private const float OUTPUT_SHARE = 0.10;
 
     /**
      * Bytes per line allowed before the line cap binds instead of the byte cap.
      * Deliberately generous: this is a guard against one pathological line, not
      * an estimate of an average one.
      */
-    private const BYTES_PER_LINE = 240;
+    private const int BYTES_PER_LINE = 240;
 
     private ?string $dockerContainer = null;
 
@@ -240,7 +240,7 @@ class ShellExecTool
             $command,
             $workDir,
             $container,
-            fn(string $script) => $this->commandIn($container, $user, $script, $workDir),
+            fn(string $script): array => $this->commandIn($container, $user, $script, $workDir),
             $container === null ? $this->sandbox->prefix($this->paths->root()) : [],
         );
         $this->jobs->firstLook($id);

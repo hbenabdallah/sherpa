@@ -13,13 +13,13 @@
 // tool's output. Only names that appear in the code are required, so a
 // correct answer passes whatever the wording.
 
-$readOnly = fn(BenchRun $run) => $run->modified() === [];
+$readOnly = fn(BenchRun $run): bool => $run->modified() === [];
 
 /** The names the answer has to contain, each one a check of its own. */
 $names = function (string ...$names): array {
     $checks = [];
     foreach ($names as $name) {
-        $checks["names {$name}"] = fn(BenchRun $r) => str_contains($r->answer(), $name);
+        $checks["names {$name}"] = fn(BenchRun $r): bool => str_contains($r->answer(), $name);
     }
 
     return $checks;

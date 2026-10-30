@@ -18,7 +18,7 @@ use RuntimeException;
 final class ChunkEmbedder
 {
     /** Chunks per request to the provider. */
-    private const BATCH = 32;
+    private const int BATCH = 32;
 
     /** @return int how many chunks were embedded now */
     public function embed(DocIndex $index, EmbeddingProvider $embeddings): int

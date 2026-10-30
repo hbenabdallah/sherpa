@@ -13,18 +13,18 @@ namespace App\Rag;
  * surrounds it — because an answer read out of its context is how a model
  * gets it wrong. Small to find, large to read.
  */
-final class Chunk
+final readonly class Chunk
 {
     /** @param list<string> $headings */
     public function __construct(
-        public readonly string $path,
-        public readonly string $title,
-        public readonly array $headings,
-        public readonly string $text,
-        public readonly string $parent,
-        public readonly int $startLine,
-        public readonly int $endLine,
-        public readonly int $position,
+        public string $path,
+        public string $title,
+        public array $headings,
+        public string $text,
+        public string $parent,
+        public int $startLine,
+        public int $endLine,
+        public int $position,
     ) {}
 
     /**

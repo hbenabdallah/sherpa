@@ -21,11 +21,11 @@ use Stringable;
 final class ServerLog extends AbstractLogger
 {
     /** How much of stderr to keep, and to quote: the end, where the reason is. */
-    private const KEEP = 4000;
+    private const int KEEP = 4000;
 
-    private const QUOTED_LINES = 15;
+    private const int QUOTED_LINES = 15;
 
-    private const QUOTED_CHARS = 1500;
+    private const int QUOTED_CHARS = 1500;
 
     private string $stderr = '';
 
@@ -38,7 +38,7 @@ final class ServerLog extends AbstractLogger
         // brittle by nature, which is why nothing depends on it: a version that
         // renames the message costs a less detailed error, not a broken client.
         if ((string) $message === 'Server stderr' && isset($context['output'])) {
-            $this->stderr = substr($this->stderr . (string) $context['output'] . "\n", -self::KEEP);
+            $this->stderr = substr($this->stderr . $context['output'] . "\n", -self::KEEP);
         }
     }
 
