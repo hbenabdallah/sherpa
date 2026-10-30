@@ -196,8 +196,10 @@ class ConfirmOverlay implements Approver
             $offer->grants !== [] => ['[s]/[p] would allow: ' . implode(', ', $offer->commands()), Terminal::CYAN],
             default => null,
         };
-        foreach ($note === null ? [] : self::wrap(Terminal::plain($note[0], singleLine: true), $inner) as $piece) {
-            $out .= $row($piece, $note[1]);
+        if ($note !== null) {
+            foreach (self::wrap(Terminal::plain($note[0], singleLine: true), $inner) as $piece) {
+                $out .= $row($piece, $note[1]);
+            }
         }
         $out .= $row(str_repeat('─', $inner), Terminal::GRAY);
 

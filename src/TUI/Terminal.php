@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\TUI;
 
+use RuntimeException;
+
 class Terminal
 {
     // ANSI colors
@@ -89,24 +91,34 @@ class Terminal
     public static function plain(string $text, bool $singleLine = false): string
     {
         // CSI: \e[ params intermediates final. Cursor movement and colour.
-        $text = preg_replace('/\e\[[\x30-\x3F]*[\x20-\x2F]*[\x40-\x7E]/', '', $text);
+        $text = self::strip('/\e\[[\x30-\x3F]*[\x20-\x2F]*[\x40-\x7E]/', $text);
         // String introducers — OSC, DCS, SOS, PM, APC — carry a payload that runs
         // to ST or BEL. Dropping only the two-byte introducer would spill the
         // payload onto the screen as text. Window-title rewrites live here.
-        $text = preg_replace('/\e[\]P\^X_][^\e\x07]*(?:\x07|\e\\\\)?/', '', $text);
+        $text = self::strip('/\e[\]P\^X_][^\e\x07]*(?:\x07|\e\\\\)?/', $text);
         // nF sequences: \e, one or more intermediates, a final. \e(B is charset
         // selection and is three bytes, not two.
-        $text = preg_replace('/\e[\x20-\x2F]+[\x30-\x7E]/', '', $text);
+        $text = self::strip('/\e[\x20-\x2F]+[\x30-\x7E]/', $text);
         // Everything else escape-led, taken whole the way a terminal would take
         // it: \ec is a full reset, \e7 saves the cursor, \eM scrolls.
-        $text = preg_replace('/\e[\x20-\x7E]/', '', $text);
+        $text = self::strip('/\e[\x20-\x7E]/', $text);
 
         // C0 controls. Tab and newline survive. Carriage return does not:
         // "\rroot@host:~# " is how output impersonates a shell prompt. A lone
         // \e (0x1B) that survived the passes above is swept up here too.
-        $text = preg_replace('/[\x00-\x08\x0B-\x1F\x7F]/', '', $text);
+        $text = self::strip('/[\x00-\x08\x0B-\x1F\x7F]/', $text);
 
         return $singleLine ? str_replace("\n", ' ', $text) : $text;
+    }
+
+    /**
+     * What plain() is there for — no escape sequence reaching the screen — is
+     * not given up when a pattern fails: the text is refused, not shown raw.
+     */
+    private static function strip(string $pattern, string $text): string
+    {
+        return preg_replace($pattern, '', $text)
+            ?? throw new RuntimeException('Could not clean text for the terminal: ' . preg_last_error_msg());
     }
 
     /** The settings to go back to after a turn; null outside one. */
@@ -144,13 +156,14 @@ class Terminal
      */
     public function endQuietInput(): void
     {
-        if ($this->quietStty === null) {
+        $quiet = $this->quietStty;
+        if ($quiet === null) {
             return;
         }
 
         $this->discardPendingInput();
 
-        exec(($this->quietStty !== '' ? 'stty ' . escapeshellarg($this->quietStty) : 'stty sane') . ' 2>/dev/null');
+        exec(($quiet !== '' ? 'stty ' . escapeshellarg($quiet) : 'stty sane') . ' 2>/dev/null');
         $this->quietStty = null;
     }
 

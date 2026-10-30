@@ -381,15 +381,15 @@ class MarkdownRenderer
 
     private function renderInline(string $text): string
     {
+        // Each style is decoration: one whose pattern fails leaves the text as it was.
         // Bold
-        $text = preg_replace('/\*\*(.+?)\*\*/', Terminal::BOLD . '$1' . Terminal::RESET, $text);
+        $text = preg_replace('/\*\*(.+?)\*\*/', Terminal::BOLD . '$1' . Terminal::RESET, $text) ?? $text;
         // Italic
-        $text = preg_replace('/\*(.+?)\*/', Terminal::ITALIC . '$1' . Terminal::RESET, $text);
+        $text = preg_replace('/\*(.+?)\*/', Terminal::ITALIC . '$1' . Terminal::RESET, $text) ?? $text;
         // Inline code
-        $text = preg_replace('/`([^`]+)`/', Terminal::BG_DARK . Terminal::CYAN . ' $1 ' . Terminal::RESET, $text);
-        // Links [text](url) → just text
-        $text = preg_replace('/\[([^\]]+)\]\([^)]+\)/', Terminal::UNDERLINE . '$1' . Terminal::RESET, $text);
+        $text = preg_replace('/`([^`]+)`/', Terminal::BG_DARK . Terminal::CYAN . ' $1 ' . Terminal::RESET, $text) ?? $text;
 
-        return $text;
+        // Links [text](url) → just text
+        return preg_replace('/\[([^\]]+)\]\([^)]+\)/', Terminal::UNDERLINE . '$1' . Terminal::RESET, $text) ?? $text;
     }
 }

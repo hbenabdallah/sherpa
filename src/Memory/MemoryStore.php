@@ -88,7 +88,7 @@ class MemoryStore
     {
         $this->assertOpen();
 
-        $existing = $this->conn->fetchOne(
+        $existing = $this->connection()->fetchOne(
             'SELECT id FROM facts WHERE key = :key AND value = :value',
             ['key' => $key, 'value' => $value],
         );
@@ -98,7 +98,7 @@ class MemoryStore
         if ($existing !== false) {
             // Seeing the same thing again is evidence it is still true, so the
             // fact is touched rather than left to age out of the summary.
-            $this->conn->executeStatement(
+            $this->connection()->executeStatement(
                 'UPDATE facts SET updated_at = :now, superseded_at = NULL WHERE id = :id',
                 ['now' => $now, 'id' => $existing],
             );
@@ -120,7 +120,7 @@ class MemoryStore
         $this->assertOpen();
         $now = $this->now();
 
-        $replaced = $this->conn->executeStatement(
+        $replaced = $this->connection()->executeStatement(
             'UPDATE facts SET superseded_at = :now WHERE key = :key AND superseded_at IS NULL AND value <> :value',
             ['now' => $now, 'key' => $key, 'value' => $value],
         );
@@ -140,7 +140,7 @@ class MemoryStore
         $term = trim((string) $search);
 
         if ($term === '') {
-            return $this->hydrate($this->conn->fetchAllAssociative(
+            return $this->hydrate($this->connection()->fetchAllAssociative(
                 'SELECT * FROM facts WHERE superseded_at IS NULL ORDER BY updated_at DESC LIMIT :limit',
                 ['limit' => $limit],
                 ['limit' => ParameterType::INTEGER],
@@ -150,7 +150,7 @@ class MemoryStore
         $rows = $this->fullText ? $this->searchFullText($term, $limit) : null;
 
         // No full-text index, or a query none of whose words are indexable.
-        $rows ??= $this->conn->fetchAllAssociative(
+        $rows ??= $this->connection()->fetchAllAssociative(
             'SELECT * FROM facts
              WHERE superseded_at IS NULL AND (key LIKE :q OR value LIKE :q)
              ORDER BY updated_at DESC LIMIT :limit',
@@ -171,7 +171,7 @@ class MemoryStore
     {
         $this->assertOpen();
 
-        return $this->hydrate($this->conn->fetchAllAssociative(
+        return $this->hydrate($this->connection()->fetchAllAssociative(
             'SELECT * FROM facts WHERE key = :key ORDER BY updated_at DESC, id DESC',
             ['key' => $key],
         ));
@@ -183,7 +183,7 @@ class MemoryStore
         $this->assertOpen();
 
         // DBAL gives a count beyond PHP_INT_MAX as a string; a facts table never holds one.
-        return (int) $this->conn->executeStatement('DELETE FROM facts WHERE key = :key', ['key' => $key]);
+        return (int) $this->connection()->executeStatement('DELETE FROM facts WHERE key = :key', ['key' => $key]);
     }
 
     /**
@@ -317,7 +317,7 @@ class MemoryStore
 
         $this->assertOpen();
 
-        $this->conn->executeStatement(
+        $this->connection()->executeStatement(
             'UPDATE facts SET recalled_count = recalled_count + 1, last_recalled_at = :now WHERE id IN (:ids)',
             ['now' => $this->now(), 'ids' => array_map(intval(...), $ids)],
             ['ids' => ArrayParameterType::INTEGER],
@@ -461,7 +461,7 @@ class MemoryStore
         $query = implode(' OR ', array_map(fn(string $w): string => '"' . $w . '"', $words));
 
         try {
-            return $this->conn->fetchAllAssociative(
+            return $this->connection()->fetchAllAssociative(
                 'SELECT f.* FROM facts_fts
                  JOIN facts f ON f.id = facts_fts.rowid
                  WHERE facts_fts MATCH :q AND f.superseded_at IS NULL
@@ -478,7 +478,7 @@ class MemoryStore
 
     private function insert(string $key, string $value, string $now, ?string $source = null): void
     {
-        $this->conn->executeStatement(
+        $this->connection()->executeStatement(
             'INSERT INTO facts (key, value, created_at, updated_at, source) VALUES (:key, :value, :now, :now, :source)',
             ['key' => $key, 'value' => $value, 'now' => $now, 'source' => $source],
         );
@@ -513,10 +513,10 @@ class MemoryStore
 
     private function migrate(): void
     {
-        $version = (int) $this->conn->fetchOne('PRAGMA user_version');
+        $version = (int) $this->connection()->fetchOne('PRAGMA user_version');
 
         if ($version < 2) {
-            $this->conn->executeStatement(<<<SQL
+            $this->connection()->executeStatement(<<<SQL
                 CREATE TABLE IF NOT EXISTS facts_v2 (
                     id            INTEGER PRIMARY KEY AUTOINCREMENT,
                     key           TEXT    NOT NULL,
@@ -530,20 +530,20 @@ class MemoryStore
 
             // Version 1 kept one row per key. Those facts are the survivors of
             // the collisions this schema exists to stop; carry them over.
-            $legacy = $this->conn->fetchOne(
+            $legacy = $this->connection()->fetchOne(
                 "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'facts'",
             );
 
             if ($legacy !== false) {
-                $this->conn->executeStatement(
+                $this->connection()->executeStatement(
                     'INSERT OR IGNORE INTO facts_v2 (key, value, created_at, updated_at)
                      SELECT key, value, updated_at, updated_at FROM facts',
                 );
-                $this->conn->executeStatement('DROP TABLE facts');
+                $this->connection()->executeStatement('DROP TABLE facts');
             }
 
-            $this->conn->executeStatement('ALTER TABLE facts_v2 RENAME TO facts');
-            $this->conn->executeStatement('PRAGMA user_version = 2');
+            $this->connection()->executeStatement('ALTER TABLE facts_v2 RENAME TO facts');
+            $this->connection()->executeStatement('PRAGMA user_version = 2');
             $version = 2;
         }
 
@@ -553,10 +553,10 @@ class MemoryStore
         if ($version < 3) {
             $this->addColumn('facts', 'recalled_count', 'INTEGER NOT NULL DEFAULT 0');
             $this->addColumn('facts', 'last_recalled_at', 'TEXT NULL');
-            $this->conn->executeStatement('PRAGMA user_version = 3');
+            $this->connection()->executeStatement('PRAGMA user_version = 3');
         }
 
-        $this->conn->executeStatement(
+        $this->connection()->executeStatement(
             'CREATE TABLE IF NOT EXISTS project_stats (key TEXT PRIMARY KEY, value INTEGER NOT NULL DEFAULT 0)',
         );
 
@@ -565,28 +565,28 @@ class MemoryStore
         // table whose name lies is the kind of thing that misleads whoever
         // reads it in six months.
         if ($version < 4) {
-            $legacyStats = $this->conn->fetchOne(
+            $legacyStats = $this->connection()->fetchOne(
                 "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'memory_stats'",
             );
 
             if ($legacyStats !== false) {
-                $this->conn->executeStatement(
+                $this->connection()->executeStatement(
                     'INSERT OR IGNORE INTO project_stats (key, value) SELECT key, value FROM memory_stats',
                 );
-                $this->conn->executeStatement('DROP TABLE memory_stats');
+                $this->connection()->executeStatement('DROP TABLE memory_stats');
             }
 
-            $this->conn->executeStatement('PRAGMA user_version = 4');
+            $this->connection()->executeStatement('PRAGMA user_version = 4');
         }
 
         // Version 5 keeps who wrote a fact, and what the session had read from
         // outside by then. Facts from before have none: nothing is guessed.
         if ($version < 5) {
             $this->addColumn('facts', 'source', 'TEXT NULL');
-            $this->conn->executeStatement('PRAGMA user_version = 5');
+            $this->connection()->executeStatement('PRAGMA user_version = 5');
         }
 
-        $this->conn->executeStatement('CREATE INDEX IF NOT EXISTS facts_current ON facts (superseded_at, updated_at)');
+        $this->connection()->executeStatement('CREATE INDEX IF NOT EXISTS facts_current ON facts (superseded_at, updated_at)');
         $this->fullText = $this->buildFullTextIndex();
     }
 
@@ -596,13 +596,13 @@ class MemoryStore
      */
     private function addColumn(string $table, string $column, string $definition): void
     {
-        foreach ($this->conn->fetchAllAssociative("PRAGMA table_info({$table})") as $existing) {
+        foreach ($this->connection()->fetchAllAssociative("PRAGMA table_info({$table})") as $existing) {
             if (($existing['name'] ?? null) === $column) {
                 return;
             }
         }
 
-        $this->conn->executeStatement("ALTER TABLE {$table} ADD COLUMN {$column} {$definition}");
+        $this->connection()->executeStatement("ALTER TABLE {$table} ADD COLUMN {$column} {$definition}");
     }
 
     /**
@@ -613,22 +613,22 @@ class MemoryStore
     private function buildFullTextIndex(): bool
     {
         try {
-            $this->conn->executeStatement(
+            $this->connection()->executeStatement(
                 "CREATE VIRTUAL TABLE IF NOT EXISTS facts_fts
                  USING fts5(key, value, content='facts', content_rowid='id', tokenize='unicode61 remove_diacritics 2')",
             );
 
-            $this->conn->executeStatement(<<<SQL
+            $this->connection()->executeStatement(<<<SQL
                 CREATE TRIGGER IF NOT EXISTS facts_fts_insert AFTER INSERT ON facts BEGIN
                     INSERT INTO facts_fts (rowid, key, value) VALUES (new.id, new.key, new.value);
                 END
             SQL);
-            $this->conn->executeStatement(<<<SQL
+            $this->connection()->executeStatement(<<<SQL
                 CREATE TRIGGER IF NOT EXISTS facts_fts_delete AFTER DELETE ON facts BEGIN
                     INSERT INTO facts_fts (facts_fts, rowid, key, value) VALUES ('delete', old.id, old.key, old.value);
                 END
             SQL);
-            $this->conn->executeStatement(<<<SQL
+            $this->connection()->executeStatement(<<<SQL
                 CREATE TRIGGER IF NOT EXISTS facts_fts_update AFTER UPDATE OF key, value ON facts BEGIN
                     INSERT INTO facts_fts (facts_fts, rowid, key, value) VALUES ('delete', old.id, old.key, old.value);
                     INSERT INTO facts_fts (rowid, key, value) VALUES (new.id, new.key, new.value);
@@ -636,14 +636,23 @@ class MemoryStore
             SQL);
 
             // Rows carried over from version 1 predate the triggers.
-            if ((int) $this->conn->fetchOne('SELECT count(*) FROM facts_fts') === 0) {
-                $this->conn->executeStatement("INSERT INTO facts_fts (facts_fts) VALUES ('rebuild')");
+            if ((int) $this->connection()->fetchOne('SELECT count(*) FROM facts_fts') === 0) {
+                $this->connection()->executeStatement("INSERT INTO facts_fts (facts_fts) VALUES ('rebuild')");
             }
 
             return true;
         } catch (Throwable) {
             return false;
         }
+    }
+
+    private function connection(): Connection
+    {
+        if (!$this->conn instanceof Connection) {
+            throw new LogicException('MemoryStore: no database opened. Call open($dbPath) first.');
+        }
+
+        return $this->conn;
     }
 
     private function assertOpen(): void

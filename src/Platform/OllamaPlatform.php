@@ -250,12 +250,12 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
         // Only the final chunk carries the counts, and the durations beside
         // them. Nanoseconds, both of them.
         if (isset($data['prompt_eval_count']) || isset($data['eval_count'])) {
-            $this->lastUsage = [
+            $usage = [
                 'prompt'     => (int) ($data['prompt_eval_count'] ?? 0),
                 'completion' => (int) ($data['eval_count'] ?? 0),
             ];
-
-            $this->lastTimings = $this->timingsFrom($data, $this->lastUsage);
+            $this->lastUsage = $usage;
+            $this->lastTimings = $this->timingsFrom($data, $usage);
         }
 
         $msg = $data['message'] ?? [];
