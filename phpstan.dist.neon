@@ -1,0 +1,13 @@
+parameters:
+    level: 0
+    # Not tests/: each suite is a standalone script with its own global helpers (check(), platform()...),
+    # and analysed together they collide.
+    paths:
+        - src
+    tmpDir: var/phpstan
+    checkMissingCallableSignature: true
+    checkUninitializedProperties: true
+    reportUnmatchedIgnoredErrors: true
+    # The server's connection and editor arrive with the session it serves, not with the service.
+    additionalConstructors:
+        - App\Acp\AcpServer::serve

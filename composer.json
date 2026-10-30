@@ -85,6 +85,12 @@
         "symfony/polyfill-php84": "*"
     },
     "scripts": {
+        "cs": "php-cs-fixer check --diff",
+        "cs:fix": "php-cs-fixer fix",
+        "stan": "phpstan analyse --no-progress --memory-limit=1G",
+        "rector": "rector --dry-run",
+        "test": "php tests/run.php",
+        "check": ["@cs", "@rector", "@stan", "@test"],
         "auto-scripts": {
             "cache:clear": "symfony-cmd"
         },
@@ -103,5 +109,11 @@
             "allow-contrib": false,
             "require": "8.0.*"
         }
+    },
+    "require-dev": {
+        "friendsofphp/php-cs-fixer": "^3.95",
+        "phpstan/phpstan": "^2.3",
+        "phpstan/phpstan-strict-rules": "^2.1",
+        "rector/rector": "^2.8"
     }
 }

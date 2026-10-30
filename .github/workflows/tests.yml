@@ -30,9 +30,10 @@ jobs:
           # The legacy builder is a workaround for one laptop's daemon.
           BUILDKIT: 1
 
-      # No network model is called: every suite runs against fakes.
-      - name: make test
-        run: make test
+      # The formatter, Rector and PHPStan, then the suites. No network model is
+      # called: every suite runs against fakes.
+      - name: make check
+        run: make check
 
   host:
     name: Suites on the host
