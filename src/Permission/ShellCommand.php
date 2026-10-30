@@ -12,13 +12,13 @@ namespace App\Permission;
  * here-document) is not interpreted, it makes the command opaque, and an
  * opaque command is only ever allowed once, by someone who has read it.
  */
-final class ShellCommand
+final readonly class ShellCommand
 {
     /** Words that open a compound command: what it runs depends on what it computes. */
-    private const KEYWORDS = ['if', 'then', 'else', 'elif', 'fi', 'for', 'while', 'until', 'do', 'done', 'case', 'esac', 'select', 'function'];
+    private const array KEYWORDS = ['if', 'then', 'else', 'elif', 'fi', 'for', 'while', 'until', 'do', 'done', 'case', 'esac', 'select', 'function'];
 
     /** What may be written to without writing a file. */
-    private const SINKS = ['/dev/null', '/dev/stdout', '/dev/stderr'];
+    private const array SINKS = ['/dev/null', '/dev/stdout', '/dev/stderr'];
 
     /**
      * @param list<list<string>> $segments the simple commands, as words
@@ -26,9 +26,9 @@ final class ShellCommand
      * @param string|null        $opaque   why no grant can cover it, or null
      */
     private function __construct(
-        public readonly array $segments,
-        public readonly array $piped,
-        public readonly ?string $opaque,
+        public array $segments,
+        public array $piped,
+        public ?string $opaque,
     ) {}
 
     public static function parse(string $line): self
@@ -151,7 +151,7 @@ final class ShellCommand
                 continue;
             }
 
-            if ($c === "\n" || $c === ';' || $c === '(' || $c === ')') {
+            if (in_array($c, ["\n", ';', '(', ')'], true)) {
                 $endSegment(false);
                 if ($c === ';' && $next === ';') {
                     $i++;
@@ -181,7 +181,7 @@ final class ShellCommand
                 continue;
             }
 
-            if ($c === '<' || $c === '>' || $c === '&') {
+            if (in_array($c, ['<', '>', '&'], true)) {
                 // A file descriptor written before it: 2>/dev/null.
                 if ($inWord && ctype_digit($word)) {
                     $word = '';
