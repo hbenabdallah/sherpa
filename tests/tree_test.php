@@ -1,12 +1,17 @@
 <?php
+
+declare(strict_types=1);
+
+use App\Agent\Tool\ToolResult;
+
 // list_dir: the one tool that shows how a project is laid out. Before it, the
 // model's only ways in were guessing grep patterns and guessing file names —
 // and a live run showed it calling file_read on the project root.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
-use App\Agent\Tool\ToolCall;
 use App\Agent\Tool\Toolbox;
+use App\Agent\Tool\ToolCall;
 use App\Project\ProjectPathResolver;
 use App\Tool\ListDirTool;
 
@@ -27,7 +32,7 @@ foreach (['src/Billing', 'src/Catalog/Deep/Deeper', 'tests', 'vendor/acme/lib', 
     mkdir("{$root}/{$dir}", 0777, true);
 }
 foreach (['src/Billing/Invoice.php', 'src/Billing/Tax.php', 'src/Catalog/Product.php', 'src/Catalog/Deep/Deeper/Leaf.php',
-          'tests/run.php', 'vendor/acme/lib/Lib.php', 'composer.json', 'README.md', '.env.example'] as $file) {
+    'tests/run.php', 'vendor/acme/lib/Lib.php', 'composer.json', 'README.md', '.env.example'] as $file) {
     file_put_contents("{$root}/{$file}", "x\n");
 }
 for ($i = 1; $i <= 55; $i++) {
@@ -38,27 +43,44 @@ $paths = new ProjectPathResolver();
 $paths->setRoot($root);
 $tool = new ListDirTool($paths);
 $toolbox = new Toolbox([$tool]);
-$list = fn(array $args = []) => $toolbox->execute(new ToolCall('c', 'list_dir', $args));
+$list = fn(array $args = []): ToolResult => $toolbox->execute(new ToolCall('c', 'list_dir', $args));
 
 $top = $list();
 check('the root lists without arguments', !$top->isError, $top->content);
-check('directories come first, marked with a slash',
-    strpos($top->content, 'src/') < strpos($top->content, 'composer.json'), $top->content);
+check(
+    'directories come first, marked with a slash',
+    strpos($top->content, 'src/') < strpos($top->content, 'composer.json'),
+    $top->content,
+);
 check('two levels are opened by default', str_contains($top->content, "src/\n  Billing/"), $top->content);
-check('and the level below is counted rather than listed',
-    str_contains($top->content, 'Billing/ (2 entries)') && !str_contains($top->content, 'Invoice.php'), $top->content);
+check(
+    'and the level below is counted rather than listed',
+    str_contains($top->content, 'Billing/ (2 entries)') && !str_contains($top->content, 'Invoice.php'),
+    $top->content,
+);
 check('dotfiles that matter are shown', str_contains($top->content, '.env.example'));
-check('vendor is named but not opened',
-    str_contains($top->content, 'vendor/ (not expanded)') && !str_contains($top->content, 'acme'), $top->content);
+check(
+    'vendor is named but not opened',
+    str_contains($top->content, 'vendor/ (not expanded)') && !str_contains($top->content, 'acme'),
+    $top->content,
+);
 check('and neither is .git', str_contains($top->content, '.git/ (not expanded)') && !str_contains($top->content, 'objects'));
-check('nor .claude, which is the assistant\'s, not the project\'s',
-    str_contains($top->content, '.claude/ (not expanded)') && !str_contains($top->content, 'skills'), $top->content);
+check(
+    'nor .claude, which is the assistant\'s, not the project\'s',
+    str_contains($top->content, '.claude/ (not expanded)') && !str_contains($top->content, 'skills'),
+    $top->content,
+);
 
 // On screen, a listing is its counts: its first line is whatever sorts first.
-check('the summary counts directories and files',
-    ListDirTool::summary($top->content) === '8 directories, 44 files, 15 more not listed', ListDirTool::summary($top->content));
-check('and says what was left out',
-    ListDirTool::summary($list(['path' => 'crowded'])->content) === '0 directories, 40 files, 15 more not listed');
+check(
+    'the summary counts directories and files',
+    ListDirTool::summary($top->content) === '8 directories, 44 files, 15 more not listed',
+    ListDirTool::summary($top->content),
+);
+check(
+    'and says what was left out',
+    ListDirTool::summary($list(['path' => 'crowded'])->content) === '0 directories, 40 files, 15 more not listed',
+);
 check('an empty listing summarises as such', ListDirTool::summary('(empty directory)') === '(empty directory)');
 
 $sub = $list(['path' => 'src', 'depth' => 4]);
@@ -81,8 +103,11 @@ check('a missing directory is an error', $missing->isError, $missing->content);
 // Seen in the benchmark: the tree shows `src/` then `  Routing/`, and the model
 // asks for `Routing`. The error now says where it is.
 $lost = $list(['path' => 'Billing']);
-check('a directory asked for by its bare name points to where it is',
-    $lost->isError && str_contains($lost->content, 'did you mean src/Billing?'), $lost->content);
+check(
+    'a directory asked for by its bare name points to where it is',
+    $lost->isError && str_contains($lost->content, 'did you mean src/Billing?'),
+    $lost->content,
+);
 check('and nothing is suggested when nothing is close', !str_contains($missing->content, 'did you mean'), $missing->content);
 
 $outside = $list(['path' => '../']);
@@ -103,8 +128,11 @@ for ($d = 1; $d <= 8; $d++) {
 $bigPaths = new ProjectPathResolver();
 $bigPaths->setRoot($big);
 $huge = (new ListDirTool($bigPaths))();
-check('a large tree is truncated, and says how to see more',
-    str_contains($huge, 'truncated at 150 lines') && substr_count($huge, "\n") <= 151, (string) substr_count($huge, "\n"));
+check(
+    'a large tree is truncated, and says how to see more',
+    str_contains($huge, 'truncated at 150 lines') && substr_count($huge, "\n") <= 151,
+    (string) substr_count($huge, "\n"),
+);
 
 exec('rm -rf ' . escapeshellarg($root) . ' ' . escapeshellarg($big));
 

@@ -1,9 +1,16 @@
 <?php
+
+declare(strict_types=1);
+
+use App\Agent\Result;
+use App\Agent\Tool\TextToolCallParser;
+use Symfony\Component\Console\Command\LazyCommand;
+
 // The model backend behind an interface — and the proof that the interface is
 // real, by running the whole agent loop through a second implementation that
 // has never heard of Ollama or of HTTP.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\AgentLoop;
 use App\Agent\ContextBudget;
@@ -16,19 +23,17 @@ use App\Agent\Tool\Permission;
 use App\Agent\Tool\Toolbox;
 use App\Agent\Tool\ToolCall;
 use App\Agent\Tool\ToolResult;
+use App\Config\Backend;
 use App\Kernel;
 use App\Permission\PermissionBroker;
 use App\Permission\ProjectPermissions;
 use App\Permission\SessionPermissions;
-use App\Config\Backend;
-use App\Platform\OllamaPlatform;
-use App\Platform\OpenAiCompatiblePlatform;
-use App\Platform\SwitchablePlatform;
-use Symfony\Component\HttpClient\MockHttpClient;
-use Symfony\Component\HttpClient\Response\MockResponse;
 use App\Platform\ModelInfo;
 use App\Platform\ModelResidency;
+use App\Platform\OllamaPlatform;
+use App\Platform\OpenAiCompatiblePlatform;
 use App\Platform\PlatformInterface;
+use App\Platform\SwitchablePlatform;
 use App\Project\ProjectStore;
 use App\Project\StackDetector;
 use App\Runtime\Interrupt;
@@ -39,6 +44,8 @@ use App\TUI\ChatPane;
 use App\TUI\ConfirmOverlay;
 use App\TUI\MarkdownRenderer;
 use App\TUI\Terminal;
+use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
 
 $pass = 0;
 $fail = 0;
@@ -66,7 +73,9 @@ final class ScriptedPlatform implements PlatformInterface
 {
     /** @var array<int, array<string, mixed>> */
     public array $sawMessages = [];
+
     public array $sawTools = [];
+
     public int $calls = 0;
 
     private ?array $usage = null;
@@ -104,23 +113,62 @@ final class ScriptedPlatform implements PlatformInterface
         return $reply;
     }
 
-    public function concurrency(): int { return 1; }
-    public function lastUsage(): ?array { return $this->usage; }
-    public function lastTimings(): ?array { return $this->timings; }
-    public function residency(): ?ModelResidency { return null; }
-    public function modelName(): string { return $this->model; }
-    public function name(): string { return 'Script'; }
-    public function isAvailable(): bool { return true; }
+    public function concurrency(): int
+    {
+        return 1;
+    }
+
+    public function lastUsage(): ?array
+    {
+        return $this->usage;
+    }
+
+    public function lastTimings(): ?array
+    {
+        return $this->timings;
+    }
+
+    public function residency(): ?ModelResidency
+    {
+        return null;
+    }
+
+    public function modelName(): string
+    {
+        return $this->model;
+    }
+
+    public function name(): string
+    {
+        return 'Script';
+    }
+
+    public function isAvailable(): bool
+    {
+        return true;
+    }
 
     // The selection half of the contract. A backend that cannot enumerate its
     // models returns an empty catalogue — which is a supported state, not a
     // failure, because a name can always be typed instead.
     public string $model = 'scripted';
+
     public int $window = 32768;
 
-    public function contextWindow(): int { return $this->window; }
-    public function catalogue(): array { return []; }
-    public function describeModel(string $model): ?ModelInfo { return null; }
+    public function contextWindow(): int
+    {
+        return $this->window;
+    }
+
+    public function catalogue(): array
+    {
+        return [];
+    }
+
+    public function describeModel(string $model): ?ModelInfo
+    {
+        return null;
+    }
 
     public function useModel(string $model, int $contextWindow): void
     {
@@ -213,7 +261,7 @@ function unpairedCalls(array $messages): array
     return $problems;
 }
 
-/** @return array{0: \App\Agent\Result|\Throwable, 1: MessageBag, 2: ContextBudget, 3: InferenceSpeed} */
+/** @return array{0: Result|\Throwable, 1: MessageBag, 2: ContextBudget, 3: InferenceSpeed} */
 function loopWith(PlatformInterface $platform, array $tools = [], string $toolbox = Toolbox::class): array
 {
     $budget = new ContextBudget(contextWindow: 32768);
@@ -230,7 +278,7 @@ function loopWith(PlatformInterface $platform, array $tools = [], string $toolbo
         $budget,
         new HistoryCompactor($platform, $budget, $speed),
         new Interrupt(),
-        new App\Agent\Tool\TextToolCallParser(),
+        new TextToolCallParser(),
         $speed,
     );
 
@@ -239,6 +287,7 @@ function loopWith(PlatformInterface $platform, array $tools = [], string $toolbo
     $bag->user('vas-y');
 
     ob_start();
+
     try {
         $result = $loop->run($bag);
     } catch (Throwable $e) {
@@ -254,16 +303,18 @@ function loopWith(PlatformInterface $platform, array $tools = [], string $toolbo
 check('the Ollama backend satisfies the interface', is_subclass_of(OllamaPlatform::class, PlatformInterface::class));
 
 $reflection = new ReflectionClass(PlatformInterface::class);
-$methods = array_map(fn($m) => $m->getName(), $reflection->getMethods());
+$methods = array_map(fn(\ReflectionMethod $m): string => $m->getName(), $reflection->getMethods());
 sort($methods);
 // Still a guard, not a rubber stamp: every name below has a caller in src/.
 // catalogue/describeModel/useModel/contextWindow arrived with model selection —
 // the note at the foot of PlatformInterface said they would, once something
 // asked — and concurrency with sub-agents run together. Anything added here
 // without a caller is what this check is for.
-check('the contract is only what callers actually need',
+check(
+    'the contract is only what callers actually need',
     $methods === ['catalogue', 'concurrency', 'contextWindow', 'describeModel', 'isAvailable', 'lastTimings', 'lastUsage', 'modelName', 'name', 'residency', 'stream', 'useModel'],
-    implode(',', $methods));
+    implode(',', $methods),
+);
 
 // chat() left under the rule that put the others here. Its one caller was the
 // compactor's summariser, which moved to stream() so Ctrl+C could reach it —
@@ -284,9 +335,11 @@ check('the backend was handed the conversation', ($scripted->sawMessages[0]['con
 $scripted = new ScriptedPlatform([['role' => 'assistant', 'content' => 'done', 'anthropic_thinking' => [['type' => 'thinking', 'signature' => 'S']]]]);
 [$result, $bag] = loopWith($scripted);
 $last = $bag->all()[count($bag->all()) - 1];
-check('a final answer keeps what the backend attached to it',
+check(
+    'a final answer keeps what the backend attached to it',
     ($last['anthropic_thinking'][0]['signature'] ?? '') === 'S' && $last['content'] === 'done' && !isset($last['tool_calls']),
-    json_encode($last));
+    json_encode($last),
+);
 
 // "I'll start by counting with count." — and nothing else. Asked once to go
 // ahead; the call then happens.
@@ -298,8 +351,11 @@ $announcing = new ScriptedPlatform([
 ]);
 [$result, $bag] = loopWith($announcing, [$tool]);
 check('an announced call that never came is asked for once', $tool->ran === 1 && $result->content === 'Three sheep.', $result->content);
-check('and the request to go ahead is in the history',
-    str_contains(json_encode($bag->all()), 'did not call the tool'), json_encode(array_column($bag->all(), 'content')));
+check(
+    'and the request to go ahead is in the history',
+    str_contains(json_encode($bag->all()), 'did not call the tool'),
+    json_encode(array_column($bag->all(), 'content')),
+);
 
 $stubborn = new ScriptedPlatform(array_fill(0, 5, ['role' => 'assistant', 'content' => "I'll use count now."]));
 [$result] = loopWith($stubborn, [new CountTool()]);
@@ -328,9 +384,11 @@ $scripted = new ScriptedPlatform([
 [$result, $bag] = loopWith($scripted, [$tool]);
 
 check('a tool call round-trips through the interface', $tool->ran === 1 && $result->content === 'three sheep', $result->content);
-check('the tool result went back to the backend',
+check(
+    'the tool result went back to the backend',
     str_contains(json_encode($scripted->sawMessages, JSON_UNESCAPED_UNICODE), 'counted: the sheep'),
-    json_encode($scripted->sawMessages, JSON_UNESCAPED_UNICODE));
+    json_encode($scripted->sawMessages, JSON_UNESCAPED_UNICODE),
+);
 check('and the tool schemas were passed along', ($scripted->sawTools[0]['function']['name'] ?? null) === 'count', json_encode($scripted->sawTools));
 
 // ---- a backend that counts nothing -----------------------------------------
@@ -356,10 +414,16 @@ $timed = new ScriptedPlatform(
 [, , , $speed] = loopWith($timed);
 
 check('the loop feeds throughput into InferenceSpeed', $speed->isMeasured());
-check('prefill is carried through unaltered on the first sample',
-    $speed->prefillTokensPerSecond() === 800.0, (string) $speed->prefillTokensPerSecond());
-check('and a re-read of the window is costed from it',
-    (int) round($speed->secondsToPrefill(8000) ?? 0) === 10, (string) $speed->secondsToPrefill(8000));
+check(
+    'prefill is carried through unaltered on the first sample',
+    $speed->prefillTokensPerSecond() === 800.0,
+    (string) $speed->prefillTokensPerSecond(),
+);
+check(
+    'and a re-read of the window is costed from it',
+    (int) round($speed->secondsToPrefill(8000) ?? 0) === 10,
+    (string) $speed->secondsToPrefill(8000),
+);
 
 $untimed = new ScriptedPlatform([['role' => 'assistant', 'content' => 'ok']]);
 [, , , $speed] = loopWith($untimed);
@@ -390,10 +454,16 @@ foreach ($bag->all() as $message) {
     $assistantCalls += count($message['tool_calls'] ?? []);
     $toolReplies += ($message['role'] ?? '') === 'tool' ? 1 : 0;
 }
-check('every tool call still has a matching result', $assistantCalls === $toolReplies,
-    "{$assistantCalls} calls / {$toolReplies} results");
-check('and each stub names the call it stands in for', unpairedCalls($bag->all()) === [],
-    json_encode(unpairedCalls($bag->all())));
+check(
+    'every tool call still has a matching result',
+    $assistantCalls === $toolReplies,
+    "{$assistantCalls} calls / {$toolReplies} results",
+);
+check(
+    'and each stub names the call it stands in for',
+    unpairedCalls($bag->all()) === [],
+    json_encode(unpairedCalls($bag->all())),
+);
 
 check('with nothing said, the stop notice is the result', !$result->repliedBeforeStop, $result->content);
 
@@ -407,17 +477,22 @@ $answeringWhileCircling = new ScriptedPlatform(array_fill(0, 12, [
 [$result, $bag] = loopWith($answeringWhileCircling, [new CountTool()]);
 $last = $bag->all()[count($bag->all()) - 1];
 
-check('a reply given alongside a repeated call becomes the result',
-    $result->repetitionDetected && $result->repliedBeforeStop && $result->content === 'There are three sheep.', $result->content);
-check('and the history ends on it as a plain reply',
+check(
+    'a reply given alongside a repeated call becomes the result',
+    $result->repetitionDetected && $result->repliedBeforeStop && $result->content === 'There are three sheep.',
+    $result->content,
+);
+check(
+    'and the history ends on it as a plain reply',
     ($last['role'] ?? '') === 'assistant' && empty($last['tool_calls']) && ($last['content'] ?? '') === 'There are three sheep.',
-    json_encode($last));
+    json_encode($last),
+);
 check('with the history still well-formed', unpairedCalls($bag->all()) === [], json_encode(unpairedCalls($bag->all())));
 
 // Different calls, the same error every time: no call repeats, so the check
 // above never fired, and a model went through twenty commands against a
 // stopped container before the iteration cap.
-$walled = new ScriptedPlatform(array_map(fn(int $i) => [
+$walled = new ScriptedPlatform(array_map(fn(int $i): array => [
     'role' => 'assistant',
     'content' => "\n",
     'tool_calls' => [['function' => ['name' => 'wall', 'arguments' => ['what' => "essai {$i}"]]]],
@@ -429,17 +504,20 @@ check('and names the error for the user', str_contains((string) $result->repeate
 check('with the history still well-formed', unpairedCalls($bag->all()) === [], json_encode(unpairedCalls($bag->all())));
 
 // shell_exec reports a failed command as its output, not as a tool error.
-$exiting = new ScriptedPlatform(array_map(fn(int $i) => [
+$exiting = new ScriptedPlatform(array_map(fn(int $i): array => [
     'role' => 'assistant',
     'content' => '',
     'tool_calls' => [['function' => ['name' => 'wall', 'arguments' => ['what' => "shell {$i}"]]]],
 ], range(1, 12)));
 [$result] = loopWith($exiting, [new WallTool()]);
-check('so does a command exiting with the same error every time, named past its exit code',
-    $result->repeatedError === 'Error response from daemon: container cf10 is not running', (string) $result->repeatedError);
+check(
+    'so does a command exiting with the same error every time, named past its exit code',
+    $result->repeatedError === 'Error response from daemon: container cf10 is not running',
+    (string) $result->repeatedError,
+);
 
 // A success in between means the model is getting somewhere.
-$progressing = new ScriptedPlatform(array_map(fn(int $i) => [
+$progressing = new ScriptedPlatform(array_map(fn(int $i): array => [
     'role' => 'assistant',
     'content' => '',
     'tool_calls' => [['function' => ['name' => 'wall', 'arguments' => ['what' => $i % 2 === 0 ? 'ok' : "essai {$i}"]]]],
@@ -468,10 +546,15 @@ $flaky = new ScriptedPlatform([
     ['role' => 'assistant', 'content' => 'the quantity is left out'],
 ]);
 [$result, $bag] = loopWith($flaky);
-check('an empty reply is asked again once', $result->content === 'the quantity is left out' && $flaky->calls === 2,
-    "{$result->content} / {$flaky->calls}");
+check(
+    'an empty reply is asked again once',
+    $result->content === 'the quantity is left out' && $flaky->calls === 2,
+    "{$result->content} / {$flaky->calls}",
+);
 check('and leaves no empty answer in the history', !in_array('', array_column(
-    array_filter($bag->all(), fn($m) => ($m['role'] ?? '') === 'assistant'), 'content'), true));
+    array_filter($bag->all(), fn(array $m): bool => ($m['role'] ?? '') === 'assistant'),
+    'content',
+), true));
 
 $mute = new ScriptedPlatform([
     ['role' => 'assistant', 'content' => ''],
@@ -479,8 +562,11 @@ $mute = new ScriptedPlatform([
     ['role' => 'assistant', 'content' => 'jamais atteint'],
 ]);
 [$result] = loopWith($mute);
-check('two empty replies in a row stop the turn, and say so',
-    str_contains($result->content, 'two empty replies') && $mute->calls === 2, "{$result->content} / {$mute->calls}");
+check(
+    'two empty replies in a row stop the turn, and say so',
+    str_contains($result->content, 'two empty replies') && $mute->calls === 2,
+    "{$result->content} / {$mute->calls}",
+);
 
 // ---- a history every backend accepts ---------------------------------------
 // Ollama never matched a tool result to its call, so nothing kept the link.
@@ -496,13 +582,19 @@ $scripted = new ScriptedPlatform([
 ]);
 [$result, $bag] = loopWith($scripted, [$tool]);
 
-$calls = array_merge(...array_map(fn($m) => $m['tool_calls'] ?? [], $bag->all()));
-check('a call that arrived without an id is given one',
-    count($calls) === 2 && preg_match('/^[A-Za-z0-9]{9}$/', $calls[0]['id'] ?? '') === 1, json_encode($calls));
+$calls = array_merge(...array_map(fn(array $m) => $m['tool_calls'] ?? [], $bag->all()));
+check(
+    'a call that arrived without an id is given one',
+    count($calls) === 2 && preg_match('/^[A-Za-z0-9]{9}$/', $calls[0]['id'] ?? '') === 1,
+    json_encode($calls),
+);
 check('two calls in one reply get different ids', ($calls[0]['id'] ?? 'x') !== ($calls[1]['id'] ?? 'x'));
 check('each result names the call it answers', unpairedCalls($bag->all()) === [], json_encode(unpairedCalls($bag->all())));
-check('and the backend is sent the history that way', unpairedCalls($scripted->sawMessages) === [],
-    json_encode(unpairedCalls($scripted->sawMessages)));
+check(
+    'and the backend is sent the history that way',
+    unpairedCalls($scripted->sawMessages) === [],
+    json_encode(unpairedCalls($scripted->sawMessages)),
+);
 
 // A backend that chose its own id will check the result against that one.
 // And one that streams arguments as JSON text must not leave a string where
@@ -516,10 +608,13 @@ $scripted = new ScriptedPlatform([
 ]);
 [, $bag] = loopWith($scripted, [$tool]);
 
-$call = array_merge(...array_map(fn($m) => $m['tool_calls'] ?? [], $bag->all()))[0] ?? [];
+$call = array_merge(...array_map(fn(array $m) => $m['tool_calls'] ?? [], $bag->all()))[0] ?? [];
 check('an id chosen by the backend is kept', ($call['id'] ?? null) === 'call_abc123', json_encode($call));
-check('arguments streamed as JSON text are stored decoded',
-    ($call['function']['arguments'] ?? null) === ['what' => 'text'], json_encode($call));
+check(
+    'arguments streamed as JSON text are stored decoded',
+    ($call['function']['arguments'] ?? null) === ['what' => 'text'],
+    json_encode($call),
+);
 check('and still reach the tool', $tool->ran === 1
     && str_contains(json_encode($bag->all(), JSON_UNESCAPED_UNICODE), 'counted: text'));
 
@@ -535,11 +630,16 @@ $scripted = new ScriptedPlatform([
 [$thrown, $bag] = loopWith($scripted, [new CountTool()], ExplodingToolbox::class);
 
 check('an exception mid-turn still reaches the caller', $thrown instanceof RuntimeException, get_debug_type($thrown));
-check('but leaves no call unanswered in the history', unpairedCalls($bag->all()) === [],
-    json_encode(unpairedCalls($bag->all())));
-check('and each stub says the call never ran',
+check(
+    'but leaves no call unanswered in the history',
+    unpairedCalls($bag->all()) === [],
+    json_encode(unpairedCalls($bag->all())),
+);
+check(
+    'and each stub says the call never ran',
     substr_count(json_encode($bag->all(), JSON_UNESCAPED_UNICODE), 'Not run') === 2,
-    json_encode($bag->all(), JSON_UNESCAPED_UNICODE));
+    json_encode($bag->all(), JSON_UNESCAPED_UNICODE),
+);
 
 $tidy = new MessageBag();
 $tidy->user('x');
@@ -566,27 +666,37 @@ $switch->switchTo(Backend::Ollama);
 check('switching moves every call at once', $switch->name() === 'Ollama' && ($switch->stream([])['content'] ?? '') === 'local');
 
 $switch->useModel('autre:7b', 16384);
-check('a model change reaches only the backend in force',
+check(
+    'a model change reaches only the backend in force',
     $local->modelName() === 'autre:7b' && $remote->modelName() === 'distant',
-    $local->modelName() . ' / ' . $remote->modelName());
+    $local->modelName() . ' / ' . $remote->modelName(),
+);
 
 // ---- the container hands out the interface ---------------------------------
 $kernel = new Kernel('dev', true);
 $kernel->boot();
 $command = $kernel->getContainer()->get('console.command_loader')->get('sherpa');
-if ($command instanceof \Symfony\Component\Console\Command\LazyCommand) {
+if ($command instanceof LazyCommand) {
     $command = $command->getCommand();
 }
-$injected = (new ReflectionProperty($command::class, 'platform'))->getValue($command);
-check('the container injects the interface, resolved to the backend switch',
-    $injected instanceof PlatformInterface && $injected instanceof SwitchablePlatform, get_debug_type($injected));
-check('and the API is the backend in force until told otherwise',
-    $injected->backend() === Backend::Api, $injected->backend()->value);
+$injected = new ReflectionProperty($command::class, 'platform')->getValue($command);
+check(
+    'the container injects the interface, resolved to the backend switch',
+    $injected instanceof PlatformInterface && $injected instanceof SwitchablePlatform,
+    get_debug_type($injected),
+);
+check(
+    'and the API is the backend in force until told otherwise',
+    $injected->backend() === Backend::Api,
+    $injected->backend()->value,
+);
 
 // The loop got the same thing: the alias is one service, not one per injection.
-$loop = (new ReflectionProperty($command::class, 'agentLoop'))->getValue($command);
-check('and the loop was handed that very instance',
-    (new ReflectionProperty(AgentLoop::class, 'platform'))->getValue($loop) === $injected);
+$loop = new ReflectionProperty($command::class, 'agentLoop')->getValue($command);
+check(
+    'and the loop was handed that very instance',
+    new ReflectionProperty(AgentLoop::class, 'platform')->getValue($loop) === $injected,
+);
 
 if ($realHome !== null) {
     $_SERVER['HOME'] = $realHome;
@@ -594,7 +704,7 @@ if ($realHome !== null) {
 exec('rm -rf ' . escapeshellarg($home));
 
 // Ollama takes images as bare base64 on the message.
-$wire = (new ReflectionMethod(OllamaPlatform::class, 'wireMessages'))->invoke($local, [['role' => 'user', 'content' => 'Look', 'images' => [['mimeType' => 'image/png', 'data' => 'iVBO']]]]);
+$wire = new ReflectionMethod(OllamaPlatform::class, 'wireMessages')->invoke($local, [['role' => 'user', 'content' => 'Look', 'images' => [['mimeType' => 'image/png', 'data' => 'iVBO']]]]);
 check('Ollama gets an image as bare base64', ($wire[0]['images'] ?? null) === ['iVBO'], json_encode($wire));
 
 printf("\n%d passed, %d failed\n", $pass, $fail);

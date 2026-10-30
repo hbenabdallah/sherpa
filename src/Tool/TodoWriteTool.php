@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Tool;
 
 use App\Agent\TodoList;
@@ -17,7 +19,8 @@ class TodoWriteTool
     public function __construct(private readonly TodoList $todos) {}
 
     public function __invoke(
-        #[Param('The whole list, one task per line, each starting with [ ], [>] or [x]')] string $tasks,
+        #[Param('The whole list, one task per line, each starting with [ ], [>] or [x]')]
+        string $tasks,
     ): string {
         $count = $this->todos->replace($tasks);
 

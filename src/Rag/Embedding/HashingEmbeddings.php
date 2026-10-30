@@ -18,6 +18,7 @@ use App\Rag\QueryTerms;
 final class HashingEmbeddings implements EmbeddingProvider
 {
     public int $calls = 0;
+
     public int $texts = 0;
 
     public function __construct(

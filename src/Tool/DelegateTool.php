@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Tool;
 
 use App\Agent\AgentLoop;
@@ -17,6 +19,7 @@ use App\Platform\PlatformInterface;
 use App\Project\ProjectPathResolver;
 use App\Runtime\Interrupt;
 use App\Usage\UsageMeter;
+use RuntimeException;
 
 #[AsTool(
     name: 'delegate',
@@ -27,7 +30,7 @@ use App\Usage\UsageMeter;
 class DelegateTool
 {
     /** What a sub-agent is: the tools that read, and nothing that changes or leaves the machine. */
-    private const SYSTEM = <<<'PROMPT'
+    private const string SYSTEM = <<<'PROMPT'
 You are a research sub-agent working for another agent, inside a software project.
 You get one task. Investigate it with your tools — search, list, read — then answer.
 
@@ -41,7 +44,7 @@ Project root: %s
 PROMPT;
 
     /** A report longer than this is cut: it lands in the main agent's window. */
-    private const MAX_REPORT_CHARS = 12_000;
+    private const int MAX_REPORT_CHARS = 12_000;
 
     public function __construct(
         private readonly PlatformInterface $platform,
@@ -63,11 +66,12 @@ PROMPT;
     ) {}
 
     public function __invoke(
-        #[Param('The task, complete on its own: what to find out, and what to report')] string $task,
+        #[Param('The task, complete on its own: what to find out, and what to report')]
+        string $task,
     ): string {
         $task = trim($task);
         if ($task === '') {
-            throw new \RuntimeException('an empty task: say what the sub-agent should find out.');
+            throw new RuntimeException('an empty task: say what the sub-agent should find out.');
         }
 
         // Its own window, sized as the main one: what it reads never reaches

@@ -1,9 +1,12 @@
 <?php
+
+declare(strict_types=1);
+
 // The diff the confirmation shows for file_patch and file_write: the lines
 // that change and where, as git shows them — the screen an edit is approved
 // from has to say what the edit does.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Project\ProjectPathResolver;
 use App\Tool\Edit\LineDiff;
@@ -27,7 +30,7 @@ function changes(string $diff): array
 {
     return array_values(array_filter(
         explode("\n", $diff),
-        fn(string $l) => preg_match('/^[-+] /', $l) === 1,
+        fn(string $l): bool => preg_match('/^[-+] /', $l) === 1,
     ));
 }
 
@@ -120,13 +123,13 @@ check('a line added at the end', changes(LineDiff::unified("a\nb\n", "a\nb\nc\n"
 check('a file emptied', changes(LineDiff::unified("a\nb", '', 'f')) === ['- a', '- b', '+ '], LineDiff::unified("a\nb", '', 'f'));
 check('an empty range sits before its line', str_contains(LineDiff::unified('', "a\n", 'f'), '@@ -0,0 +1 @@'), LineDiff::unified('', "a\n", 'f'));
 
-$old = implode("\n", array_map(fn($i) => "old {$i}", range(1, 600)));
-$new = implode("\n", array_map(fn($i) => "new {$i}", range(1, 600)));
+$old = implode("\n", array_map(fn($i): string => "old {$i}", range(1, 600)));
+$new = implode("\n", array_map(fn($i): string => "new {$i}", range(1, 600)));
 $started = microtime(true);
 $diff = LineDiff::unified($old, $new, 'f');
 check('a rewrite too large to align shows as replaced, quickly', count(changes($diff)) === 1200 && microtime(true) - $started < 1.0);
 
-array_map('unlink', glob("{$project}/src/*"));
+array_map(unlink(...), glob("{$project}/src/*"));
 rmdir("{$project}/src");
 rmdir($project);
 

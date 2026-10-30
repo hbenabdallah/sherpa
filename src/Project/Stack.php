@@ -1,6 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Project;
+
+use Stringable;
 
 /**
  * What a project is written in, and what it is built out of.
@@ -8,7 +12,7 @@ namespace App\Project;
  * The language is a field of its own because the system prompt names it
  * ("a PHP development agent"), and that is the part it has to get right.
  */
-final class Stack
+final readonly class Stack implements Stringable
 {
     /**
      * @param string|null        $language the primary language, on its own —
@@ -20,9 +24,9 @@ final class Stack
      * @param array<int, string> $parts    frameworks, tools, runtimes
      */
     public function __construct(
-        public readonly ?string $language = null,
-        public readonly ?string $version = null,
-        public readonly array $parts = [],
+        public ?string $language = null,
+        public ?string $version = null,
+        public array $parts = [],
     ) {}
 
     public static function unknown(): self
@@ -40,11 +44,11 @@ final class Stack
     {
         $language = $this->language === null
             ? null
-            : trim($this->language . ' ' . (string) $this->version);
+            : trim($this->language . ' ' . $this->version);
 
         $all = array_values(array_filter(
             array_merge($language === null ? [] : [$language], $this->parts),
-            fn(string $p) => trim($p) !== '',
+            fn(string $p): bool => trim($p) !== '',
         ));
 
         return $all === [] ? 'Unknown' : implode(', ', $all);

@@ -1,9 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Platform;
 
 use App\Runtime\Interrupt;
+use RuntimeException;
+use stdClass;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Throwable;
 
 class OllamaPlatform implements PlatformInterface, EmbeddingBackend
 {
@@ -40,21 +45,21 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
      * Liveness probes, not inference. These answer instantly or not at all, so
      * they keep a short leash — hanging on them is worse than failing.
      */
-    private const PROBE_TIMEOUT = 5;
+    private const int PROBE_TIMEOUT = 5;
 
     /**
      * /api/show reads the manifest and returns the licence with it, so it is
      * measurably heavier than /api/tags — but it is still metadata, not
      * inference, and it runs while someone waits on a menu.
      */
-    private const SHOW_TIMEOUT = 20;
+    private const int SHOW_TIMEOUT = 20;
 
     /**
      * How often to surface control while the server is silent. Nothing arrives
      * during the prompt-evaluation pass — the longest part of the wait on a
      * CPU, and exactly when someone reaches for Ctrl+C.
      */
-    private const POLL_SECONDS = 0.5;
+    private const float POLL_SECONDS = 0.5;
 
     /**
      * @param float $timeout Idle timeout in seconds for inference requests.
@@ -122,7 +127,7 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
 
             foreach ($message['tool_calls'] ?? [] as $j => $call) {
                 if (($call['function']['arguments'] ?? null) === []) {
-                    $messages[$i]['tool_calls'][$j]['function']['arguments'] = new \stdClass();
+                    $messages[$i]['tool_calls'][$j]['function']['arguments'] = new stdClass();
                 }
             }
         }
@@ -144,7 +149,7 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
             'options'    => $this->options(),
         ];
 
-        if (!empty($tools)) {
+        if ($tools !== []) {
             $payload['tools'] = $tools;
         }
 
@@ -288,9 +293,7 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
 
             $key = 'partial:' . ($delta['index'] ?? $position);
 
-            if (!isset($acc[$key])) {
-                $acc[$key] = ['function' => ['name' => '', 'arguments' => '']];
-            }
+            $acc[$key] ??= ['function' => ['name' => '', 'arguments' => '']];
             if (isset($delta['id'])) {
                 $acc[$key]['id'] = $delta['id'];
             }
@@ -361,7 +364,7 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
             }
 
             $data = $response->toArray(throw: false);
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return null;
         }
 
@@ -456,8 +459,8 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
                 ]);
                 $status = $response->getStatusCode();
                 $body = $response->getContent(throw: false);
-            } catch (\Throwable $e) {
-                throw new \RuntimeException("Embeddings: Ollama unreachable ({$e->getMessage()}).", previous: $e);
+            } catch (Throwable $e) {
+                throw new RuntimeException("Embeddings: Ollama unreachable ({$e->getMessage()}).", $e->getCode(), previous: $e);
             }
 
             if ($status === 404) {
@@ -466,11 +469,11 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
 
             $rows = json_decode($body, true)['embeddings'] ?? null;
             if ($status >= 400 || !is_array($rows) || count($rows) !== count($batch)) {
-                throw new \RuntimeException("Embeddings: unexpected answer from Ollama for \"{$model}\" (HTTP {$status}).");
+                throw new RuntimeException("Embeddings: unexpected answer from Ollama for \"{$model}\" (HTTP {$status}).");
             }
 
             foreach ($rows as $row) {
-                $vectors[] = array_map('floatval', (array) $row);
+                $vectors[] = array_map(floatval(...), (array) $row);
             }
         }
 
@@ -492,8 +495,9 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
     {
         try {
             $response = $this->client->request('GET', $this->baseUrl . '/api/tags', ['timeout' => self::PROBE_TIMEOUT]);
+
             return $response->getStatusCode() === 200;
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return false;
         }
     }
@@ -510,7 +514,7 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
         try {
             $response = $this->client->request('GET', $this->baseUrl . '/api/tags', ['timeout' => self::PROBE_TIMEOUT]);
             $data = $response->toArray();
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return [];
         }
 
@@ -538,7 +542,7 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
 
         // Biggest first: on a machine with a GPU worth having, that is the one
         // being looked for, and it is also the one whose window needs thought.
-        usort($models, fn(ModelInfo $a, ModelInfo $b) => ($b->sizeBytes ?? 0) <=> ($a->sizeBytes ?? 0));
+        usort($models, fn(ModelInfo $a, ModelInfo $b): int => ($b->sizeBytes ?? 0) <=> ($a->sizeBytes ?? 0));
 
         return $models;
     }
@@ -566,11 +570,11 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
             }
 
             $data = $response->toArray(throw: false);
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return null;
         }
 
-        if (!is_array($data) || isset($data['error'])) {
+        if (isset($data['error'])) {
             return null;
         }
 

@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * Minimal test runner — no PHPUnit dependency yet.
  *

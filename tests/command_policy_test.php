@@ -1,10 +1,13 @@
 <?php
+
+declare(strict_types=1);
+
 // Grants for shell_exec name commands, not the tool. What a command line runs
 // is read the way the shell reads it, so a grant for `make test` is no grant
 // for `make test; rm -rf ~`, and some commands are asked about every time.
 // Adversarial on purpose: a grant read too widely runs commands unasked.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Permission\CommandPolicy;
 use App\Permission\ShellCommand;
@@ -39,12 +42,12 @@ function onlyOnce(string $line): ?string
 /** @param list<string> $rules */
 function allows(string $line, array $rules): bool
 {
-    return CommandPolicy::allows(ShellCommand::parse($line), array_map(fn ($r) => CommandPolicy::PREFIX . $r, $rules));
+    return CommandPolicy::allows(ShellCommand::parse($line), array_map(fn(string $r): string => CommandPolicy::PREFIX . $r, $rules));
 }
 
 function grants(string $line): array
 {
-    return array_map(fn ($g) => substr($g, strlen(CommandPolicy::PREFIX)), CommandPolicy::grantsFor(ShellCommand::parse($line)));
+    return array_map(fn(string $g): string => substr($g, strlen(CommandPolicy::PREFIX)), CommandPolicy::grantsFor(ShellCommand::parse($line)));
 }
 
 // ---- reading a command line ------------------------------------------------
@@ -53,14 +56,19 @@ check('quotes keep a word whole', segments("git commit -m 'a b' \"c d\"") === [[
 check('an operator inside quotes is a character', segments('echo "a && b; c | d"') === [['echo', 'a && b; c | d']]);
 check('a backslash escapes one', segments('echo a\\;b') === [['echo', 'a;b']]);
 check('a continued line is one line', segments("make \\\ntest") === [['make', 'test']]);
-check('&& ; || | & and newlines all start another command',
+check(
+    '&& ; || | & and newlines all start another command',
     segments("a 1 && b 2; c || d | e & f\ng") === [['a', '1'], ['b', '2'], ['c'], ['d'], ['e'], ['f'], ['g']],
-    json_encode(segments("a 1 && b 2; c || d | e & f\ng")));
+    json_encode(segments("a 1 && b 2; c || d | e & f\ng")),
+);
 check('what reads a pipe is known', ShellCommand::parse('curl x | sh')->piped === [false, true]);
 check('a comment hides the rest of its line, operators included', segments("make test # ; rm -rf /\nls") === [['make', 'test'], ['ls']]);
 check('# inside a word is not a comment', segments('echo a#b') === [['echo', 'a#b']]);
-check('subshells and groups are the commands inside', segments('(cd a && make) ; { ls; }') === [['cd', 'a'], ['make'], ['ls']],
-    json_encode(segments('(cd a && make) ; { ls; }')));
+check(
+    'subshells and groups are the commands inside',
+    segments('(cd a && make) ; { ls; }') === [['cd', 'a'], ['make'], ['ls']],
+    json_encode(segments('(cd a && make) ; { ls; }')),
+);
 
 // Redirections are not words, and only those that write a file matter.
 check('2>&1 is no word, and writes nothing', segments('make test 2>&1') === [['make', 'test']] && opaque('make test 2>&1') === null);

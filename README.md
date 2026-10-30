@@ -407,6 +407,7 @@ Docker:
 
 ```sh
 make test       # every suite, against fakes — no model is called
+make check      # the formatter, Rector and PHPStan, then every suite: what CI runs
 make lint       # the shell scripts
 make bench      # realistic tasks against a real model (costs a little)
 make release VERSION=1.2.0        # the single executable for this machine, checked end to end
@@ -416,7 +417,8 @@ make release-all VERSION=1.2.0    # the executable for every platform
 `make release` packs Sherpa into a phar appended to the static PHP `micro`
 runtime of the platform (`PLATFORM=linux-aarch64` builds another one), pinned by
 checksum, then runs it against a fake provider (`tests/release/smoke.sh`) when
-the platform is this machine's. A tag `v1.2.0` builds every platform in CI, runs
+the platform is this machine's. It packs `vendor/` as it is, so install without
+the dev dependencies first (`composer install --no-dev`). A tag `v1.2.0` builds every platform in CI, runs
 each executable on its own platform, and publishes them with their SHA-256 and
 `THIRD-PARTY-NOTICES.md` in the
 [Releases](https://github.com/hbenabdallah/sherpa/releases).

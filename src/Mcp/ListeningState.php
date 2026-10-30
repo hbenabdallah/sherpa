@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Mcp;
 
 use App\Runtime\Interrupt;
@@ -8,6 +10,7 @@ use Mcp\Schema\Enum\ProtocolVersion;
 use Mcp\Schema\Implementation;
 use Mcp\Schema\JsonRpc\Error;
 use Mcp\Schema\JsonRpc\Response;
+use Mcp\Schema\ServerCapabilities;
 
 /**
  * The SDK's record of what is awaited, as a transport sees it. The transport
@@ -18,13 +21,13 @@ use Mcp\Schema\JsonRpc\Response;
  *
  * The server is not told; it finishes, and its late answer goes nowhere.
  */
-final class ListeningState implements ClientStateInterface
+final readonly class ListeningState implements ClientStateInterface
 {
-    public const INTERRUPTED = 'Interrupted by the user.';
+    public const string INTERRUPTED = 'Interrupted by the user.';
 
     public function __construct(
-        private readonly ClientStateInterface $state,
-        private readonly Interrupt $interrupt,
+        private ClientStateInterface $state,
+        private Interrupt $interrupt,
     ) {}
 
     public function consumeResponse(int|string $requestId): Response|Error|null
@@ -37,19 +40,88 @@ final class ListeningState implements ClientStateInterface
         return $response;
     }
 
-    public function nextRequestId(): int { return $this->state->nextRequestId(); }
-    public function addPendingRequest(int|string $requestId, int $timeout): void { $this->state->addPendingRequest($requestId, $timeout); }
-    public function removePendingRequest(int|string $requestId): void { $this->state->removePendingRequest($requestId); }
-    public function getPendingRequests(): array { return $this->state->getPendingRequests(); }
-    public function storeResponse(int|string $requestId, array $responseData): void { $this->state->storeResponse($requestId, $responseData); }
-    public function setInitialized(bool $initialized): void { $this->state->setInitialized($initialized); }
-    public function isInitialized(): bool { return $this->state->isInitialized(); }
-    public function setProtocolVersion(ProtocolVersion $protocolVersion): void { $this->state->setProtocolVersion($protocolVersion); }
-    public function getProtocolVersion(): ?ProtocolVersion { return $this->state->getProtocolVersion(); }
-    public function setServerInfo(Implementation $serverInfo): void { $this->state->setServerInfo($serverInfo); }
-    public function getServerInfo(): ?Implementation { return $this->state->getServerInfo(); }
-    public function setInstructions(?string $instructions): void { $this->state->setInstructions($instructions); }
-    public function getInstructions(): ?string { return $this->state->getInstructions(); }
-    public function storeProgress(string $token, float $progress, ?float $total, ?string $message): void { $this->state->storeProgress($token, $progress, $total, $message); }
-    public function consumeProgressUpdates(): array { return $this->state->consumeProgressUpdates(); }
+    public function nextRequestId(): int
+    {
+        return $this->state->nextRequestId();
+    }
+
+    public function addPendingRequest(int|string $requestId, int $timeout): void
+    {
+        $this->state->addPendingRequest($requestId, $timeout);
+    }
+
+    public function removePendingRequest(int|string $requestId): void
+    {
+        $this->state->removePendingRequest($requestId);
+    }
+
+    public function getPendingRequests(): array
+    {
+        return $this->state->getPendingRequests();
+    }
+
+    public function storeResponse(int|string $requestId, array $responseData): void
+    {
+        $this->state->storeResponse($requestId, $responseData);
+    }
+
+    public function setInitialized(bool $initialized): void
+    {
+        $this->state->setInitialized($initialized);
+    }
+
+    public function isInitialized(): bool
+    {
+        return $this->state->isInitialized();
+    }
+
+    public function setProtocolVersion(?ProtocolVersion $protocolVersion): void
+    {
+        $this->state->setProtocolVersion($protocolVersion);
+    }
+
+    public function getProtocolVersion(): ?ProtocolVersion
+    {
+        return $this->state->getProtocolVersion();
+    }
+
+    public function setServerInfo(?Implementation $serverInfo): void
+    {
+        $this->state->setServerInfo($serverInfo);
+    }
+
+    public function getServerInfo(): ?Implementation
+    {
+        return $this->state->getServerInfo();
+    }
+
+    public function setServerCapabilities(?ServerCapabilities $capabilities): void
+    {
+        $this->state->setServerCapabilities($capabilities);
+    }
+
+    public function getServerCapabilities(): ?ServerCapabilities
+    {
+        return $this->state->getServerCapabilities();
+    }
+
+    public function setInstructions(?string $instructions): void
+    {
+        $this->state->setInstructions($instructions);
+    }
+
+    public function getInstructions(): ?string
+    {
+        return $this->state->getInstructions();
+    }
+
+    public function storeProgress(string $token, float $progress, ?float $total, ?string $message): void
+    {
+        $this->state->storeProgress($token, $progress, $total, $message);
+    }
+
+    public function consumeProgressUpdates(): array
+    {
+        return $this->state->consumeProgressUpdates();
+    }
 }

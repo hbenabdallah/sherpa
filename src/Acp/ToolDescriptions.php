@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Acp;
 
 use App\TUI\Terminal;
@@ -10,7 +12,7 @@ use App\TUI\Terminal;
  */
 final class ToolDescriptions
 {
-    private const TITLE_CHARS = 80;
+    private const int TITLE_CHARS = 80;
 
     public static function kind(string $tool): string
     {

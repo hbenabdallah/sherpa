@@ -1,15 +1,21 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\TUI;
 
 class Terminal
 {
     // ANSI colors
-    const RESET     = "\e[0m";
-    const BOLD      = "\e[1m";
-    const DIM       = "\e[2m";
-    const ITALIC    = "\e[3m";
-    const UNDERLINE = "\e[4m";
+    public const RESET     = "\e[0m";
+
+    public const BOLD      = "\e[1m";
+
+    public const DIM       = "\e[2m";
+
+    public const ITALIC    = "\e[3m";
+
+    public const UNDERLINE = "\e[4m";
 
     // One palette, drawn from the logo (public/sherpa.jpeg): its lime and
     // slate peaks, the grey of mist and rock, the white of snow — and, for the
@@ -17,38 +23,60 @@ class Terminal
     // muted register. The names stay those of the roles every caller already
     // uses; only what they look like is chosen here. 256-colour codes, which
     // every current terminal has.
-    const BLACK   = "\e[30m";
-    const RED     = "\e[38;5;167m";   // errors — a soft red, #d75f5f
-    const GREEN   = "\e[38;5;149m";   // done, allowed — the lime peak, #afd75f
-    const YELLOW  = "\e[38;5;179m";   // warnings, questions — amber, #d7af5f
-    const BLUE    = "\e[38;5;67m";    // a deeper slate, #5f87af
-    const MAGENTA = "\e[38;5;139m";   // a dusk slate, #af87af
-    const CYAN    = "\e[38;5;109m";   // accents, headings, code — the slate peak, #87afaf
-    const WHITE   = "\e[38;5;254m";   // what you typed — snow, #e4e4e4
-    const GRAY    = "\e[38;5;245m";   // everything secondary — mist, #8a8a8a
+    public const BLACK   = "\e[30m";
+
+    public const RED     = "\e[38;5;167m";   // errors — a soft red, #d75f5f
+
+    public const GREEN   = "\e[38;5;149m";   // done, allowed — the lime peak, #afd75f
+
+    public const YELLOW  = "\e[38;5;179m";   // warnings, questions — amber, #d7af5f
+
+    public const BLUE    = "\e[38;5;67m";    // a deeper slate, #5f87af
+
+    public const MAGENTA = "\e[38;5;139m";   // a dusk slate, #af87af
+
+    public const CYAN    = "\e[38;5;109m";   // accents, headings, code — the slate peak, #87afaf
+
+    public const WHITE   = "\e[38;5;254m";   // what you typed — snow, #e4e4e4
+
+    public const GRAY    = "\e[38;5;245m";   // everything secondary — mist, #8a8a8a
 
     // The logo's two peaks by name, for what is Sherpa's own: the banner, the
     // "Sherpa:" and "You:" labels.
-    const SLATE = "\e[38;5;109m";
-    const LIME  = "\e[38;5;149m";
+    public const SLATE = "\e[38;5;109m";
 
-    const BG_BLACK  = "\e[40m";
-    const BG_RED    = "\e[48;5;167m";
-    const BG_GREEN  = "\e[48;5;149m";
-    const BG_YELLOW = "\e[48;5;179m";
-    const BG_BLUE   = "\e[48;5;67m";
-    const BG_GRAY   = "\e[48;5;240m";
-    const BG_DARK   = "\e[48;5;236m";   // code blocks — the dark of the wordmark
+    public const LIME  = "\e[38;5;149m";
+
+    public const BG_BLACK  = "\e[40m";
+
+    public const BG_RED    = "\e[48;5;167m";
+
+    public const BG_GREEN  = "\e[48;5;149m";
+
+    public const BG_YELLOW = "\e[48;5;179m";
+
+    public const BG_BLUE   = "\e[48;5;67m";
+
+    public const BG_GRAY   = "\e[48;5;240m";
+
+    public const BG_DARK   = "\e[48;5;236m";   // code blocks — the dark of the wordmark
 
     // Box-drawing
-    const H  = '─';
-    const V  = '│';
-    const TL = '┌';
-    const TR = '┐';
-    const BL = '└';
-    const BR = '┘';
-    const TT = '┬';
-    const BT = '┴';
+    public const H  = '─';
+
+    public const V  = '│';
+
+    public const TL = '┌';
+
+    public const TR = '┐';
+
+    public const BL = '└';
+
+    public const BR = '┘';
+
+    public const TT = '┬';
+
+    public const BT = '┴';
 
     private string $savedStty = '';
 
@@ -310,6 +338,7 @@ class Terminal
         echo $prompt;
         $line = trim(fgets(STDIN) ?: '');
         $this->rawMode();
+
         return $line;
     }
 

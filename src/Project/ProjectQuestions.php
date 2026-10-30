@@ -7,6 +7,7 @@ namespace App\Project;
 use App\TUI\LineEditor;
 use App\TUI\Terminal;
 use Symfony\Component\Process\Process;
+use Throwable;
 
 /**
  * The questions a new directory gets, once: its name, and whether its commands
@@ -17,8 +18,9 @@ use Symfony\Component\Process\Process;
 class ProjectQuestions
 {
     /** Service names that usually hold the application and its database. */
-    private const APP_HINTS = ['app', 'php', 'web', 'api', 'backend'];
-    private const DB_HINTS = ['db', 'database', 'mysql', 'mariadb', 'postgres', 'pgsql'];
+    private const array APP_HINTS = ['app', 'php', 'web', 'api', 'backend'];
+
+    private const array DB_HINTS = ['db', 'database', 'mysql', 'mariadb', 'postgres', 'pgsql'];
 
     public function __construct(
         private readonly LineEditor $editor,
@@ -111,7 +113,7 @@ class ProjectQuestions
         $wrapper = ($composed || $running !== []) ? DockerWrapper::in($path) : null;
         $likely = $current?->enabled ?? (($composed || $running !== []) && $wrapper === null);
 
-        if ($current === null && ($composed || $running !== [])) {
+        if (!$current instanceof DockerConfig && ($composed || $running !== [])) {
             echo Terminal::GRAY . '  ' . ($running !== []
                 ? 'Containers of this directory are running: ' . implode(', ', $running)
                 : 'A docker compose file is here.') . "\n" . Terminal::RESET;
@@ -172,7 +174,7 @@ class ProjectQuestions
         try {
             $process = new Process(['docker', 'ps', '--format', '{{.Names}}'], timeout: 3);
             $process->run();
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return [];
         }
 
@@ -181,8 +183,8 @@ class ProjectQuestions
         }
 
         return array_values(array_filter(
-            array_map('trim', explode("\n", $process->getOutput())),
-            static fn(string $name) => $name !== '' && str_starts_with(strtolower($name), $prefix),
+            array_map(trim(...), explode("\n", $process->getOutput())),
+            static fn(string $name): bool => $name !== '' && str_starts_with(strtolower($name), $prefix),
         ));
     }
 
@@ -206,12 +208,6 @@ class ProjectQuestions
 
     private function hasCompose(string $path): bool
     {
-        foreach (['compose.yaml', 'compose.yml', 'docker-compose.yml', 'docker-compose.yaml'] as $file) {
-            if (is_file($path . '/' . $file)) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any(['compose.yaml', 'compose.yml', 'docker-compose.yml', 'docker-compose.yaml'], fn(string $file): bool => is_file($path . '/' . $file));
     }
 }

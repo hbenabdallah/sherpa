@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 // A page that takes its time, served by `php -S` in web_fetch_test:
 //   /pause   sends half, waits a second, sends the rest
 //   /silent  sends nothing for five seconds

@@ -1,8 +1,11 @@
 <?php
+
+declare(strict_types=1);
+
 // Ctrl+C cancels the turn, not the session — and leaves the conversation in a
 // state the next request can actually be built from.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\AgentLoop;
 use App\Agent\ContextBudget;
@@ -50,7 +53,9 @@ $_SERVER['HOME'] = $home;
 // ---- the signal path, driven by real signals -------------------------------
 $interrupt = new Interrupt();
 $quits = 0;
-$interrupt->install(function () use (&$quits) { $quits++; });
+$interrupt->install(function () use (&$quits): void {
+    $quits++;
+});
 
 check('nothing is requested to start with', !$interrupt->requested());
 
@@ -98,7 +103,9 @@ $cancelling = new Interrupt();
 $cancelling->request();
 $platform = new OllamaPlatform(new MockHttpClient(new MockResponse($chunks)), 'http://x', 'm', 32768, -1.0, $cancelling);
 $tokens = [];
-$msg = $platform->stream([], [], function (string $t) use (&$tokens) { $tokens[] = $t; });
+$msg = $platform->stream([], [], function (string $t) use (&$tokens): void {
+    $tokens[] = $t;
+});
 check('a cancelled stream yields no content', $msg['content'] === '', json_encode($msg));
 check('and emits no tokens', $tokens === [], json_encode($tokens));
 
@@ -106,9 +113,9 @@ check('and emits no tokens', $tokens === [], json_encode($tokens));
 
 /** Cancels the turn from inside a tool, so the loop is interrupted mid-batch. */
 #[AsTool(name: 'trip', description: 'Demande l\'annulation', permission: Permission::AUTO)]
-final class TripTool
+final readonly class TripTool
 {
-    public function __construct(private readonly Interrupt $interrupt) {}
+    public function __construct(private Interrupt $interrupt) {}
 
     public function __invoke(#[Param('unused')] string $note = ''): string
     {
@@ -134,7 +141,7 @@ final class AfterTool
 function loopWith(Interrupt $interrupt, array $tools, array $chunks): array
 {
     // A list of lists: one response per request of the turn.
-    $responses = is_array($chunks[0] ?? null) ? array_map(fn(array $c) => new MockResponse($c), $chunks) : new MockResponse($chunks);
+    $responses = is_array($chunks[0] ?? null) ? array_map(fn(array $c): MockResponse => new MockResponse($c), $chunks) : new MockResponse($chunks);
     $platform = new OllamaPlatform(new MockHttpClient($responses), 'http://x', 'm', 32768, -1.0, $interrupt);
     $budget = new ContextBudget();
     $broker = new PermissionBroker(
@@ -214,9 +221,9 @@ check('and returns the reply', $result->content === 'salut', $result->content);
 
 /** Waits as a command does: checking for Ctrl+C every 20 ms. */
 #[AsTool(name: 'slow', description: 'Prend son temps', permission: Permission::AUTO)]
-final class SlowTool
+final readonly class SlowTool
 {
-    public function __construct(private readonly Interrupt $interrupt, private readonly float $seconds) {}
+    public function __construct(private Interrupt $interrupt, private float $seconds) {}
 
     public function __invoke(#[Param('unused')] string $note = ''): string
     {
@@ -242,7 +249,9 @@ $brief = new Interrupt();
 check('a quick one is not', !str_contains($shown, 'running…'), Terminal::plain($shown));
 
 $ticks = 0;
-$before = function () use (&$ticks): void { $ticks++; };
+$before = function () use (&$ticks): void {
+    $ticks++;
+};
 $kept = new Interrupt();
 $kept->meanwhile($before);
 loopWith($kept, [new SlowTool($kept, 0.1)], $oneCall);

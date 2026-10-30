@@ -1,8 +1,11 @@
 <?php
+
+declare(strict_types=1);
+
 // Verification of TextToolCallParser: recovering tool calls a model emitted as
 // prose, without firing on models that merely talk about JSON.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\Tool\TextToolCallParser;
 
@@ -22,8 +25,8 @@ function check(string $label, $expected, $actual): void
 
 $p = new TextToolCallParser();
 $known = ['file_read', 'project_grep', 'shell_exec'];
-$names = fn(array $calls) => array_map(fn($c) => $c['function']['name'], $calls);
-$args = fn(array $calls) => array_map(fn($c) => $c['function']['arguments'], $calls);
+$names = fn(array $calls): array => array_map(fn(array $c) => $c['function']['name'], $calls);
+$args = fn(array $calls): array => array_map(fn(array $c) => $c['function']['arguments'], $calls);
 
 // ---- THE ACTUAL FAILURE: bare JSON, no wrapper tags -----------------------
 $real = '{
@@ -108,16 +111,31 @@ $live = "Je vais utiliser la commande `list_dir` pour obtenir une vue d'ensemble
 check('bare arguments are taken for the tool the text names', ['list_dir'], $names($p->parse($live, $allKnown, $signatures)));
 check('with their values', [['path' => '', 'depth' => 2]], $args($p->parse($live, $allKnown, $signatures)));
 
-check('not when no tool is named in the text', [],
-    $names($p->parse("Here is the config:\n```json\n{\"path\": \"src\"}\n```", $allKnown, $signatures)));
-check('not when the keys fit no named tool', [],
-    $names($p->parse("With list_dir I found:\n```json\n{\"files\": 3}\n```", $allKnown, $signatures)));
-check('not when two named tools fit the same keys', [],
-    $names($p->parse("Either list_dir or file_read:\n{\"path\": \"src\"}", $allKnown, $signatures)));
-check('not when a required argument is missing', [],
-    $names($p->parse("Next, project_grep:\n{\"path\": \"src\"}", $allKnown, $signatures)));
-check('a named call still wins over bare arguments', ['file_read'],
-    $names($p->parse("list_dir {\"path\": \"a\"} then {\"name\":\"file_read\",\"arguments\":{\"path\":\"b\"}}", $allKnown, $signatures)));
+check(
+    'not when no tool is named in the text',
+    [],
+    $names($p->parse("Here is the config:\n```json\n{\"path\": \"src\"}\n```", $allKnown, $signatures)),
+);
+check(
+    'not when the keys fit no named tool',
+    [],
+    $names($p->parse("With list_dir I found:\n```json\n{\"files\": 3}\n```", $allKnown, $signatures)),
+);
+check(
+    'not when two named tools fit the same keys',
+    [],
+    $names($p->parse("Either list_dir or file_read:\n{\"path\": \"src\"}", $allKnown, $signatures)),
+);
+check(
+    'not when a required argument is missing',
+    [],
+    $names($p->parse("Next, project_grep:\n{\"path\": \"src\"}", $allKnown, $signatures)),
+);
+check(
+    'a named call still wins over bare arguments',
+    ['file_read'],
+    $names($p->parse("list_dir {\"path\": \"a\"} then {\"name\":\"file_read\",\"arguments\":{\"path\":\"b\"}}", $allKnown, $signatures)),
+);
 
 printf("\n%d passed, %d failed\n", $pass, $fail);
 exit($fail === 0 ? 0 : 1);

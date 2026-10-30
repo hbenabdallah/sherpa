@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Runtime;
 
 use Symfony\Component\HttpClient\DecoratorTrait;
@@ -21,7 +23,7 @@ final class InterruptibleHttpClient implements HttpClientInterface
         DecoratorTrait::__construct as private decorate;
     }
 
-    private const POLL_SECONDS = 0.1;
+    private const float POLL_SECONDS = 0.1;
 
     public function __construct(HttpClientInterface $client, private readonly Interrupt $interrupt)
     {
@@ -35,6 +37,7 @@ final class InterruptibleHttpClient implements HttpClientInterface
 
         // stream() ends at its first silence: asked again until the headers.
         $interrupted = false;
+
         try {
             for ($waiting = true; $waiting && !$interrupted;) {
                 $waiting = false;

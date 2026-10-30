@@ -1,4 +1,9 @@
 <?php
+
+declare(strict_types=1);
+
+use App\Rag\Hit;
+
 // Retrieval, measured. A small documentation corpus written for this purpose,
 // 32 questions written before any search ran, and the strategies side by side.
 //
@@ -7,7 +12,7 @@
 // questions are printed, not asserted: they are the gap the embeddings phase
 // exists to close, and the numbers here are the baseline it will be judged on.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Rag\Bm25Retriever;
 use App\Rag\Chunker;
@@ -34,7 +39,7 @@ $questions = json_decode((string) file_get_contents(__DIR__ . '/fixtures/rag/que
 
 $index = new DocIndex();
 $index->open(':memory:');
-$report = (new Ingestor(new DocSource(), new Chunker()))->sync($corpus, $index);
+$report = new Ingestor(new DocSource(), new Chunker())->sync($corpus, $index);
 
 check('the whole corpus is indexed, every format included', $report->added === 12 && $report->failed === [], $report->summary() . ' ' . json_encode($report->failed));
 check('32 questions to answer', count($questions) === 32);
@@ -56,21 +61,31 @@ foreach ($results as $name => $result) {
 echo "\n";
 
 // What keyword search has no excuse to miss.
-check('exact references are found in the first five', $results['bm25']['kinds']['exact']['rk'] >= 0.9,
-    sprintf('%.0f%%', $results['bm25']['kinds']['exact']['rk'] * 100));
-check('a value in a table is found through its row', $results['bm25']['kinds']['table']['rk'] >= 0.66,
-    sprintf('%.0f%%', $results['bm25']['kinds']['table']['rk'] * 100));
+check(
+    'exact references are found in the first five',
+    $results['bm25']['kinds']['exact']['rk'] >= 0.9,
+    sprintf('%.0f%%', $results['bm25']['kinds']['exact']['rk'] * 100),
+);
+check(
+    'a value in a table is found through its row',
+    $results['bm25']['kinds']['table']['rk'] >= 0.66,
+    sprintf('%.0f%%', $results['bm25']['kinds']['table']['rk'] * 100),
+);
 
 // The default is the fusion because it measured best: plain BM25's precision
 // and the stemmed variant's recall at once. Should that stop being true, the
 // default has to be decided again — this is where it would show.
 $fused = $results['rrf(les deux)']['overall'];
-check('the fused default ranks as well as the best single strategy',
+check(
+    'the fused default ranks as well as the best single strategy',
     $fused['mrr'] >= max($results['bm25']['overall']['mrr'], $results['bm25+racines']['overall']['mrr']),
-    sprintf('MRR %.2f', $fused['mrr']));
-check('and recalls as much as the best single strategy',
+    sprintf('MRR %.2f', $fused['mrr']),
+);
+check(
+    'and recalls as much as the best single strategy',
     $fused['rk'] >= max($results['bm25']['overall']['rk'], $results['bm25+racines']['overall']['rk']),
-    sprintf('recall@5 %.0f%%', $fused['rk'] * 100));
+    sprintf('recall@5 %.0f%%', $fused['rk'] * 100),
+);
 
 // ---- incremental re-indexing -------------------------------------------------
 $copy = sys_get_temp_dir() . '/sherpa-rag-' . bin2hex(random_bytes(4));
@@ -90,10 +105,10 @@ file_put_contents($copy . '/docs/nouveau.md', "# New\n\nA document that was adde
 
 $delta = $ingestor->sync($copy, $index2);
 check('only what changed is re-indexed', $delta->added === 1 && $delta->updated === 1 && $delta->removed === 1 && $delta->unchanged === 10, $delta->summary() . " / {$delta->unchanged} unchanged");
-check('a new section is searchable at once', (new Bm25Retriever($index2))->retrieve('panier en cours', 3)[0]->chunk->path === 'docs/glossaire.md');
+check('a new section is searchable at once', new Bm25Retriever($index2)->retrieve('panier en cours', 3)[0]->chunk->path === 'docs/glossaire.md');
 check('a removed document is no longer found', array_filter(
-    (new Bm25Retriever($index2))->retrieve('paiement en trois fois', 5),
-    fn($h) => $h->chunk->path === 'CHANGELOG.md',
+    new Bm25Retriever($index2)->retrieve('paiement en trois fois', 5),
+    fn(Hit $h): bool => $h->chunk->path === 'CHANGELOG.md',
 ) === []);
 exec('rm -rf ' . escapeshellarg($copy));
 

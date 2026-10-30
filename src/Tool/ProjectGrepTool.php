@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Tool;
 
 use App\Agent\ContextBudget;
@@ -24,21 +26,23 @@ class ProjectGrepTool
      * the model back for a narrower one, and each of those round trips costs a
      * whole turn to recover matches that would have fitted.
      */
-    private const MIN_RESULTS = 50;
-    private const MAX_RESULTS = 600;
+    private const int MIN_RESULTS = 50;
+
+    private const int MAX_RESULTS = 600;
 
     /** Matches reported per file before grep moves on. */
-    private const MIN_PER_FILE = 5;
-    private const MAX_PER_FILE = 15;
+    private const int MIN_PER_FILE = 5;
+
+    private const int MAX_PER_FILE = 15;
 
     /** Share of the prompt window one search may occupy. */
-    private const RESULT_SHARE = 0.06;
+    private const float RESULT_SHARE = 0.06;
 
     /** Rough width of one match line, for turning a character budget into rows. */
-    private const CHARS_PER_RESULT = 110;
+    private const int CHARS_PER_RESULT = 110;
 
     /** Longest match line shown whole; past it, the part around the match. */
-    private const MAX_LINE_CHARS = 300;
+    private const int MAX_LINE_CHARS = 300;
 
     public function __construct(
         private readonly ProjectPathResolver $paths = new ProjectPathResolver(),
@@ -53,7 +57,7 @@ class ProjectGrepTool
     /** How many match lines this window can afford from one search. */
     private function resultCap(): int
     {
-        if ($this->budget === null) {
+        if (!$this->budget instanceof ContextBudget) {
             return self::MIN_RESULTS;
         }
 
@@ -76,9 +80,12 @@ class ProjectGrepTool
     }
 
     public function __invoke(
-        #[Param('Extended regular expression, as grep -E reads it: foo|bar, (get|set)Name, [0-9]+. Use [0-9] rather than \\d')] string $pattern,
-        #[Param('Subdirectory or file to search in, relative to project root (optional, defaults to entire project)')] ?string $path = null,
-        #[Param('File extension filter e.g. php, yaml, env (optional); also matches files where it is followed by another, like .env.example or phpunit.xml.dist')] ?string $ext = null,
+        #[Param('Extended regular expression, as grep -E reads it: foo|bar, (get|set)Name, [0-9]+. Use [0-9] rather than \\d')]
+        string $pattern,
+        #[Param('Subdirectory or file to search in, relative to project root (optional, defaults to entire project)')]
+        ?string $path = null,
+        #[Param('File extension filter e.g. php, yaml, env (optional); also matches files where it is followed by another, like .env.example or phpunit.xml.dist')]
+        ?string $ext = null,
     ): string {
         $base = $this->paths->root();
         // A subdirectory argument is confined too — otherwise grep becomes a

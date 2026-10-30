@@ -6,6 +6,9 @@ namespace App\Rag\Parser;
 
 use App\Rag\ParsedDocument;
 use App\Rag\Section;
+use DOMDocument;
+use DOMElement;
+use DOMNode;
 
 /**
  * HTML pages: generated documentation, exported wikis, static sites.
@@ -18,7 +21,7 @@ use App\Rag\Section;
  */
 final class HtmlParser implements DocumentParser
 {
-    private const FURNITURE = ['script', 'style', 'noscript', 'nav', 'footer', 'template', 'svg'];
+    private const array FURNITURE = ['script', 'style', 'noscript', 'nav', 'footer', 'template', 'svg'];
 
     public function supports(string $path): bool
     {
@@ -27,7 +30,7 @@ final class HtmlParser implements DocumentParser
 
     public function parse(string $path, string $content): ParsedDocument
     {
-        $dom = new \DOMDocument();
+        $dom = new DOMDocument();
         $previous = libxml_use_internal_errors(true);
         // The XML declaration is how libxml is told the page is UTF-8 when the
         // page does not say so itself; without it, accents come out mangled.
@@ -41,7 +44,7 @@ final class HtmlParser implements DocumentParser
             }
         }
 
-        $title = trim((string) ($dom->getElementsByTagName('title')->item(0)?->textContent ?? ''));
+        $title = trim($dom->getElementsByTagName('title')->item(0)?->textContent ?? '');
 
         $sections = [];
         $stack = [];
@@ -57,7 +60,7 @@ final class HtmlParser implements DocumentParser
 
         $body = $dom->getElementsByTagName('body')->item(0) ?? $dom->documentElement;
         if ($body !== null) {
-            $this->walk($body, function (\DOMElement $node) use (&$stack, &$blocks, &$start, $flush, &$title): bool {
+            $this->walk($body, function (DOMElement $node) use (&$stack, &$blocks, &$start, $flush, &$title): bool {
                 $tag = strtolower($node->nodeName);
 
                 if (preg_match('/^h([1-6])$/', $tag, $m) === 1) {
@@ -107,30 +110,30 @@ final class HtmlParser implements DocumentParser
     /**
      * Depth first, in document order. $visit answers whether to go inside.
      *
-     * @param callable(\DOMElement): bool $visit
+     * @param callable(DOMElement): bool $visit
      */
-    private function walk(\DOMNode $node, callable $visit): void
+    private function walk(DOMNode $node, callable $visit): void
     {
         foreach ($node->childNodes as $child) {
-            if ($child instanceof \DOMElement && $visit($child)) {
+            if ($child instanceof DOMElement && $visit($child)) {
                 $this->walk($child, $visit);
             }
         }
     }
 
-    private static function text(\DOMNode $node): string
+    private static function text(DOMNode $node): string
     {
         return trim((string) preg_replace('/\s+/u', ' ', $node->textContent));
     }
 
     /** A table as Markdown: a header row, its rule, then one line per row. */
-    private static function table(\DOMElement $table): string
+    private static function table(DOMElement $table): string
     {
         $rows = [];
         foreach ($table->getElementsByTagName('tr') as $tr) {
             $cells = [];
             foreach ($tr->childNodes as $cell) {
-                if ($cell instanceof \DOMElement && in_array(strtolower($cell->nodeName), ['td', 'th'], true)) {
+                if ($cell instanceof DOMElement && in_array(strtolower($cell->nodeName), ['td', 'th'], true)) {
                     $cells[] = str_replace('|', '\|', self::text($cell));
                 }
             }
@@ -143,8 +146,8 @@ final class HtmlParser implements DocumentParser
             return '';
         }
 
-        $width = max(array_map('count', $rows));
-        $line = static fn(array $cells) => '| ' . implode(' | ', array_pad($cells, $width, '')) . ' |';
+        $width = max(array_map(count(...), $rows));
+        $line = static fn(array $cells): string => '| ' . implode(' | ', array_pad($cells, $width, '')) . ' |';
 
         $out = [$line($rows[0]), '|' . str_repeat(' --- |', $width)];
         foreach (array_slice($rows, 1) as $row) {

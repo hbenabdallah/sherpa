@@ -1,4 +1,9 @@
 <?php
+
+declare(strict_types=1);
+
+use Symfony\Component\Process\Exception\ProcessTimedOutException;
+
 // The documentation search measured where it counts: in the agent's answers.
 //
 // tests/rag/eval_live.php measures whether the right passage is found. This
@@ -71,7 +76,7 @@ if (!is_array($questions) || $questions === []) {
     exit(2);
 }
 
-$only = isset($options['only']) ? array_map('intval', explode(',', $options['only'])) : null;
+$only = isset($options['only']) ? array_map(intval(...), explode(',', $options['only'])) : null;
 $timeout = (int) ($options['timeout'] ?? 300);
 $repeat = max(1, (int) ($options['repeat'] ?? 1));
 
@@ -83,7 +88,7 @@ mkdir($out, 0777, true);
 $copy = sys_get_temp_dir() . '/sherpa-rag-answers-' . bin2hex(random_bytes(4)) . '/' . basename($source);
 mkdir($copy, 0777, true);
 // Gone however the run ends: it is a whole copy of someone's project.
-register_shutdown_function(static fn() => (new Process(['rm', '-rf', dirname($copy)]))->run());
+register_shutdown_function(static fn(): int => new Process(['rm', '-rf', dirname($copy)])->run());
 
 // ---- the project, copied ----------------------------------------------------
 // What a clone would hold, plus what the user has not committed yet: the same
@@ -98,7 +103,7 @@ if ($git->isSuccessful()) {
         }
     }
 } else {
-    (new Process(['cp', '-a', $source . '/.', $copy]))->mustRun();
+    new Process(['cp', '-a', $source . '/.', $copy])->mustRun();
 }
 
 // ---- the index, built once ----------------------------------------------------
@@ -108,11 +113,12 @@ if ($git->isSuccessful()) {
 $index = $out . '/docs.db';
 $docs = new DocIndex();
 $docs->open($index);
-(new Ingestor(new DocSource(), new Chunker()))->sync($copy, $docs);
+new Ingestor(new DocSource(), new Chunker())->sync($copy, $docs);
 if ($embeddingModel !== '') {
     $platform = new OpenAiCompatiblePlatform(HttpClient::create(), $url, $model, (string) getenv('SHERPA_API_KEY'));
+
     try {
-        (new ChunkEmbedder())->embed($docs, new FixedEmbeddings($platform, $embeddingModel));
+        new ChunkEmbedder()->embed($docs, new FixedEmbeddings($platform, $embeddingModel));
     } catch (\Throwable $e) {
         // A quota spent before the first question: nothing measured, and
         // better said in one line than in a stack trace.
@@ -123,9 +129,15 @@ if ($embeddingModel !== '') {
 $counts = $docs->counts();
 unset($docs);
 
-printf("\n  %s · %d documents, %d passages%s\n  %d question(s) · %s\n\n",
-    basename($source), $counts['documents'], $counts['chunks'],
-    $embeddingModel !== '' ? " · vectors {$embeddingModel}" : ' · keywords only', $only === null ? count($questions) : count($only), $model);
+printf(
+    "\n  %s · %d documents, %d passages%s\n  %d question(s) · %s\n\n",
+    basename($source),
+    $counts['documents'],
+    $counts['chunks'],
+    $embeddingModel !== '' ? " · vectors {$embeddingModel}" : ' · keywords only',
+    $only === null ? count($questions) : count($only),
+    $model,
+);
 
 // ---- one question, one session ---------------------------------------------------
 
@@ -170,9 +182,10 @@ function ask(string $repo, string $dir, string $copy, string $index, string $nam
     ], input: $question . "\n/exit\n", timeout: $timeout);
 
     $started = microtime(true);
+
     try {
         $process->run();
-    } catch (Symfony\Component\Process\Exception\ProcessTimedOutException) {
+    } catch (ProcessTimedOutException) {
     }
     $output = (string) preg_replace('/\e\[[0-9;?]*[a-zA-Z]/', '', $process->getOutput() . $process->getErrorOutput());
     file_put_contents("{$dir}/output.txt", $output);
@@ -244,13 +257,7 @@ function mentions(string $text, array $expect): bool
 
 function mentionsFile(string $text, array $expect): bool
 {
-    foreach ($expect as $target) {
-        if (str_contains($text, $target['path'])) {
-            return true;
-        }
-    }
-
-    return false;
+    return array_any($expect, fn($target): bool => str_contains($text, $target['path']));
 }
 
 /**
@@ -304,16 +311,27 @@ foreach ($attempts as [$n, $attempt, $question]) {
     ];
     $rows[] = $row;
 
-    $yes = static fn(?bool $b) => $b === null ? '—' : ($b ? 'oui' : 'NON');
-    printf("  %2d%s  %-12s searched %-3s  found %-3s  cites file %-3s section %-3s  %s  %3.0f s  %2d req%s%s\n",
-        $n, $repeat > 1 ? ".{$attempt}" : '', mb_substr($row['kind'], 0, 12), $row['searched'] > 0 ? 'oui' : 'NON', $yes($row['found']),
-        $yes($row['file']), $yes($row['section']), $answerable ? '           ' : 'says so ' . $yes($row['declined']), $row['seconds'], $row['requests'],
-        $row['capped'] ? '  · token cap reached' : '', $row['unsaved'] ? '  · conversation not saved' : '');
+    $yes = static fn(?bool $b): string => $b === null ? '—' : ($b ? 'oui' : 'NON');
+    printf(
+        "  %2d%s  %-12s searched %-3s  found %-3s  cites file %-3s section %-3s  %s  %3.0f s  %2d req%s%s\n",
+        $n,
+        $repeat > 1 ? ".{$attempt}" : '',
+        mb_substr($row['kind'], 0, 12),
+        $row['searched'] > 0 ? 'oui' : 'NON',
+        $yes($row['found']),
+        $yes($row['file']),
+        $yes($row['section']),
+        $answerable ? '           ' : 'says so ' . $yes($row['declined']),
+        $row['seconds'],
+        $row['requests'],
+        $row['capped'] ? '  · token cap reached' : '',
+        $row['unsaved'] ? '  · conversation not saved' : '',
+    );
 
     $report .= "\n## {$n}" . ($repeat > 1 ? ".{$attempt}" : '') . ". {$row['q']}\n\n"
-        . '- expected: ' . ($answerable ? implode(' ; ', array_map(static fn($t) => $t['path'] . ($t['section'] !== '' ? ' › ' . $t['section'] : ''), $expect)) : 'nothing — the documentation does not answer') . "\n"
-        . '- searches: ' . ($seen['searches'] === [] ? 'none' : implode(' · ', array_map(static fn($s) => "\"{$s}\"", $seen['searches']))) . "\n"
-        . '- tools: ' . ($row['tools'] === [] ? 'none' : implode(', ', array_map(static fn($t, $c) => "{$t} ×{$c}", array_keys($row['tools']), $row['tools']))) . "\n\n"
+        . '- expected: ' . ($answerable ? implode(' ; ', array_map(static fn(array $t): string => $t['path'] . ($t['section'] !== '' ? ' › ' . $t['section'] : ''), $expect)) : 'nothing — the documentation does not answer') . "\n"
+        . '- searches: ' . ($seen['searches'] === [] ? 'none' : implode(' · ', array_map(static fn($s): string => "\"{$s}\"", $seen['searches']))) . "\n"
+        . '- tools: ' . ($row['tools'] === [] ? 'none' : implode(', ', array_map(static fn($t, $c): string => "{$t} ×{$c}", array_keys($row['tools']), $row['tools']))) . "\n\n"
         . ($seen['answer'] !== '' ? $seen['answer'] : '(no answer)') . "\n";
 }
 
@@ -321,18 +339,20 @@ file_put_contents("{$out}/answers.md", $report);
 file_put_contents("{$out}/results.json", json_encode(['model' => $model, 'embedding' => $embeddingModel, 'rows' => $rows], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
 // ---- totals ---------------------------------------------------------------------
-$answerable = array_values(array_filter($rows, static fn($r) => $r['found'] !== null));
-$outside = array_values(array_filter($rows, static fn($r) => $r['declined'] !== null));
-$share = static fn(array $set, callable $test) => $set === [] ? '—' : sprintf('%d/%d', count(array_filter($set, $test)), count($set));
+$answerable = array_values(array_filter($rows, static fn(array $r): bool => $r['found'] !== null));
+$outside = array_values(array_filter($rows, static fn(array $r): bool => $r['declined'] !== null));
+$share = static fn(array $set, callable $test): string => $set === [] ? '—' : sprintf('%d/%d', count(array_filter($set, $test)), count($set));
 
-echo "\n  searched the documentation       " . $share($rows, static fn($r) => $r['searched'] > 0) . "\n";
+echo "\n  searched the documentation       " . $share($rows, static fn($r): bool => $r['searched'] > 0) . "\n";
 echo '  found the right section          ' . $share($answerable, static fn($r) => $r['found']) . "\n";
 echo '  cites the right file             ' . $share($answerable, static fn($r) => $r['file']) . "\n";
 echo '  cites the right section          ' . $share($answerable, static fn($r) => $r['section']) . "\n";
 echo '  says when the docs do not answer ' . $share($outside, static fn($r) => $r['declined']) . "\n";
 echo '  answered                         ' . $share($rows, static fn($r) => $r['answered']) . "\n";
-printf("  on average                       %.0f s, %.1f requests, %s tokens per question\n",
+printf(
+    "  on average                       %.0f s, %.1f requests, %s tokens per question\n",
     array_sum(array_column($rows, 'seconds')) / max(1, count($rows)),
     array_sum(array_column($rows, 'requests')) / max(1, count($rows)),
-    number_format(array_sum(array_column($rows, 'tokens')) / max(1, count($rows)), 0, ',', ' '));
+    number_format(array_sum(array_column($rows, 'tokens')) / max(1, count($rows)), 0, ',', ' '),
+);
 echo "\n  Answers to read: {$out}/answers.md\n\n";

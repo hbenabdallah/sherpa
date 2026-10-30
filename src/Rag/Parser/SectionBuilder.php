@@ -94,6 +94,6 @@ final class SectionBuilder
         // A heading with nothing under it before the next one says where the
         // next section sits, not something of its own: it lives on in the
         // path of the sections below, and an empty section is dropped.
-        return array_values(array_filter($sections, static fn(Section $s) => trim($s->text) !== ''));
+        return array_values(array_filter($sections, static fn(Section $s): bool => trim($s->text) !== ''));
     }
 }

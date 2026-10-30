@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Tool;
 
 use App\Agent\Tool\AsTool;
@@ -10,10 +12,10 @@ use App\Project\PathSuggestions;
 use App\Project\ProjectPathResolver;
 use App\Tool\Edit\Files;
 use App\Tool\Edit\LineDiff;
-use App\Tool\Edit\PatchOutcome;
 use App\Tool\Edit\ProposedEdit;
 use App\Tool\Edit\SyntaxGuard;
 use App\Tool\Edit\TextPatch;
+use RuntimeException;
 
 #[AsTool(
     name: 'file_patch',
@@ -34,28 +36,31 @@ class FilePatchTool
      * counted as such — with the same "Error: …" text the model always read.
      */
     public function __invoke(
-        #[Param('Path to the file, relative to the project root. Must be inside the project.')] string $path,
-        #[Param('The text to replace, copied from the file; it must occur exactly once')] string $search,
-        #[Param('The text to put in its place')] string $replace,
+        #[Param('Path to the file, relative to the project root. Must be inside the project.')]
+        string $path,
+        #[Param('The text to replace, copied from the file; it must occur exactly once')]
+        string $search,
+        #[Param('The text to put in its place')]
+        string $replace,
     ): string {
         $resolved = $this->paths->resolve($path);
 
         if (!is_file($resolved)) {
-            throw new \RuntimeException("file not found: {$path}" . PathSuggestions::hint($this->paths->root(), $path, directory: false));
+            throw new RuntimeException("file not found: {$path}" . PathSuggestions::hint($this->paths->root(), $path, directory: false));
         }
 
         $original = (string) $this->files->read($resolved);
         $outcome = TextPatch::apply($original, $search, $replace);
 
         if (!$outcome->ok()) {
-            throw new \RuntimeException("{$path}: " . $outcome->message());
+            throw new RuntimeException("{$path}: " . $outcome->message());
         }
 
         // Only a change that breaks a file that parsed is refused: a file
         // already broken may take several patches to repair.
         $problem = $this->syntax->problem($path, (string) $outcome->content);
         if ($problem !== null && $this->syntax->problem($path, $original) === null) {
-            throw new \RuntimeException(
+            throw new RuntimeException(
                 "this change would break {$path}, so it was not applied: {$problem}. "
                 . 'The file is unchanged; correct the replacement and try again.',
             );

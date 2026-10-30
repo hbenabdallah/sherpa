@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\TUI;
 
 use App\Agent\AgentOutput;
@@ -9,7 +11,9 @@ use App\Tool\ListDirTool;
 class ChatPane implements AgentOutput
 {
     private array $history = [];
+
     private string $spinner = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏';
+
     private int $spinnerFrame = 0;
 
     /** Trailing partial line of the reply being streamed, not yet terminated by "\n". */
@@ -20,16 +24,18 @@ class ChatPane implements AgentOutput
 
     /** Whether the waiting line is on screen and must be erased before anything else. */
     private bool $waiting = false;
+
     private float $lastWaitFrame = 0.0;
 
     /** Redraws of the waiting line, at most — reasoning can arrive fifty fragments a second. */
-    private const WAIT_FRAME_SECONDS = 0.1;
+    private const float WAIT_FRAME_SECONDS = 0.1;
 
     /**
      * Tokens printed nowhere yet because the reply may turn out to be a tool
      * call written as prose. See appendToken().
      */
     private string $withheld = '';
+
     private bool $holding = true;
 
     public function __construct(

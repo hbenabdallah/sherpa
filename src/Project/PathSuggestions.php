@@ -19,12 +19,12 @@ namespace App\Project;
 final class PathSuggestions
 {
     /** Never searched: other people's code, generated output, VCS internals. */
-    private const SKIPPED = ['vendor', 'node_modules', '.git', 'var', '.idea', '.vscode', '__pycache__', '.venv', 'target'];
+    private const array SKIPPED = ['vendor', 'node_modules', '.git', 'var', '.idea', '.vscode', '__pycache__', '.venv', 'target'];
 
     /** A project is walked this far and no further: a hint is not worth a slow error. */
-    private const MAX_ENTRIES = 20_000;
+    private const int MAX_ENTRIES = 20_000;
 
-    private const MAX_SUGGESTIONS = 5;
+    private const int MAX_SUGGESTIONS = 5;
 
     /**
      * Paths, relative to $root, that $missing was most likely meant to be:
@@ -37,7 +37,7 @@ final class PathSuggestions
     {
         $root = rtrim($root, '/');
         $name = strtolower(basename(rtrim($missing, '/')));
-        if ($name === '' || $name === '.' || $name === '..') {
+        if (in_array($name, ['', '.', '..'], true)) {
             return [];
         }
 
@@ -72,7 +72,7 @@ final class PathSuggestions
             }
         }
 
-        usort($found, fn(string $a, string $b) => strlen($a) <=> strlen($b) ?: strcmp($a, $b));
+        usort($found, fn(string $a, string $b): int => strlen($a) <=> strlen($b) ?: strcmp($a, $b));
 
         return array_slice($found, 0, self::MAX_SUGGESTIONS);
     }

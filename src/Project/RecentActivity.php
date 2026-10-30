@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Project;
 
 use Symfony\Component\Process\Process;
+use Throwable;
 
 /**
  * What this project has been worked on lately, as a handful of keywords. The
@@ -17,16 +18,16 @@ use Symfony\Component\Process\Process;
 final class RecentActivity
 {
     /** Commits looked back through. Far enough for a week, short enough to stay cheap. */
-    private const COMMITS = 20;
+    private const int COMMITS = 20;
 
     /** Keywords returned at most; past this it stops discriminating. */
-    private const MAX_TERMS = 25;
+    private const int MAX_TERMS = 25;
 
     /**
      * Path segments that name every project rather than this one, so boosting
      * on them would boost everything — which is the same as boosting nothing.
      */
-    private const NOISE = [
+    private const array NOISE = [
         'src', 'tests', 'test', 'config', 'var', 'vendor', 'public', 'bin',
         'app', 'lib', 'index', 'node_modules', 'php', 'yaml', 'yml', 'json',
         'xml', 'twig', 'md', 'lock', 'dist', 'build', 'assets', 'templates',
@@ -170,7 +171,7 @@ final class RecentActivity
             }
 
             return explode("\n", trim($process->getOutput()));
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return [];
         }
     }

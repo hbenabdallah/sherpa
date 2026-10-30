@@ -1,4 +1,4 @@
-.PHONY: help build install link unlink doctor shell sherpa test lint bench rag-eval stop logs setup-env config-dir php release release-all
+.PHONY: help build install link unlink doctor shell sherpa test lint bench rag-eval check fix stop logs setup-env config-dir php release release-all
 
 SERVICE = app
 
@@ -146,6 +146,12 @@ lint: ## Check the shell scripts, with the same shellcheck CI uses
 
 test: ## Run the test suites
 	docker compose run --rm --no-deps $(RUN_TTY) $(SERVICE) php tests/run.php
+
+check: ## Format check, Rector, PHPStan and the test suites: what CI runs
+	docker compose run --rm --no-deps $(RUN_TTY) $(SERVICE) composer check
+
+fix: ## Apply the formatter and Rector
+	docker compose run --rm --no-deps $(RUN_TTY) $(SERVICE) sh -c 'vendor/bin/rector && vendor/bin/php-cs-fixer fix'
 
 bench: ## Live benchmark against the API (costs a little): ARGS="--only=a,b --repeat=N --label=x"
 	docker compose run --rm --no-deps -e SHERPA_BENCH_MODEL $(SERVICE) php tests/bench/bench.php $(ARGS)

@@ -1,7 +1,10 @@
 <?php
+
+declare(strict_types=1);
+
 // file_find: files by name pattern, confined to the project, newest first.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Project\PathOutsideProjectException;
 use App\Project\ProjectPathResolver;
@@ -20,7 +23,7 @@ function check(string $label, bool $ok, string $detail = ''): void
 }
 
 // ---- globs ------------------------------------------------------------------
-$matches = fn(string $glob, string $path) => preg_match(FileFindTool::toRegex($glob), $path) === 1;
+$matches = fn(string $glob, string $path): bool => preg_match(FileFindTool::toRegex($glob), $path) === 1;
 check('* stays within a directory', $matches('src/*.php', 'src/A.php') && !$matches('src/*.php', 'src/Billing/A.php'));
 check('** goes through them, none included', $matches('src/**/*.php', 'src/A.php') && $matches('src/**/*.php', 'src/Billing/Tax/A.php'));
 check('? is one character', $matches('a?.txt', 'ab.txt') && !$matches('a?.txt', 'abc.txt'));
@@ -57,19 +60,35 @@ $out = $find('src/**/*.php');
 check('a path pattern is taken from the root', substr_count($out, "\n") === 3 && !str_contains($out, 'tests/'), $out);
 
 $out = $find('*.php', 'src/Billing');
-check('path narrows the search, and the paths stay relative to the root',
-    str_contains($out, 'src/Billing/Invoice.php') && !str_contains($out, 'Kernel.php'), $out);
+check(
+    'path narrows the search, and the paths stay relative to the root',
+    str_contains($out, 'src/Billing/Invoice.php') && !str_contains($out, 'Kernel.php'),
+    $out,
+);
 
 $out = $find('src/*.php');
-check('a miss says why when "*" was meant to cross directories',
-    str_contains($find('lib/*.php'), 'No file matches') && str_contains($find('lib/*.php'), '"**"'), $find('lib/*.php'));
+check(
+    'a miss says why when "*" was meant to cross directories',
+    str_contains($find('lib/*.php'), 'No file matches') && str_contains($find('lib/*.php'), '"**"'),
+    $find('lib/*.php'),
+);
 
 $threw = false;
-try { $find('*.php', '../'); } catch (PathOutsideProjectException) { $threw = true; }
+
+try {
+    $find('*.php', '../');
+} catch (PathOutsideProjectException) {
+    $threw = true;
+}
 check('a path outside the project is refused', $threw);
 
 $threw = false;
-try { $find('   '); } catch (RuntimeException $e) { $threw = str_contains($e->getMessage(), 'empty pattern'); }
+
+try {
+    $find('   ');
+} catch (RuntimeException $e) {
+    $threw = str_contains($e->getMessage(), 'empty pattern');
+}
 check('an empty pattern is an error the model can act on', $threw);
 
 // ---- in a git repository: .gitignore counts -----------------------------------
@@ -85,8 +104,11 @@ for ($i = 0; $i < 150; $i++) {
     file_put_contents("{$root}/many/f{$i}.txt", 'x');
 }
 $out = $find('many/*.txt');
-check('a long list is capped, with how many were left out',
-    str_starts_with($out, '150 files match') && str_contains($out, '… and 50 more'), substr($out, -80));
+check(
+    'a long list is capped, with how many were left out',
+    str_starts_with($out, '150 files match') && str_contains($out, '… and 50 more'),
+    substr($out, -80),
+);
 
 exec('rm -rf ' . escapeshellarg($root));
 

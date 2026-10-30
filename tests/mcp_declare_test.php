@@ -1,9 +1,14 @@
 <?php
+
+declare(strict_types=1);
+
+use App\Agent\Tool\ToolDefinition;
+
 // Declaring MCP servers without opening mcp.json: /mcp add and its siblings in
 // a session, `sherpa mcp …` in the shell — the same file written either way,
 // and a session that takes the change at once.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\Tool\Toolbox;
 use App\Command\McpCommand;
@@ -42,16 +47,26 @@ function configAt(string $path): McpConfig
 
 // ---- a command line, cut as a shell would ---------------------------------------
 check('words are cut on spaces', CommandLine::split('npx -y  server') === ['npx', '-y', 'server']);
-check('single quotes keep everything as it is',
+check(
+    'single quotes keep everything as it is',
     CommandLine::split("sh -c 'exec docker run -v \"\$PWD:\$PWD\" img'") === ['sh', '-c', 'exec docker run -v "$PWD:$PWD" img'],
-    json_encode(CommandLine::split("sh -c 'exec docker run -v \"\$PWD:\$PWD\" img'")));
-check('double quotes group, and unescape what sh unescapes',
-    CommandLine::split('echo "a b \\"c\\" \\n"') === ['echo', 'a b "c" \\n'], json_encode(CommandLine::split('echo "a b \\"c\\" \\n"')));
+    json_encode(CommandLine::split("sh -c 'exec docker run -v \"\$PWD:\$PWD\" img'")),
+);
+check(
+    'double quotes group, and unescape what sh unescapes',
+    CommandLine::split('echo "a b \\"c\\" \\n"') === ['echo', 'a b "c" \\n'],
+    json_encode(CommandLine::split('echo "a b \\"c\\" \\n"')),
+);
 check('a backslash escapes a space', CommandLine::split('/My\\ Apps/server --x') === ['/My Apps/server', '--x']);
 check('an empty quoted word is a word', CommandLine::split("cmd ''") === ['cmd', '']);
 check('nothing is expanded: no variable, no glob', CommandLine::split('ls $HOME *.php') === ['ls', '$HOME', '*.php']);
 $threw = false;
-try { CommandLine::split("sh -c 'oops"); } catch (McpException) { $threw = true; }
+
+try {
+    CommandLine::split("sh -c 'oops");
+} catch (McpException) {
+    $threw = true;
+}
 check('a quote left open is refused rather than swallowing the line', $threw);
 
 // ---- the file, written --------------------------------------------------------
@@ -68,9 +83,11 @@ file_put_contents($path, json_encode([
 ], JSON_PRETTY_PRINT));
 $config->save(ServerConfig::fromArray('demo', ['command' => PHP_BINARY, 'args' => [$fixture, 'ok']]));
 $data = json_decode((string) file_get_contents($path), true);
-check('the rest of the file is kept: comments, other servers, keys Sherpa does not know',
+check(
+    'the rest of the file is kept: comments, other servers, keys Sherpa does not know',
     ($data['_comment'] ?? null) === ['kept'] && ($data['mcpServers']['autre']['custom'] ?? null) === 'kept too' && isset($data['mcpServers']['demo']),
-    json_encode($data));
+    json_encode($data),
+);
 check('nothing empty or default is written', !isset($data['mcpServers']['demo']['env']) && !isset($data['mcpServers']['demo']['enabled']), json_encode($data['mcpServers']['demo']));
 
 check('turning one off keeps how it was set up', $config->setEnabled('demo', false) && $config->server('demo')?->enabled === false && $config->server('demo')?->command === PHP_BINARY);
@@ -79,7 +96,12 @@ check('a name nobody declared is not invented', !$config->setEnabled('personne',
 check('removing one leaves the others', $config->remove('autre') && $config->server('autre') === null && $config->server('demo') !== null);
 
 $threw = false;
-try { $config->save(new ServerConfig(name: 'mon serveur', command: 'x')); } catch (McpException) { $threw = true; }
+
+try {
+    $config->save(new ServerConfig(name: 'mon serveur', command: 'x'));
+} catch (McpException) {
+    $threw = true;
+}
 check('a name that cannot prefix a tool is refused', $threw);
 
 $servers = configAt($dir . '/servers.json');
@@ -96,7 +118,7 @@ $registry->load($toolbox);
 check('no server, no tool', $toolbox->getDefinitions() === [] && $registry->promptSection() === '');
 
 $line = $registry->connect(ServerConfig::fromArray('demo', ['command' => PHP_BINARY, 'args' => [$fixture, 'ok']]), $toolbox);
-$names = array_map(fn($d) => $d->name, $toolbox->getDefinitions());
+$names = array_map(fn(ToolDefinition $d): string => $d->name, $toolbox->getDefinitions());
 check('connected mid-session, its tools are there at once', in_array('mcp__demo__echo', $names, true), implode(',', $names));
 check('with its line in the report', str_contains($line, 'demo: 3 tools') && $registry->report() === [$line], json_encode($registry->report()));
 check('and its instructions in the prompt section', str_contains($registry->promptSection(), 'Call horloge'));
@@ -105,11 +127,12 @@ $registry->connect(ServerConfig::fromArray('demo', ['command' => PHP_BINARY, 'ar
 check('connecting it again replaces it rather than clashing', count($toolbox->getDefinitions()) === 3 && count($registry->report()) === 1);
 
 $registry->disconnect('demo', $toolbox, 'demo: disabled');
-check('let go, its tools leave the Toolbox', $toolbox->getDefinitions() === [], implode(',', array_map(fn($d) => $d->name, $toolbox->getDefinitions())));
+check('let go, its tools leave the Toolbox', $toolbox->getDefinitions() === [], implode(',', array_map(fn(ToolDefinition $d): string => $d->name, $toolbox->getDefinitions())));
 check('its instructions leave the prompt', $registry->promptSection() === '');
 check('and its line says why', $registry->report() === ['demo: disabled'] && !$registry->isConnected('demo'));
 
 $threw = false;
+
 try {
     $registry->connect(ServerConfig::fromArray('mort', ['command' => PHP_BINARY, 'args' => [$fixture, 'crash']]), $toolbox);
 } catch (McpException) {
@@ -146,8 +169,11 @@ check('one already taken is not replaced without a yes', str_contains($r['shown'
 
 $crash = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($fixture) . ' crash';
 $r = $session($live, 'add', "mort\n{$crash}\n\nn\n");
-check('a server that does not answer is said so, and not saved without a yes',
-    str_contains($r['shown'], 'missing configuration') && configAt($live)->server('mort') === null && !in_array('mcp__mort__echo', $r['tools'], true), $r['shown']);
+check(
+    'a server that does not answer is said so, and not saved without a yes',
+    str_contains($r['shown'], 'missing configuration') && configAt($live)->server('mort') === null && !in_array('mcp__mort__echo', $r['tools'], true),
+    $r['shown'],
+);
 $r = $session($live, 'add', "mort\n{$crash}\n\ny\n");
 check('saved anyway when asked to', configAt($live)->server('mort') !== null && str_contains($r['shown'], 'not connected'), $r['shown']);
 
@@ -199,6 +225,6 @@ check('and again, an error: nothing by that name', $tester->getStatusCode() === 
 $tester->execute(['action' => 'frobnicate']);
 check('an unknown action is refused', $tester->getStatusCode() === 1);
 
-(new Process(['rm', '-rf', $dir]))->run();
+new Process(['rm', '-rf', $dir])->run();
 printf("\n%d passed, %d failed\n", $pass, $fail);
 exit($fail === 0 ? 0 : 1);

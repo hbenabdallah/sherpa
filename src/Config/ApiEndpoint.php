@@ -17,7 +17,7 @@ namespace App\Config;
 final class ApiEndpoint
 {
     /** Suffixes copied along with the base URL, from a provider's own examples. */
-    private const COPIED_SUFFIXES = ['/chat/completions', '/completions', '/models'];
+    private const array COPIED_SUFFIXES = ['/chat/completions', '/completions', '/models'];
 
     /** The base URL, or null when $typed is not an http(s) address. */
     public static function normalize(string $typed): ?string

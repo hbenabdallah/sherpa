@@ -12,14 +12,14 @@ namespace App\Project;
  */
 final class DockerWrapper
 {
-    private const FILES = ['Makefile', 'makefile', 'GNUmakefile', 'justfile', 'Justfile'];
+    private const array FILES = ['Makefile', 'makefile', 'GNUmakefile', 'justfile', 'Justfile'];
 
     /**
      * `docker run|exec`, `docker compose run|exec` or `docker-compose run|exec`,
      * flags allowed in between, on one command: not a `docker compose up && npm
      * run dev`, which only starts the containers.
      */
-    private const CALL = '/\bdocker(?:-compose|\s+compose)?\s+(?:[^\n;&|]*\s)?(?:run|exec)\b/';
+    private const string CALL = '/\bdocker(?:-compose|\s+compose)?\s+(?:[^\n;&|]*\s)?(?:run|exec)\b/';
 
     /** The task file in $path that calls docker run or exec itself, or null. */
     public static function in(string $path): ?string

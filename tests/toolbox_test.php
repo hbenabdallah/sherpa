@@ -1,7 +1,10 @@
 <?php
+
+declare(strict_types=1);
+
 // The bridge between what a model writes and what a PHP handler will accept.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\Tool\AsTool;
 use App\Agent\Tool\Param;
@@ -25,10 +28,14 @@ function check(string $label, bool $ok, string $detail = ''): void
 final class TypedTool
 {
     public function __invoke(
-        #[Param('un entier')] int $count,
-        #[Param('a boolean')] bool $flag = false,
-        #[Param('un flottant')] float $ratio = 0.0,
-        #[Param('du texte')] string $label = '',
+        #[Param('un entier')]
+        int $count,
+        #[Param('a boolean')]
+        bool $flag = false,
+        #[Param('un flottant')]
+        float $ratio = 0.0,
+        #[Param('du texte')]
+        string $label = '',
     ): string {
         return json_encode([
             'count' => $count, 'flag' => $flag, 'ratio' => $ratio, 'label' => $label,
@@ -86,10 +93,13 @@ check('and the error lists the tools that do exist', str_contains($result->conte
 #[AsTool(name: 'sans_args', description: 'Ne prend rien', permission: Permission::AUTO)]
 final class NoArgsTool
 {
-    public function __invoke(): string { return 'ok'; }
+    public function __invoke(): string
+    {
+        return 'ok';
+    }
 }
 
-$schema = (new Toolbox([new NoArgsTool()]))->getDefinitions()[0]->toFunctionSchema();
+$schema = new Toolbox([new NoArgsTool()])->getDefinitions()[0]->toFunctionSchema();
 $json = json_encode($schema);
 
 // An empty PHP array encodes as [], and JSON Schema says "properties" is an
@@ -97,14 +107,19 @@ $json = json_encode($schema);
 // '}' symbol" and the whole turn dies — for every tool in the request, not just
 // this one. No native tool takes zero arguments, so nothing caught it until an
 // MCP server exposed one that does.
-check('a tool with no arguments still declares properties as an object',
-    str_contains($json, '"properties":{}'), $json);
+check(
+    'a tool with no arguments still declares properties as an object',
+    str_contains($json, '"properties":{}'),
+    $json,
+);
 check('and required stays a list', str_contains($json, '"required":[]'), $json);
 
-$withArgs = (new Toolbox([new TypedTool()]))->getDefinitions()[0]->toFunctionSchema();
-check('a tool with arguments is unaffected',
+$withArgs = new Toolbox([new TypedTool()])->getDefinitions()[0]->toFunctionSchema();
+check(
+    'a tool with arguments is unaffected',
     ($withArgs['function']['parameters']['properties']['count']['type'] ?? null) === 'integer',
-    json_encode($withArgs));
+    json_encode($withArgs),
+);
 
 printf("\n%d passed, %d failed\n", $pass, $fail);
 exit($fail === 0 ? 0 : 1);

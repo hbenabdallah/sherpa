@@ -21,11 +21,22 @@ use Symfony\Component\Console\Output\OutputInterface;
  * install guide, or someone who would rather not open a session to do it.
  * The same file as /mcp writes, the same checks.
  */
-#[AsCommand(name: 'mcp', description: 'Declare the MCP servers Sherpa connects to')]
+#[AsCommand(name: 'mcp', description: 'Declare the MCP servers Sherpa connects to', help: <<<'TXT'
+<info>sherpa mcp list</info>
+<info>sherpa mcp add</info> <name> [--var KEY=value]... -- <command> [arguments...]
+<info>sherpa mcp add</info> <name> --url https://… [-H "Authorization: Bearer …"]
+<info>sherpa mcp disable</info>|<info>enable</info>|<info>remove</info> <name>
+
+A server added is started once to check it answers, and saved only if it
+does; --no-check saves it as it is. Values given with --var and -H end up in
+your shell history: for a token, /mcp add in a session asks for it hidden.
+
+Servers are kept in ~/.config/sherpa/mcp.json, readable by you only.
+TXT)]
 final class McpCommand extends Command
 {
     /** Long enough for `npx -y` to fetch a package; shorter than a session's. */
-    private const CHECK_TIMEOUT = 60.0;
+    private const float CHECK_TIMEOUT = 60.0;
 
     public function __construct(private readonly McpConfig $config)
     {
@@ -42,19 +53,7 @@ final class McpCommand extends Command
             ->addOption('header', 'H', InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'For add --url: a header sent with every request, "Name: value"')
             // Not --env/-e: the console takes those for the kernel's environment.
             ->addOption('var', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'For add: a variable the command gets, KEY=value')
-            ->addOption('no-check', null, InputOption::VALUE_NONE, 'For add: save without starting the server to try it')
-            ->setHelp(<<<'HELP'
-                <info>sherpa mcp list</info>
-                <info>sherpa mcp add</info> <name> [--var KEY=value]... -- <command> [arguments...]
-                <info>sherpa mcp add</info> <name> --url https://… [-H "Authorization: Bearer …"]
-                <info>sherpa mcp disable</info>|<info>enable</info>|<info>remove</info> <name>
-
-                A server added is started once to check it answers, and saved only if it
-                does; --no-check saves it as it is. Values given with --var and -H end up in
-                your shell history: for a token, /mcp add in a session asks for it hidden.
-
-                Servers are kept in ~/.config/sherpa/mcp.json, readable by you only.
-                HELP);
+            ->addOption('no-check', null, InputOption::VALUE_NONE, 'For add: save without starting the server to try it');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -124,6 +123,7 @@ final class McpCommand extends Command
 
         if (!$input->getOption('no-check')) {
             $client = McpClient::for($server, callTimeout: self::CHECK_TIMEOUT);
+
             try {
                 $tools = count($client->listTools());
             } catch (McpException $e) {
@@ -137,7 +137,7 @@ final class McpCommand extends Command
             $output->writeln("<info>✓</info> {$name} answers: {$tools} tool" . ($tools === 1 ? '' : 's'));
         }
 
-        $replaced = $this->config->server($name) !== null;
+        $replaced = $this->config->server($name) instanceof ServerConfig;
         $this->config->save($server);
         $output->writeln("<info>✓</info> {$name} " . ($replaced ? 'replaced' : 'saved') . ' in ' . $this->config->path()
             . ' — in the next session; in one already open, /mcp enable ' . $name);

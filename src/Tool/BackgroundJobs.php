@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tool;
 
+use RuntimeException;
 use Symfony\Component\Process\Process;
 
 /**
@@ -21,7 +22,7 @@ use Symfony\Component\Process\Process;
 final class BackgroundJobs
 {
     /** How long a job is watched at start, to report an early failure or a first line. */
-    public const FIRST_LOOK_SECONDS = 3.0;
+    public const float FIRST_LOOK_SECONDS = 3.0;
 
     /** @var array<int, array{command: string, process: Process, started: float, container: ?string, inContainer: callable(string): list<string>, group: bool, stopped: bool}> */
     private array $jobs = [];
@@ -168,13 +169,7 @@ final class BackgroundJobs
 
     private static function onPath(string $command): bool
     {
-        foreach (explode(':', (string) getenv('PATH')) as $dir) {
-            if ($dir !== '' && is_executable("{$dir}/{$command}")) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any(explode(':', (string) getenv('PATH')), fn($dir): bool => $dir !== '' && is_executable("{$dir}/{$command}"));
     }
 
     private static function pidFile(int $id): string
@@ -185,7 +180,7 @@ final class BackgroundJobs
     /** @return array{command: string, process: Process, started: float, container: ?string, inContainer: callable(string): list<string>, group: bool, stopped: bool} */
     private function job(int $id): array
     {
-        return $this->jobs[$id] ?? throw new \RuntimeException("no job {$id}: /jobs lists them, and ids are given when a job starts.");
+        return $this->jobs[$id] ?? throw new RuntimeException("no job {$id}: /jobs lists them, and ids are given when a job starts.");
     }
 
     public function __destruct()

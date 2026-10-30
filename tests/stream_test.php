@@ -1,6 +1,9 @@
 <?php
+
+declare(strict_types=1);
+
 // Verification of OllamaPlatform::stream() tool-call accumulation.
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Platform\OllamaPlatform;
 use Symfony\Component\HttpClient\MockHttpClient;
@@ -32,7 +35,9 @@ $msg = platform([
     '{"message":{"role":"assistant","content":"Hel',
     'lo "}}' . "\n" . '{"message":{"role":"assistant","content":"world"}}' . "\n",
     '{"message":{"role":"assistant","content":"!"},"done":true}',  // no trailing \n
-])->stream([], [], function (string $t) use (&$tokens) { $tokens[] = $t; });
+])->stream([], [], function (string $t) use (&$tokens): void {
+    $tokens[] = $t;
+});
 
 check('text reassembled across a split line', 'Hello world!', $msg['content']);
 check('tokens delivered individually', ['Hello ', 'world', '!'], $tokens);
@@ -86,7 +91,7 @@ check('no tool_calls key on a plain reply', false, isset($msg['tool_calls']));
 // is silent for the whole prompt-evaluation pass, which is exactly what an
 // idle timeout measures — hence unlimited by default.
 $seen = [];
-$recorder = new MockHttpClient(function ($method, $url, $options) use (&$seen) {
+$recorder = new MockHttpClient(function ($method, $url, array $options) use (&$seen): MockResponse {
     $seen[] = $options['timeout'] ?? null;
 
     return new MockResponse('{"message":{"content":"ok"},"done":true}');
@@ -110,16 +115,16 @@ check('the availability probe stays bounded', true, $seen[2] > 0 && $seen[2] <= 
 // minutes; on a machine where a turn takes seconds, it is the longest wait in
 // the session and it is spent re-uploading weights that were already resident.
 $bodies = [];
-$spy = new MockHttpClient(function ($method, $url, $options) use (&$bodies) {
+$spy = new MockHttpClient(function ($method, $url, array $options) use (&$bodies): MockResponse {
     $bodies[] = json_decode($options['body'] ?? '{}', true);
 
     return new MockResponse('{"message":{"content":"ok"},"done":true}');
 });
 
-(new OllamaPlatform($spy, 'http://x', 'm'))->stream([]);
+new OllamaPlatform($spy, 'http://x', 'm')->stream([]);
 check('keep_alive is sent by default', '30m', $bodies[0]['keep_alive'] ?? null);
 
-(new OllamaPlatform($spy, 'http://x', 'm', 32768, -1.0, null, '2h'))->stream([]);
+new OllamaPlatform($spy, 'http://x', 'm', 32768, -1.0, null, '2h')->stream([]);
 check('and it is configurable', '2h', $bodies[1]['keep_alive'] ?? null);
 
 // ---- 8b-bis. Sampling: this is a structured-output system -------------------
@@ -127,13 +132,19 @@ check('and it is configurable', '2h', $bodies[1]['keep_alive'] ?? null);
 // system that only ever emits tool calls, JSON and summaries. And num_predict
 // is what makes ContextBudget's response reservation true rather than hopeful.
 check('temperature is sent, and low', true, ($bodies[0]['options']['temperature'] ?? 1.0) <= 0.3);
-check('it is not zero, which traps some models in repetition loops',
-    true, ($bodies[0]['options']['temperature'] ?? 0.0) > 0.0);
-check('a reply is capped so the budget’s reservation is real',
-    4096, $bodies[0]['options']['num_predict'] ?? null);
+check(
+    'it is not zero, which traps some models in repetition loops',
+    true,
+    ($bodies[0]['options']['temperature'] ?? 0.0) > 0.0,
+);
+check(
+    'a reply is capped so the budget’s reservation is real',
+    4096,
+    $bodies[0]['options']['num_predict'] ?? null,
+);
 check('and num_ctx still travels with them', 32768, $bodies[0]['options']['num_ctx'] ?? null);
 
-(new OllamaPlatform($spy, 'http://x', 'm', 32768, -1.0, null, '30m', 0.7, 512))->stream([]);
+new OllamaPlatform($spy, 'http://x', 'm', 32768, -1.0, null, '30m', 0.7, 512)->stream([]);
 check('temperature is configurable', 0.7, $bodies[2]['options']['temperature'] ?? null);
 check('so is the reply cap', 512, $bodies[2]['options']['num_predict'] ?? null);
 
@@ -141,12 +152,12 @@ check('so is the reply cap', 512, $bodies[2]['options']['num_predict'] ?? null);
 // PHP holds it as [], which json_encode writes as a list; Ollama's decoder
 // wants an object there. The model's own call, echoed on the next request.
 $raw = [];
-$rawSpy = new MockHttpClient(function ($method, $url, $options) use (&$raw) {
+$rawSpy = new MockHttpClient(function ($method, $url, array $options) use (&$raw): MockResponse {
     $raw[] = $options['body'] ?? '';
 
     return new MockResponse('{"message":{"content":"ok"},"done":true}');
 });
-(new OllamaPlatform($rawSpy, 'http://x', 'm'))->stream([
+new OllamaPlatform($rawSpy, 'http://x', 'm')->stream([
     ['role' => 'assistant', 'content' => '', 'tool_calls' => [
         ['id' => 'aaaaaaaaa', 'function' => ['name' => 'memory_recall', 'arguments' => []]],
         ['id' => 'bbbbbbbbb', 'function' => ['name' => 'file_read', 'arguments' => ['path' => 'a.php']]],
@@ -162,7 +173,7 @@ $waits = [];
 platform([
     '{"message":{"thinking":"voyons"}}' . "\n",
     '{"message":{"content":"ok"},"done":true}',
-])->stream([], [], null, function (bool $reasoning) use (&$waits) {
+])->stream([], [], null, function (bool $reasoning) use (&$waits): void {
     $waits[] = $reasoning;
 });
 check('Ollama\'s thinking field is reported as reasoning', true, in_array(true, $waits, true));
@@ -196,7 +207,7 @@ check('a fully cached prompt yields no prefill figure', 0.0, $platform->lastTimi
 check('while generation is still measured', 10.0, $platform->lastTimings()['decode'] ?? null);
 
 // ---- 8d. Residency: is the card actually being used? -----------------------
-$ps = fn(string $json) => new OllamaPlatform(
+$ps = fn(string $json): OllamaPlatform => new OllamaPlatform(
     new MockHttpClient(new MockResponse($json, ['http_code' => 200])),
     'http://x',
     'qwen3-coder:30b',
@@ -242,7 +253,9 @@ $msg = platform([
     '',
     '{"message":{"content":" apres"}}' . "\n",
     '{"message":{"content":"","done":true},"prompt_eval_count":11,"eval_count":3}',
-])->stream([], [], function (string $t) use (&$tokens) { $tokens[] = $t; });
+])->stream([], [], function (string $t) use (&$tokens): void {
+    $tokens[] = $t;
+});
 
 check('a pause mid-reply does not truncate it', 'avant apres', $msg['content']);
 check('tokens after the pause still reach the caller', ['avant', ' apres'], $tokens);

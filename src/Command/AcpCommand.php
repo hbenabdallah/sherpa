@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Command;
 
 use App\Acp\AcpServer;
@@ -7,6 +9,7 @@ use App\Acp\Connection;
 use App\Acp\EditorFrontend;
 use App\Agent\TodoList;
 use App\Config\Backend;
+use App\Config\ModelProfile;
 use App\Config\ModelResolver;
 use App\Config\ProviderName;
 use App\Mcp\McpRegistry;
@@ -80,7 +83,7 @@ class AcpCommand extends Command
 
         // MCP servers and background jobs are child processes: not left
         // running behind an editor that closed, however it closed.
-        register_shutdown_function(function () {
+        register_shutdown_function(function (): void {
             $this->mcp->shutdown();
             $this->jobs->stopAll();
         });
@@ -131,7 +134,7 @@ class AcpCommand extends Command
             return true;
         }
 
-        return $this->platform->isAvailable() && $this->model->profile() === null;
+        return $this->platform->isAvailable() && !$this->model->profile() instanceof ModelProfile;
     }
 
     /**
@@ -156,7 +159,7 @@ class AcpCommand extends Command
     {
         $flag = $input->getOption('backend');
         $requested = is_string($flag) && trim($flag) !== '' ? Backend::parse($flag) : null;
-        if (is_string($flag) && trim($flag) !== '' && $requested === null) {
+        if (is_string($flag) && trim($flag) !== '' && !$requested instanceof Backend) {
             echo "Unknown backend: {$flag}. Possible values: api, ollama.\n";
 
             return false;
@@ -196,7 +199,7 @@ class AcpCommand extends Command
             rememberAsDefault: false,
         );
 
-        if ($profile === null || $profile->model === '') {
+        if (!$profile instanceof ModelProfile || $profile->model === '') {
             echo "No model chosen for the API. Set SHERPA_API_MODEL, pass -m <model> in the editor's agent settings, or run sherpa in a terminal once to choose.\n";
 
             return false;

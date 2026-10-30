@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Project;
 
+use InvalidArgumentException;
+use LogicException;
+
 /**
  * Confines every filesystem tool to the current project.
  *
@@ -29,7 +32,7 @@ final class ProjectPathResolver
         $real = realpath($path);
 
         if ($real === false) {
-            throw new \InvalidArgumentException("Project path does not exist: {$path}");
+            throw new InvalidArgumentException("Project path does not exist: {$path}");
         }
 
         $this->root = rtrim($real, '/');
@@ -37,8 +40,8 @@ final class ProjectPathResolver
 
     public function root(): string
     {
-        return $this->root ?? throw new \LogicException(
-            'ProjectPathResolver: no project root set. Call setRoot() first.'
+        return $this->root ?? throw new LogicException(
+            'ProjectPathResolver: no project root set. Call setRoot() first.',
         );
     }
 
@@ -106,7 +109,7 @@ final class ProjectPathResolver
     }
 
     /** As many links as Linux follows before it calls it a loop. */
-    private const MAX_LINKS = 40;
+    private const int MAX_LINKS = 40;
 
     /**
      * realpath() that tolerates a path whose tail does not exist yet: resolve

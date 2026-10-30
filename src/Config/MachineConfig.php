@@ -6,6 +6,7 @@ namespace App\Config;
 
 use App\Usage\Price;
 use Symfony\Component\Yaml\Yaml;
+use Throwable;
 
 /**
  * What this machine has settled on: ~/.config/sherpa/config.yaml.
@@ -91,7 +92,7 @@ class MachineConfig
         }
 
         $backend ??= $this->backend();
-        if ($backend === null) {
+        if (!$backend instanceof Backend) {
             return null;
         }
 
@@ -137,7 +138,7 @@ class MachineConfig
         if ($legacy !== null) {
             $data[Backend::Ollama->value] ??= array_filter(
                 ['model' => $legacy, 'context' => $data['context'] ?? null],
-                fn($v) => $v !== null,
+                fn($v): bool => $v !== null,
             );
             $data['backend'] ??= Backend::Ollama->value;
         }
@@ -324,7 +325,7 @@ class MachineConfig
 
         $data['api']['providers'][$name] = array_filter(
             ['url' => $url, 'key_env' => $keyVariable],
-            fn($v) => $v !== null && $v !== '',
+            fn(?string $v): bool => $v !== null && $v !== '',
         ) + $section;
         $data['api']['provider'] ??= $name;
 
@@ -373,7 +374,7 @@ class MachineConfig
 
         try {
             $keys = Yaml::parseFile($this->keysPath());
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return [];
         }
 
@@ -401,7 +402,7 @@ class MachineConfig
 
         try {
             Yaml::parseFile($path);
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return true;
         }
 
@@ -584,7 +585,7 @@ class MachineConfig
 
         try {
             $data = Yaml::parseFile($this->path());
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // A hand-edited file with a typo in it. Better to fall through to
             // the defaults and say so than to refuse to start.
             return null;

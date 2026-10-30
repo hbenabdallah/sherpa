@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Runtime;
 
 use App\Agent\AgentOutput;
@@ -20,6 +22,7 @@ use App\TUI\ConfirmOverlay;
 class Frontend implements AgentOutput, Approver
 {
     private AgentOutput $output;
+
     private Approver $approver;
 
     public function __construct(ChatPane $chat, ConfirmOverlay $overlay)

@@ -1,15 +1,20 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Agent;
 
 use App\Agent\Tool\TextToolCallParser;
-use App\Agent\Tool\ToolCall;
-use App\Agent\Tool\ToolResult;
 use App\Agent\Tool\Toolbox;
+use App\Agent\Tool\ToolCall;
+use App\Agent\Tool\ToolDefinition;
+use App\Agent\Tool\ToolResult;
 use App\Permission\PermissionBroker;
 use App\Platform\PlatformInterface;
 use App\Runtime\Interrupt;
 use App\Usage\UsageMeter;
+use Fiber;
+use Throwable;
 
 class AgentLoop
 {
@@ -19,62 +24,75 @@ class AgentLoop
      * of an ordinary request. A model genuinely stuck repeats itself, which is
      * detected below within three turns.
      */
-    private const MAX_ITERATIONS = 40;
+    private const int MAX_ITERATIONS = 40;
 
     /**
      * Identical tool calls this many turns running means the model is circling
      * rather than working — re-reading the same file, re-running the same
      * failing command — and no further turn is going to tell it anything new.
      */
-    private const REPEATED_CALL_LIMIT = 3;
+    private const int REPEATED_CALL_LIMIT = 3;
 
     /**
      * The same error this many results running, whatever the calls: the model
      * is trying things against a wall — a stopped container answered every
      * command, docker compose up and echo alike, with the same line.
      */
-    private const REPEATED_ERROR_LIMIT = 3;
+    private const int REPEATED_ERROR_LIMIT = 3;
 
-    private const INTERRUPTED = 'Interrupted by the user.';
-    private const REFUSED = 'Refused by the user.';
-    private const STUCK = 'Stopped: the model repeated the same tool call without getting anywhere.';
-    private const WALLED = 'Stopped: every call came back with the same error, %d times running: %s';
-    private const ABANDONED = 'Not run: the turn stopped on an error before this call.';
-    private const EMPTY_RETRY = 'Empty reply from the model: trying again.';
+    private const string INTERRUPTED = 'Interrupted by the user.';
+
+    private const string REFUSED = 'Refused by the user.';
+
+    private const string STUCK = 'Stopped: the model repeated the same tool call without getting anywhere.';
+
+    private const string WALLED = 'Stopped: every call came back with the same error, %d times running: %s';
+
+    private const string ABANDONED = 'Not run: the turn stopped on an error before this call.';
+
+    private const string EMPTY_RETRY = 'Empty reply from the model: trying again.';
+
     /** Longer than this, a reply is an answer, whatever it says about tools. */
-    private const ANNOUNCEMENT_MAX_CHARS = 800;
+    private const int ANNOUNCEMENT_MAX_CHARS = 800;
 
-    private const NUDGE_SHOWN = 'The model described a tool call without making it: asking it to go ahead.';
+    private const string NUDGE_SHOWN = 'The model described a tool call without making it: asking it to go ahead.';
+
     /** Said for a call whose arguments did not arrive whole. */
-    private const CUT_OFF = 'Not run: the arguments of this call were not valid JSON (%s characters arrived), '
+    private const string CUT_OFF = 'Not run: the arguments of this call were not valid JSON (%s characters arrived), '
         . 'most likely cut off by the output limit. Send it again in smaller pieces: a file in parts, '
         . 'file_write for the first and file_patch to add the rest.';
 
     /** @var array<string, int> calls of this reply whose arguments were cut off, by id: how much arrived */
     private array $cutOff = [];
 
-    private const NUDGE = 'You described what you are going to do but did not call the tool. Call it now, through the tool interface, rather than describing it.';
-    private const EMPTY = 'The model returned two empty replies in a row. Rephrase the request, or change model with /model.';
+    private const string NUDGE = 'You described what you are going to do but did not call the tool. Call it now, through the tool interface, rather than describing it.';
+
+    private const string EMPTY = 'The model returned two empty replies in a row. Rephrase the request, or change model with /model.';
 
     /**
      * A turn that runs out of tokens or steps used to end on the stop notice,
      * however much the model had found by then. It is asked to answer first,
      * once, while there is still room for the answer.
      */
-    private const CLOSING_SHOWN = 'Asking the model to answer now: %s.';
-    private const CLOSING = 'Stop investigating: %s. Answer the request now with what you have found, without calling any tool, and say plainly what you could not check.';
-    private const NOT_RUN_CLOSING = 'Not run: there is no room left for tools in this turn. Answer with what you have found.';
-    private const CLOSED_WITHOUT_ANSWER = 'Stopped: asked to answer with what it had found, the model kept calling tools instead.';
-    private const OUT_OF_TOKENS = 'the token budget of this session is nearly spent';
-    private const OUT_OF_STEPS = 'this turn has reached its limit of steps';
+    private const string CLOSING_SHOWN = 'Asking the model to answer now: %s.';
+
+    private const string CLOSING = 'Stop investigating: %s. Answer the request now with what you have found, without calling any tool, and say plainly what you could not check.';
+
+    private const string NOT_RUN_CLOSING = 'Not run: there is no room left for tools in this turn. Answer with what you have found.';
+
+    private const string CLOSED_WITHOUT_ANSWER = 'Stopped: asked to answer with what it had found, the model kept calling tools instead.';
+
+    private const string OUT_OF_TOKENS = 'the token budget of this session is nearly spent';
+
+    private const string OUT_OF_STEPS = 'this turn has reached its limit of steps';
 
     /** Tools that show their own work, or wait on the user: no "running" line over them. */
-    private const SHOW_THEMSELVES = [self::SUB_AGENT, 'plan_ready'];
+    private const array SHOW_THEMSELVES = [self::SUB_AGENT, 'plan_ready'];
 
-    private const SUB_AGENT = 'delegate';
+    private const string SUB_AGENT = 'delegate';
 
     /** How long a tool runs before it is said to be running: a read never shows it. */
-    private const QUIET_SECONDS = 1.0;
+    private const float QUIET_SECONDS = 1.0;
 
     public function __construct(
         private readonly PlatformInterface $platform,
@@ -144,7 +162,7 @@ class AgentLoop
 
             if (empty($message['tool_calls'])) {
                 $result = $this->conclude($bag, $message, $content, $state, $iteration);
-                if ($result === null) {
+                if (!$result instanceof Result) {
                     continue;
                 }
 
@@ -156,7 +174,7 @@ class AgentLoop
 
             if ($state->closing !== null) {
                 $result = $this->refuseWhileClosing($bag, $message['tool_calls'], $content, $state, $iteration);
-                if ($result === null) {
+                if (!$result instanceof Result) {
                     continue;
                 }
 
@@ -164,7 +182,7 @@ class AgentLoop
             }
 
             $stuck = $this->checkRepetition($bag, $message['tool_calls'], $content, $state, $iteration);
-            if ($stuck !== null) {
+            if ($stuck instanceof Result) {
                 return $stuck;
             }
 
@@ -204,7 +222,7 @@ class AgentLoop
         $message = $this->platform->stream(
             messages: $bag->all(),
             tools: $toolSchemas,
-            onToken: function (string $token) use (&$buffer) {
+            onToken: function (string $token) use (&$buffer): void {
                 $this->chat->appendToken($token);
                 $buffer .= $token;
             },
@@ -223,7 +241,7 @@ class AgentLoop
         if (empty($message['tool_calls'])) {
             $recovered = $this->textToolCalls->parse(
                 $content,
-                array_map(fn($def) => $def->name, $this->toolbox->getDefinitions()),
+                array_map(fn(ToolDefinition $def): string => $def->name, $this->toolbox->getDefinitions()),
                 $this->signatures(),
             );
 
@@ -405,7 +423,7 @@ class AgentLoop
     /** @param array<int, array<string, mixed>> $calls */
     private function runCalls(MessageBag $bag, array $calls, TurnState $state): void
     {
-        $calls = array_map(fn(array $raw) => new ToolCall(
+        $calls = array_map(fn(array $raw): ToolCall => new ToolCall(
             id: $raw['id'],
             name: $raw['function']['name'],
             arguments: $raw['function']['arguments'],
@@ -476,7 +494,7 @@ class AgentLoop
                 $call = $waiting[$i];
                 unset($waiting[$i]);
                 // Shown as it starts, with the number its lines will carry.
-                $running[$i] = new \Fiber(function () use ($call): ToolResult {
+                $running[$i] = new Fiber(function () use ($call): ToolResult {
                     $this->chat->showToolCall($call->name, $call->arguments, $call->id);
 
                     return $this->decide($call);
@@ -490,7 +508,7 @@ class AgentLoop
                     if ($fiber->isTerminated()) {
                         $results[$i] = $fiber->getReturn();
                     }
-                } catch (\Throwable $e) {
+                } catch (Throwable $e) {
                     $results[$i] = new ToolResult($calls[$i]->id, 'Error: ' . $e->getMessage(), isError: true);
                 }
 
@@ -624,7 +642,7 @@ class AgentLoop
             return false;
         }
 
-        $names = array_map(fn($def) => preg_quote($def->name, '/'), $this->toolbox->getDefinitions());
+        $names = array_map(fn(ToolDefinition $def): string => preg_quote($def->name, '/'), $this->toolbox->getDefinitions());
         if ($names === []) {
             return false;
         }
@@ -632,13 +650,7 @@ class AgentLoop
         $tool = '/(?<![\\w-])(' . implode('|', $names) . ')(?![\\w-])/';
         $intent = "/\\b(je vais|je commence|commençons|let me(?! know| explain)|i'll|i will|i am going to|i'm going to|next,? i|now i)\\b/iu";
 
-        foreach (preg_split('/(?<=[.!?])\\s+|\\n+/u', $content) ?: [] as $sentence) {
-            if (preg_match($tool, $sentence) === 1 && preg_match($intent, $sentence) === 1) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any(preg_split('/(?<=[.!?])\\s+|\\n+/u', $content) ?: [], fn(string $sentence): bool => preg_match($tool, $sentence) === 1 && preg_match($intent, $sentence) === 1);
     }
 
     /**
@@ -650,8 +662,8 @@ class AgentLoop
     {
         $signatures = [];
         foreach ($this->toolbox->getDefinitions() as $def) {
-            $params = array_map('strval', array_keys($def->parameters));
-            $required = array_values(array_filter($params, fn(string $p) => (bool) ($def->parameters[$p]['required'] ?? false)));
+            $params = array_map(strval(...), array_keys($def->parameters));
+            $required = array_values(array_filter($params, fn(string $p): bool => (bool) ($def->parameters[$p]['required'] ?? false)));
             $signatures[$def->name] = ['params' => $params, 'required' => $required];
         }
 

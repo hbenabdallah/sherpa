@@ -17,10 +17,11 @@ final class InferenceSpeed
      * is noisy. A short prompt against a warm cache reads as absurdly fast, a
      * cold load as absurdly slow, and neither describes the machine.
      */
-    private const SMOOTHING = 0.3;
+    private const float SMOOTHING = 0.3;
 
     /** Tokens per second, prompt-evaluation (prefill) and generation (decode). */
     private ?float $prefill = null;
+
     private ?float $decode = null;
 
     private int $samples = 0;

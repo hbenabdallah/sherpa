@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Rag\Parser;
 
 use App\Rag\ParsedDocument;
+use App\Rag\Section;
 
 /**
  * Markdown, the format most project documentation is written in.
@@ -17,7 +18,7 @@ use App\Rag\ParsedDocument;
  */
 final class MarkdownParser implements DocumentParser
 {
-    private const EXTENSIONS = ['md', 'markdown', 'mdx'];
+    private const array EXTENSIONS = ['md', 'markdown', 'mdx'];
 
     public function supports(string $path): bool
     {
@@ -64,7 +65,7 @@ final class MarkdownParser implements DocumentParser
 
                 return null;
             },
-            static fn(string $line) => preg_match('/^\s*(```|~~~)/', $line) === 1,
+            static fn(string $line): bool => preg_match('/^\s*(```|~~~)/', $line) === 1,
         );
 
         $title ??= self::firstHeading($sections) ?? pathinfo($path, PATHINFO_FILENAME);
@@ -72,7 +73,7 @@ final class MarkdownParser implements DocumentParser
         return new ParsedDocument($path, $title, 'markdown', $sections);
     }
 
-    /** @param list<\App\Rag\Section> $sections */
+    /** @param list<Section> $sections */
     private static function firstHeading(array $sections): ?string
     {
         foreach ($sections as $section) {

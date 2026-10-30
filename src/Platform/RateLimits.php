@@ -15,15 +15,15 @@ namespace App\Platform;
  * A provider that sends none (NVIDIA, Cloudflare) gets no figure at all,
  * rather than one that would look like a measurement.
  */
-final class RateLimits
+final readonly class RateLimits
 {
     /**
-     * @param array<string, array{remaining: int, limit: int, reset: ?string}> $windows by name
+     * @param array<int|string, array{remaining: int, limit: int, reset: ?string}> $windows by name; a name like "60" is an int key
      */
-    private function __construct(public readonly array $windows) {}
+    private function __construct(public array $windows) {}
 
     /** A window with less than this share left is not one to spend fast. */
-    private const NEARLY_SPENT = 0.1;
+    private const float NEARLY_SPENT = 0.1;
 
     /**
      * @param array<string, list<string>|string> $headers as the HTTP client hands them, names lowercase
@@ -35,6 +35,7 @@ final class RateLimits
             $values[strtolower((string) $name)] = is_array($value) ? (string) ($value[0] ?? '') : (string) $value;
         }
 
+        /** @var array<int|string, array<string, string>> $found a window named "60" is keyed 60 */
         $found = [];
         foreach ($values as $name => $value) {
             if (preg_match('/^(?:x-)?ratelimit-(limit|remaining|reset)(?:-(.+))?$/', $name, $m) === 1) {
@@ -86,14 +87,7 @@ final class RateLimits
      */
     public function roomFor(int $requests): bool
     {
-        foreach ($this->windows as $name => $w) {
-            if ($w['remaining'] < $w['limit'] * self::NEARLY_SPENT
-                || str_starts_with($name, 'requests') && $w['remaining'] < 2 * $requests) {
-                return false;
-            }
-        }
-
-        return true;
+        return array_all($this->windows, fn(array $w, $name): bool => $w['remaining'] >= $w['limit'] * self::NEARLY_SPENT && (!str_starts_with($name, 'requests') || $w['remaining'] >= 2 * $requests));
     }
 
     private static function number(string $value): ?int

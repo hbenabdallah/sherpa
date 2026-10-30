@@ -21,6 +21,13 @@ if (ini_get('phar.readonly')) {
     fwrite(STDERR, "phar.readonly is on: run with php -d phar.readonly=0\n");
     exit(2);
 }
+// vendor/ goes in whole: with the quality tools in it, the executable would
+// carry them and the build runs out of memory.
+$installed = json_decode((string) file_get_contents(dirname(__DIR__) . '/vendor/composer/installed.json'), true);
+if (($installed['dev'] ?? false) === true) {
+    fwrite(STDERR, "vendor/ holds the dev dependencies: run composer install --no-dev first, and composer install after\n");
+    exit(2);
+}
 
 $root = dirname(__DIR__);
 @mkdir($out, 0755, true);

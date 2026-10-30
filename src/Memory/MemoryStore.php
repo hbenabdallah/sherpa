@@ -1,11 +1,17 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Memory;
 
+use DateTimeImmutable;
+use DateTimeInterface;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\ParameterType;
+use LogicException;
+use Throwable;
 
 /**
  * Per-project long-term memory. A fact's key is a label, never an identity:
@@ -15,40 +21,40 @@ use Doctrine\DBAL\ParameterType;
  */
 class MemoryStore
 {
-    /** Bumped when the shape below changes; open() migrates anything older. */
-    private const SCHEMA_VERSION = 4;
-
     /**
      * How the digest ranks. Situation leads: it is the only signal that knows
      * what today is about. Usage is the long-run one — a fact the model keeps
      * returning to belongs in the prompt. Recency is what is left.
      */
-    private const WEIGHT_SITUATION = 0.50;
-    private const WEIGHT_USAGE     = 0.25;
-    private const WEIGHT_RECENCY   = 0.25;
+    private const float WEIGHT_SITUATION = 0.50;
+
+    private const float WEIGHT_USAGE     = 0.25;
+
+    private const float WEIGHT_RECENCY   = 0.25;
 
     /** Recalls past this stop counting; the signal is "used", not "popular". */
-    private const USAGE_SATURATION = 5;
+    private const int USAGE_SATURATION = 5;
 
     /** Situation terms matched for full marks. One strong hit already scores. */
-    private const SITUATION_SATURATION = 3;
+    private const int SITUATION_SATURATION = 3;
 
     /** How deep digest() looks before it stops naming what it skipped. */
-    private const DIGEST_CANDIDATES = 200;
+    private const int DIGEST_CANDIDATES = 200;
 
     /** A fact quoted in full in the prompt; longer ones are elided. */
-    private const DIGEST_MAX_VALUE = 200;
+    private const int DIGEST_MAX_VALUE = 200;
 
     /** Keys named in the overflow line before it says "and N others". */
-    private const DIGEST_MAX_KEYS = 40;
+    private const int DIGEST_MAX_KEYS = 40;
 
     /** Share of the budget spent quoting facts; the rest indexes the leftovers. */
-    private const DIGEST_DETAIL_SHARE = 0.75;
+    private const float DIGEST_DETAIL_SHARE = 0.75;
 
     /** Room kept for the ", and N others." that closes the index line. */
-    private const DIGEST_TAIL_RESERVE = 20;
+    private const int DIGEST_TAIL_RESERVE = 20;
 
     private ?Connection $conn = null;
+
     private ?string $currentDb = null;
 
     /** FTS5 is compiled into every SQLite worth using, but not into all of them. */
@@ -56,7 +62,7 @@ class MemoryStore
 
     public function open(string $dbPath): void
     {
-        if ($this->currentDb === $dbPath && $this->conn !== null) {
+        if ($this->currentDb === $dbPath && $this->conn instanceof Connection) {
             return;
         }
 
@@ -267,7 +273,7 @@ class MemoryStore
 
         // PHP's sort is stable, so facts that score alike keep their recency
         // order rather than being shuffled by the comparison.
-        usort($scored, static fn(array $a, array $b) => $b['score'] <=> $a['score']);
+        usort($scored, static fn(array $a, array $b): int => $b['score'] <=> $a['score']);
 
         return array_column($scored, 'fact');
     }
@@ -327,7 +333,7 @@ class MemoryStore
      */
     public function bump(string $counter): void
     {
-        if ($this->conn === null) {
+        if (!$this->conn instanceof Connection) {
             return;
         }
 
@@ -341,7 +347,7 @@ class MemoryStore
     /** @return array<string, int> every counter this project has accumulated */
     public function counters(): array
     {
-        if ($this->conn === null) {
+        if (!$this->conn instanceof Connection) {
             return [];
         }
 
@@ -383,13 +389,13 @@ class MemoryStore
 
     public function isOpen(): bool
     {
-        return $this->conn !== null;
+        return $this->conn instanceof Connection;
     }
 
     /** Facts in force — what forgetting the project would throw away. */
     public function count(): int
     {
-        if ($this->conn === null) {
+        if (!$this->conn instanceof Connection) {
             return 0;
         }
 
@@ -445,13 +451,13 @@ class MemoryStore
         // as query syntax: an unbalanced quote or a bare "AND" is a syntax
         // error, not zero results. Keep the words, quote them, drop the rest.
         preg_match_all('/[\p{L}\p{N}_]+/u', $term, $matches);
-        $words = array_filter($matches[0], fn(string $w) => mb_strlen($w) > 1);
+        $words = array_filter($matches[0], fn(string $w): bool => mb_strlen($w) > 1);
 
         if ($words === []) {
             return null;
         }
 
-        $query = implode(' OR ', array_map(fn(string $w) => '"' . $w . '"', $words));
+        $query = implode(' OR ', array_map(fn(string $w): string => '"' . $w . '"', $words));
 
         try {
             return $this->conn->fetchAllAssociative(
@@ -462,7 +468,7 @@ class MemoryStore
                 ['q' => $query, 'limit' => $limit],
                 ['limit' => ParameterType::INTEGER],
             );
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // A malformed expression must degrade to a worse search, never to a
             // broken tool call in the middle of a turn.
             return null;
@@ -484,24 +490,24 @@ class MemoryStore
      */
     private function hydrate(array $rows): array
     {
-        return array_map(fn(array $row) => new Fact(
+        return array_map(fn(array $row): Fact => new Fact(
             id: (int) $row['id'],
             key: (string) $row['key'],
             value: (string) $row['value'],
-            createdAt: new \DateTimeImmutable((string) $row['created_at']),
-            updatedAt: new \DateTimeImmutable((string) $row['updated_at']),
-            supersededAt: $row['superseded_at'] === null ? null : new \DateTimeImmutable((string) $row['superseded_at']),
+            createdAt: new DateTimeImmutable((string) $row['created_at']),
+            updatedAt: new DateTimeImmutable((string) $row['updated_at']),
+            supersededAt: $row['superseded_at'] === null ? null : new DateTimeImmutable((string) $row['superseded_at']),
             recalledCount: (int) ($row['recalled_count'] ?? 0),
             lastRecalledAt: ($row['last_recalled_at'] ?? null) === null
                 ? null
-                : new \DateTimeImmutable((string) $row['last_recalled_at']),
+                : new DateTimeImmutable((string) $row['last_recalled_at']),
             source: isset($row['source']) ? (string) $row['source'] : null,
         ), $rows);
     }
 
     private function now(): string
     {
-        return (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM);
+        return new DateTimeImmutable()->format(DateTimeInterface::ATOM);
     }
 
     private function migrate(): void
@@ -634,15 +640,15 @@ class MemoryStore
             }
 
             return true;
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return false;
         }
     }
 
     private function assertOpen(): void
     {
-        if ($this->conn === null) {
-            throw new \LogicException('MemoryStore: no database opened. Call open($dbPath) first.');
+        if (!$this->conn instanceof Connection) {
+            throw new LogicException('MemoryStore: no database opened. Call open($dbPath) first.');
         }
     }
 }

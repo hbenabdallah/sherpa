@@ -14,9 +14,10 @@ use App\Agent\Lanes;
  */
 final class SubagentPane extends ChatPane
 {
-    private const SPINNER_EVERY = 0.12;
+    private const float SPINNER_EVERY = 0.12;
 
     private float $lastFrame = 0.0;
+
     private bool $spinning = false;
 
     public function beginAssistantMessage(): void
@@ -24,9 +25,7 @@ final class SubagentPane extends ChatPane
         $this->showWaiting();
     }
 
-    public function appendToken(string $token): void
-    {
-    }
+    public function appendToken(string $token): void {}
 
     public function flushBuffer(bool $wasToolCall = false): void
     {
@@ -53,13 +52,9 @@ final class SubagentPane extends ChatPane
             . Terminal::RESET . "\n";
     }
 
-    public function showToolResult(string $toolName, string $result, bool $isError = false, ?string $callId = null): void
-    {
-    }
+    public function showToolResult(string $toolName, string $result, bool $isError = false, ?string $callId = null): void {}
 
-    public function showPlan(string $plan): void
-    {
-    }
+    public function showPlan(string $plan): void {}
 
     public function showInfo(string $message): void
     {

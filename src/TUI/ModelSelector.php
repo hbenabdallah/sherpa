@@ -22,10 +22,10 @@ use App\Platform\PlatformInterface;
 class ModelSelector
 {
     /** Above this, a window is very unlikely to fit beside the weights. */
-    private const LARGE_WINDOW = 131072;
+    private const int LARGE_WINDOW = 131072;
 
     /** Rows skipped by PageUp / PageDown — a provider can list hundreds. */
-    private const PAGE = 10;
+    private const int PAGE = 10;
 
     /** Whose models are on screen. Set by run(), read by every step after it. */
     private Backend $backend = Backend::DEFAULT;
@@ -52,7 +52,7 @@ class ModelSelector
 
         // A model of the other backend is not "the current one" on this list,
         // even when the names happen to match.
-        if ($current !== null && $current->backend !== $this->backend) {
+        if ($current instanceof ModelProfile && $current->backend !== $this->backend) {
             $current = null;
         }
 
@@ -85,7 +85,7 @@ class ModelSelector
                     $selected = min($last, $selected + self::PAGE);
                 } elseif ($key === 'a' || $key === 'A') {
                     $profile = $this->askForName($current);
-                    if ($profile !== null) {
+                    if ($profile instanceof ModelProfile) {
                         return $profile;
                     }
                 } elseif ($key === "\r" || $key === "\n") {
@@ -93,7 +93,7 @@ class ModelSelector
                         ? $this->askForName($current)
                         : $this->accept($models[$selected], $current);
 
-                    if ($profile !== null) {
+                    if ($profile instanceof ModelProfile) {
                         return $profile;
                     }
                 } elseif ($key === 'q' || $key === "\x03") {
@@ -137,7 +137,7 @@ class ModelSelector
             echo Terminal::GRAY . "\n  Asking the server…\n" . Terminal::RESET;
             $info = $this->platform->describeModel($name);
 
-            if ($info === null) {
+            if (!$info instanceof ModelInfo) {
                 echo Terminal::YELLOW . "\n  ⚠ This server does not know \"{$name}\".\n" . Terminal::RESET;
                 echo Terminal::GRAY . ($this->backend->isLocal()
                         ? "    Pull it first:  ollama pull {$name}\n"
@@ -200,7 +200,7 @@ class ModelSelector
             $info->parameterSize === null ? null : self::shown($info->parameterSize),
             $info->humanSize(),
             $info->capabilitiesUnknown() ? null : self::shown(implode(' · ', $info->capabilities)),
-        ], fn(?string $f) => $f !== null && $f !== '');
+        ], fn(?string $f): bool => $f !== null && $f !== '');
 
         return Terminal::BOLD . Terminal::GREEN . "\n  " . self::shown($info->name) . "\n" . Terminal::RESET
             . ($facts === [] ? '' : Terminal::GRAY . '  ' . implode('  ·  ', $facts) . "\n" . Terminal::RESET)
@@ -228,7 +228,7 @@ class ModelSelector
 
         // Keeping the window when only retuning the same model: someone who
         // already tuned this to their card should not have to redo it.
-        if ($current !== null && $current->backend === $this->backend && $current->model === $info->name) {
+        if ($current instanceof ModelProfile && $current->backend === $this->backend && $current->model === $info->name) {
             $suggested = $native === null ? $current->contextWindow : min($current->contextWindow, $native);
         }
 
@@ -345,7 +345,7 @@ class ModelSelector
 
         return $firstRun
             ? $count . ' — this choice is kept for this machine.'
-            : $count . ($current === null ? '' : ' — current: ' . $current->model);
+            : $count . ($current instanceof ModelProfile ? ' — current: ' . $current->model : '');
     }
 
     /** Size, weight and window, and whether it can call tools. */
@@ -371,7 +371,7 @@ class ModelSelector
         if (mb_strlen($name) > $this->nameWidth) {
             $name = mb_substr($name, 0, $this->nameWidth - 1) . '…';
         }
-        $isCurrent = $current !== null && $current->model === $model->name;
+        $isCurrent = $current instanceof ModelProfile && $current->model === $model->name;
         $meta = $this->meta($model);
 
         $arrow = $selected ? Terminal::BOLD . Terminal::YELLOW . '> ' : '  ';

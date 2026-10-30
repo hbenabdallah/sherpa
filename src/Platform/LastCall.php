@@ -1,6 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Platform;
+
+use Fiber;
+use WeakMap;
 
 /**
  * What a platform keeps of its last request — the tokens it took, how fast it
@@ -13,26 +18,26 @@ trait LastCall
     /** @var array<string, mixed> outside any Fiber: the main conversation */
     private array $mainCall = [];
 
-    /** @var \WeakMap<\Fiber<mixed, mixed, mixed, mixed>, array<string, mixed>>|null */
-    private ?\WeakMap $fiberCalls = null;
+    /** @var WeakMap<Fiber<mixed, mixed, mixed, mixed>, array<string, mixed>>|null */
+    private ?WeakMap $fiberCalls = null;
 
     private function lastOf(string $key): mixed
     {
-        $fiber = \Fiber::getCurrent();
+        $fiber = Fiber::getCurrent();
 
-        return $fiber === null ? $this->mainCall[$key] ?? null : $this->fiberCalls[$fiber][$key] ?? null;
+        return $fiber instanceof Fiber ? $this->fiberCalls[$fiber][$key] ?? null : $this->mainCall[$key] ?? null;
     }
 
     private function keepLast(string $key, mixed $value): void
     {
-        $fiber = \Fiber::getCurrent();
-        if ($fiber === null) {
+        $fiber = Fiber::getCurrent();
+        if (!$fiber instanceof Fiber) {
             $this->mainCall[$key] = $value;
 
             return;
         }
 
-        $this->fiberCalls ??= new \WeakMap();
+        $this->fiberCalls ??= new WeakMap();
         $calls = $this->fiberCalls[$fiber] ?? [];
         $calls[$key] = $value;
         $this->fiberCalls[$fiber] = $calls;

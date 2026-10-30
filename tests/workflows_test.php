@@ -1,9 +1,12 @@
 <?php
+
+declare(strict_types=1);
+
 // The GitHub workflows, read as GitHub reads them. A line with ": " inside an
 // unquoted value made tests.yml invalid YAML, and GitHub then ran none of its
 // jobs — reported as one failure with nothing in it, after the push.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use Symfony\Component\Yaml\Yaml;
 
@@ -19,11 +22,12 @@ function check(string $label, bool $ok, string $detail = ''): void
     }
 }
 
-$files = glob(dirname(__DIR__) . '/.github/workflows/*.yml') ?: [];
+$files = glob(__DIR__ . '/../.github/workflows/*.yml') ?: [];
 check('there are workflows to read', $files !== []);
 
 foreach ($files as $file) {
     $name = basename($file);
+
     try {
         $workflow = Yaml::parseFile($file);
         $error = '';
@@ -35,7 +39,7 @@ foreach ($files as $file) {
     check("{$name} is valid YAML", is_array($workflow), $error);
 
     $jobs = is_array($workflow) ? ($workflow['jobs'] ?? null) : null;
-    $shaped = is_array($jobs) && $jobs !== [] && array_filter($jobs, fn($job) => !is_array($job)
+    $shaped = is_array($jobs) && $jobs !== [] && array_filter($jobs, fn($job): bool => !is_array($job)
         || (!isset($job['runs-on']) && !isset($job['uses'])) || (!isset($job['steps']) && !isset($job['uses']))) === [];
     check("{$name} has jobs, each with a runner and steps", $shaped, json_encode(is_array($jobs) ? array_keys($jobs) : $jobs));
 
@@ -48,8 +52,11 @@ foreach ($files as $file) {
             }
         }
     }
-    check("{$name}: every run is a command, not something YAML read as a mapping",
-        array_filter($runs, fn($run) => !is_string($run)) === [], json_encode($runs));
+    check(
+        "{$name}: every run is a command, not something YAML read as a mapping",
+        array_filter($runs, fn($run): bool => !is_string($run)) === [],
+        json_encode($runs),
+    );
 }
 
 printf("\n%d passed, %d failed\n", $pass, $fail);

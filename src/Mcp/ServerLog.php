@@ -1,8 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Mcp;
 
 use Psr\Log\AbstractLogger;
+use Stringable;
 
 /**
  * What a server said about itself while it was failing.
@@ -20,22 +23,24 @@ use Psr\Log\AbstractLogger;
 final class ServerLog extends AbstractLogger
 {
     /** How much of stderr to keep, and to quote: the end, where the reason is. */
-    private const KEEP = 4000;
-    private const QUOTED_LINES = 15;
-    private const QUOTED_CHARS = 1500;
+    private const int KEEP = 4000;
+
+    private const int QUOTED_LINES = 15;
+
+    private const int QUOTED_CHARS = 1500;
 
     private string $stderr = '';
 
     /**
      * @param mixed[] $context
      */
-    public function log(mixed $level, \Stringable|string $message, array $context = []): void
+    public function log(mixed $level, Stringable|string $message, array $context = []): void
     {
         // The SDK's own wording for a drained stderr chunk. Matching on it is
         // brittle by nature, which is why nothing depends on it: a version that
         // renames the message costs a less detailed error, not a broken client.
         if ((string) $message === 'Server stderr' && isset($context['output'])) {
-            $this->stderr = substr($this->stderr . (string) $context['output'] . "\n", -self::KEEP);
+            $this->stderr = substr($this->stderr . $context['output'] . "\n", -self::KEEP);
         }
     }
 

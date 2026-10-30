@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\TUI;
 
 use App\Agent\Tool\ToolCall;
@@ -10,11 +12,12 @@ use App\Permission\Offer;
 use App\Tool\FilePatchTool;
 use App\Tool\FileWriteTool;
 use App\Tool\ShellExecTool;
+use Throwable;
 
 class ConfirmOverlay implements Approver
 {
     /** Rows of preview the box holds; past them, it says how many it hid. */
-    private const PREVIEW_ROWS = 24;
+    private const int PREVIEW_ROWS = 24;
 
     public function __construct(
         private readonly Terminal $terminal,
@@ -127,14 +130,14 @@ class ConfirmOverlay implements Approver
         return $choice;
     }
 
-    private const QUESTION = '  '
+    private const string QUESTION = '  '
         . Terminal::GREEN . '[a]' . Terminal::RESET . ' Allow once  '
         . Terminal::CYAN . '[s]' . Terminal::RESET . ' This session  '
         . Terminal::BLUE . '[p]' . Terminal::RESET . ' Always (project)  '
         . Terminal::RED . '[r]' . Terminal::RESET . ' Refuse  '
         . Terminal::BOLD . '› ' . Terminal::RESET;
 
-    private const QUESTION_ONCE = '  '
+    private const string QUESTION_ONCE = '  '
         . Terminal::GREEN . '[a]' . Terminal::RESET . ' Allow once  '
         . Terminal::RED . '[r]' . Terminal::RESET . ' Refuse  '
         . Terminal::BOLD . '› ' . Terminal::RESET;
@@ -255,7 +258,7 @@ class ConfirmOverlay implements Approver
     {
         try {
             return $this->renderPreview($call);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // Building the preview must never be able to kill the session. The
             // tools resolve paths to build it, and a path outside the project
             // throws — which would take Sherpa down at the exact moment it was

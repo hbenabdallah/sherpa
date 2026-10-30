@@ -8,6 +8,8 @@ use App\Rag\Embedding\Vectors;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\ParameterType;
+use LogicException;
+use Throwable;
 
 /**
  * Where a project's documentation is kept, searchable: SQLite, one database per
@@ -18,9 +20,10 @@ use Doctrine\DBAL\ParameterType;
  */
 final class DocIndex
 {
-    private const SCHEMA = 2;
+    private const int SCHEMA = 2;
 
     private ?Connection $conn = null;
+
     private bool $fullText = false;
 
     /**
@@ -45,7 +48,7 @@ final class DocIndex
 
     public function isOpen(): bool
     {
-        return $this->conn !== null;
+        return $this->conn instanceof Connection;
     }
 
     /** @return array{hash: string, size: int, mtime: int}|null */
@@ -69,7 +72,7 @@ final class DocIndex
                 'INSERT OR REPLACE INTO documents (path, hash, size, mtime, title, type, chunks, indexed_at)
                  VALUES (:p, :h, :s, :m, :t, :ty, :n, :at)',
                 ['p' => $path, 'h' => $hash, 's' => $size, 'm' => $mtime, 't' => $document->title,
-                 'ty' => $document->type, 'n' => count($chunks), 'at' => date(DATE_ATOM)],
+                    'ty' => $document->type, 'n' => count($chunks), 'at' => date(DATE_ATOM)],
             );
 
             foreach ($chunks as $chunk) {
@@ -77,14 +80,15 @@ final class DocIndex
                     'INSERT INTO chunks (path, position, title, headings, context, text, parent, start_line, end_line)
                      VALUES (:p, :pos, :t, :h, :c, :x, :pa, :s, :e)',
                     ['p' => $path, 'pos' => $chunk->position, 't' => $chunk->title,
-                     'h' => json_encode($chunk->headings, JSON_UNESCAPED_UNICODE), 'c' => $chunk->context(),
-                     'x' => $chunk->text, 'pa' => $chunk->parent, 's' => $chunk->startLine, 'e' => $chunk->endLine],
+                        'h' => json_encode($chunk->headings, JSON_UNESCAPED_UNICODE), 'c' => $chunk->context(),
+                        'x' => $chunk->text, 'pa' => $chunk->parent, 's' => $chunk->startLine, 'e' => $chunk->endLine],
                 );
             }
 
             $db->commit();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $db->rollBack();
+
             throw $e;
         }
     }
@@ -105,7 +109,7 @@ final class DocIndex
     /** @return list<string> */
     public function paths(): array
     {
-        return array_map('strval', $this->db()->fetchFirstColumn('SELECT path FROM documents ORDER BY path'));
+        return array_map(strval(...), $this->db()->fetchFirstColumn('SELECT path FROM documents ORDER BY path'));
     }
 
     /** @return array{documents: int, chunks: int} */
@@ -143,7 +147,7 @@ final class DocIndex
     public function unembedded(int $limit): array
     {
         return array_map(
-            static fn(array $row) => ['id' => (int) $row['id'], 'text' => $row['context'] . "\n\n" . $row['text']],
+            static fn(array $row): array => ['id' => (int) $row['id'], 'text' => $row['context'] . "\n\n" . $row['text']],
             $this->db()->fetchAllAssociative(
                 'SELECT c.id, c.context, c.text FROM chunks c LEFT JOIN vectors v ON v.chunk_id = c.id
                  WHERE v.chunk_id IS NULL ORDER BY c.id LIMIT :limit',
@@ -214,7 +218,7 @@ final class DocIndex
 
         if ($this->fullText) {
             $expression = implode(' OR ', array_map(
-                static fn(string $t) => '"' . str_replace('"', '', $t) . '"' . ($prefix ? '*' : ''),
+                static fn(string $t): string => '"' . str_replace('"', '', $t) . '"' . ($prefix ? '*' : ''),
                 $terms,
             ));
 
@@ -226,7 +230,7 @@ final class DocIndex
                     ['q' => $expression, 'limit' => $limit],
                     ['limit' => ParameterType::INTEGER],
                 );
-            } catch (\Throwable) {
+            } catch (Throwable) {
                 // A malformed expression degrades to the fallback below.
                 $rows = [];
             }
@@ -256,7 +260,7 @@ final class DocIndex
      */
     private function like(array $terms, int $limit): array
     {
-        $score = implode(' + ', array_map(static fn(int $i) => "(CASE WHEN lower(context || ' ' || text) LIKE :t{$i} THEN 1 ELSE 0 END)", array_keys($terms)));
+        $score = implode(' + ', array_map(static fn(int $i): string => "(CASE WHEN lower(context || ' ' || text) LIKE :t{$i} THEN 1 ELSE 0 END)", array_keys($terms)));
         $params = ['limit' => $limit];
         foreach ($terms as $i => $term) {
             $params['t' . $i] = '%' . $term . '%';
@@ -277,7 +281,7 @@ final class DocIndex
         return new Chunk(
             path: (string) $row['path'],
             title: (string) $row['title'],
-            headings: is_array($headings) ? array_values(array_map('strval', $headings)) : [],
+            headings: is_array($headings) ? array_values(array_map(strval(...), $headings)) : [],
             text: (string) $row['text'],
             parent: (string) $row['parent'],
             startLine: (int) $row['start_line'],
@@ -288,7 +292,7 @@ final class DocIndex
 
     private function db(): Connection
     {
-        return $this->conn ?? throw new \LogicException('Index de documentation non ouvert.');
+        return $this->conn ?? throw new LogicException('Index de documentation non ouvert.');
     }
 
     private function migrate(): void
@@ -348,7 +352,7 @@ final class DocIndex
                 END
             SQL);
             $this->fullText = true;
-        } catch (\Throwable) {
+        } catch (Throwable) {
             $this->fullText = false;
         }
 

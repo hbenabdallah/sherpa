@@ -30,14 +30,14 @@ use App\TUI\Terminal;
  * Every change is in force at once, as /provider's are: the server's tools
  * come in or go, and the system prompt is rebuilt for its instructions.
  */
-final class McpCommands
+final readonly class McpCommands
 {
     public function __construct(
-        private readonly McpRegistry $mcp,
-        private readonly Toolbox $toolbox,
-        private readonly SystemPromptBuilder $promptBuilder,
-        private readonly ChatPane $chat,
-        private readonly LineEditor $lineEditor,
+        private McpRegistry $mcp,
+        private Toolbox $toolbox,
+        private SystemPromptBuilder $promptBuilder,
+        private ChatPane $chat,
+        private LineEditor $lineEditor,
     ) {}
 
     public function handle(string $args, MessageBag $bag, Project $project): void
@@ -213,7 +213,7 @@ final class McpCommands
         }
 
         $server = $this->mcp->config()->server($name);
-        if ($server === null) {
+        if (!$server instanceof ServerConfig) {
             $this->unknown($name);
 
             return;
@@ -231,7 +231,7 @@ final class McpCommands
     private function restore(string $name, ?ServerConfig $previous): void
     {
         $this->mcp->disconnect($name, $this->toolbox);
-        if ($previous === null || !$previous->enabled) {
+        if (!$previous instanceof ServerConfig || !$previous->enabled) {
             return;
         }
 
@@ -256,7 +256,7 @@ final class McpCommands
                 continue;
             }
 
-            if ($this->mcp->config()->server($name) === null) {
+            if (!$this->mcp->config()->server($name) instanceof ServerConfig) {
                 return $name;
             }
 

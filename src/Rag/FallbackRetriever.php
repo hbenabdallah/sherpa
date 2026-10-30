@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Rag;
 
+use Throwable;
+
 /**
  * One strategy, and another when it cannot answer.
  *
@@ -35,7 +37,7 @@ final class FallbackRetriever implements Retriever
             if ($hits !== []) {
                 return $hits;
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->lastError = $e->getMessage();
         }
 

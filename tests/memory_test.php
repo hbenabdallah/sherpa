@@ -1,11 +1,15 @@
 <?php
+
+declare(strict_types=1);
+
+use App\Agent\PlanMode;
+
 // Project memory: what gets kept, what gets found again, and what must never be
 // lost quietly.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\MessageBag;
-use App\Memory\Extraction;
 use App\Memory\Fact;
 use App\Memory\FactExtractor;
 use App\Memory\MemoryStore;
@@ -30,7 +34,7 @@ function check(string $label, bool $ok, string $detail = ''): void
 /** @return array<int, string> */
 function values(array $facts): array
 {
-    return array_map(fn(Fact $f) => $f->value, $facts);
+    return array_map(fn(Fact $f): string => $f->value, $facts);
 }
 
 $dir = sys_get_temp_dir() . '/sherpa-mem-' . bin2hex(random_bytes(4));
@@ -50,12 +54,16 @@ $current = $store->recall();
 check('a colliding key does not destroy the earlier fact', count($current) === 2, json_encode(values($current), JSON_UNESCAPED_UNICODE));
 
 // ---- re-learning the same thing is not a change ----------------------------
-check('re-recording an identical fact reports no change',
-    $store->remember('database', 'PostgreSQL 16 en production') === Recorded::Unchanged);
+check(
+    're-recording an identical fact reports no change',
+    $store->remember('database', 'PostgreSQL 16 en production') === Recorded::Unchanged,
+);
 check('and does not duplicate the row', count($store->recall()) === 2);
 
-check('a genuinely new fact reports as created',
-    $store->remember('tests', 'phpunit -c phpunit.xml.dist') === Recorded::Created);
+check(
+    'a genuinely new fact reports as created',
+    $store->remember('tests', 'phpunit -c phpunit.xml.dist') === Recorded::Created,
+);
 
 // ---- an explicit correction supersedes, it does not vanish -----------------
 $result = $store->supersede('tests', 'make test');
@@ -132,8 +140,11 @@ check('a multi-line value stays on its fact\'s line', !in_array('- deploy: produ
 
 $empty = new MemoryStore();
 $empty->open(sys_get_temp_dir() . '/sherpa-empty-' . bin2hex(random_bytes(4)) . '/memory.db');
-check('an empty memory says so rather than showing an empty section',
-    str_contains($empty->digest(), 'nothing remembered'), $empty->digest());
+check(
+    'an empty memory says so rather than showing an empty section',
+    str_contains($empty->digest(), 'nothing remembered'),
+    $empty->digest(),
+);
 
 // ---- the old schema must not strand anyone's facts -------------------------
 $legacyDir = sys_get_temp_dir() . '/sherpa-legacy-' . bin2hex(random_bytes(4));
@@ -158,7 +169,12 @@ check('re-opening a migrated database keeps its facts', count($again->recall()) 
 // ---- an unopened store is a programming error, not a silent no-op ----------
 $closed = new MemoryStore();
 $threw = false;
-try { $closed->recall(); } catch (\LogicException) { $threw = true; }
+
+try {
+    $closed->recall();
+} catch (\LogicException) {
+    $threw = true;
+}
 check('using a store with no database open throws', $threw);
 
 // ---- the end-of-session extractor ------------------------------------------
@@ -205,8 +221,11 @@ $reply = "Here are the facts I found (see [the code] and [the config]):\n"
     . "```json\n" . '[{"key":"auth_strategy","value":"JWT via lexik"},{"key":"tests","value":"make test [not phpunit]"}]' . "\n```\nJ'espère que cela aide.";
 $result = extractor($fresh, $reply)->extract(conversation());
 check('facts are found inside prose, fences and stray brackets', $result->created === 2, $result->summary());
-check('a "]" inside a value does not end the array early',
-    count($fresh->recall('phpunit')) === 1, json_encode(values($fresh->recall()), JSON_UNESCAPED_UNICODE));
+check(
+    'a "]" inside a value does not end the array early',
+    count($fresh->recall('phpunit')) === 1,
+    json_encode(values($fresh->recall()), JSON_UNESCAPED_UNICODE),
+);
 
 // Running it twice must not multiply the same facts.
 $result = extractor($fresh, $reply)->extract(conversation());
@@ -237,25 +256,25 @@ check('an interrupted extraction stores nothing', $result->skipped !== null && $
 // prompt already contains the memory summary, and feeding it back invites the
 // model to re-extract what it has just been told.
 $seen = '';
-$recorder = new MockHttpClient(function ($method, $url, $options) use (&$seen) {
+$recorder = new MockHttpClient(function ($method, $url, array $options) use (&$seen): MockResponse {
     $seen = $options['body'] ?? '';
 
     return new MockResponse(json_encode(['message' => ['content' => '[]'], 'done' => true]));
 });
 $bag = conversation();
 $bag->tool('file_read', 'CONTENU_DE_FICHIER_VOLUMINEUX');
-(new FactExtractor(new OllamaPlatform($recorder, 'http://x', 'm', 32768, -1.0, new Interrupt()), $fresh, new Interrupt()))->extract($bag);
+new FactExtractor(new OllamaPlatform($recorder, 'http://x', 'm', 32768, -1.0, new Interrupt()), $fresh, new Interrupt())->extract($bag);
 check('the system prompt is not fed back into the extractor', !str_contains($seen, 'the project memory digest lives here'), substr($seen, 0, 200));
 check('nor are tool results', !str_contains($seen, 'CONTENU_DE_FICHIER_VOLUMINEUX'), substr($seen, 0, 200));
 check('but the conversation itself is, labelled in the prompt\'s language', str_contains($seen, 'question 0') && str_contains($seen, '[USER]') && !str_contains($seen, 'UTILISATEUR'), substr($seen, 0, 300));
 
 // A request made in plan mode is handed over as it was typed.
-$planned = new App\Agent\PlanMode();
+$planned = new PlanMode();
 $planned->on();
 $bag = conversation();
 $bag->user($planned->frame('Planifie la migration'));
 $bag->assistant('Plan prêt.');
-(new FactExtractor(new OllamaPlatform($recorder, 'http://x', 'm', 32768, -1.0, new Interrupt()), $fresh, new Interrupt()))->extract($bag);
+new FactExtractor(new OllamaPlatform($recorder, 'http://x', 'm', 32768, -1.0, new Interrupt()), $fresh, new Interrupt())->extract($bag);
 check('without plan mode\'s reminder', str_contains($seen, 'Planifie la migration') && !str_contains($seen, 'Plan mode'), substr($seen, -400));
 
 // ---- ranking: the digest has more than recency to go on now ----------------
@@ -275,16 +294,25 @@ $ranked->remember('deploy_procedure', 'make deploy pousse sur le serveur de prod
 
 // Recency alone puts deploy_procedure first — it was written last.
 $plain = $ranked->digest(4000);
-check('with no situation, the most recent fact leads',
-    strpos($plain, 'deploy_procedure') < strpos($plain, 'payment_gateway'), $plain);
+check(
+    'with no situation, the most recent fact leads',
+    strpos($plain, 'deploy_procedure') < strpos($plain, 'payment_gateway'),
+    $plain,
+);
 
 // Someone working in src/Payment wants the payment fact quoted, on a morning
 // when nothing about it has changed in days.
 $situated = $ranked->digest(4000, ['payment', 'stripe']);
-check('a fact about what is being worked on leads instead',
-    strpos($situated, 'payment_gateway') < strpos($situated, 'deploy_procedure'), $situated);
-check('and the others are still there, just after it',
-    str_contains($situated, 'mailer_transport'), $situated);
+check(
+    'a fact about what is being worked on leads instead',
+    strpos($situated, 'payment_gateway') < strpos($situated, 'deploy_procedure'),
+    $situated,
+);
+check(
+    'and the others are still there, just after it',
+    str_contains($situated, 'mailer_transport'),
+    $situated,
+);
 
 // Terms that match nothing must not reorder anything.
 $unrelated = $ranked->digest(4000, ['kubernetes', 'terraform']);
@@ -322,9 +350,11 @@ foreach ($ranked->recall() as $fact) {
 check('recalls are counted', $used !== null && $used->recalledCount === 5, (string) $used?->recalledCount);
 check('and dated', $used?->lastRecalledAt !== null);
 
-check('a fact the model keeps coming back for climbs the digest',
+check(
+    'a fact the model keeps coming back for climbs the digest',
     strpos($ranked->digest(4000), 'mailer_transport') < strpos($ranked->digest(4000), 'deploy_procedure'),
-    $ranked->digest(4000));
+    $ranked->digest(4000),
+);
 
 // digest() reaches facts through recall(); if that counted as usage, every
 // fact would be "used" every session and the signal would measure nothing.
@@ -335,10 +365,13 @@ foreach ($ranked->recall() as $fact) {
         $after = $fact;
     }
 }
-check('building the prompt does not count as using a fact', $after !== null && $after->recalledCount === 0,
-    (string) $after?->recalledCount);
+check(
+    'building the prompt does not count as using a fact',
+    $after !== null && $after->recalledCount === 0,
+    (string) $after?->recalledCount,
+);
 
-check('marking nothing is harmless', (function () use ($ranked) {
+check('marking nothing is harmless', (function () use ($ranked): true {
     $ranked->markRecalled([]);
 
     return true;
@@ -359,8 +392,11 @@ $pdo = null;
 $upgraded = new MemoryStore();
 $upgraded->open($v2);
 $facts = $upgraded->recall();
-check('a v2 database keeps its facts through the v3 migration',
-    count($facts) === 1 && $facts[0]->value === 'Doctrine ORM 3', json_encode(values($facts), JSON_UNESCAPED_UNICODE));
+check(
+    'a v2 database keeps its facts through the v3 migration',
+    count($facts) === 1 && $facts[0]->value === 'Doctrine ORM 3',
+    json_encode(values($facts), JSON_UNESCAPED_UNICODE),
+);
 check('and its facts simply start at zero recalls', $facts[0]->recalledCount === 0);
 $upgraded->markRecalled([$facts[0]->id]);
 check('the new columns are usable straight away', $upgraded->recall()[0]->recalledCount === 1);

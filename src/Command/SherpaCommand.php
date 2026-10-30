@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Command;
 
 use App\Agent\AgentLoop;
@@ -7,38 +9,40 @@ use App\Agent\ContextBudget;
 use App\Agent\HistoryCompactor;
 use App\Agent\InferenceSpeed;
 use App\Agent\MessageBag;
+use App\Agent\PlanMode;
 use App\Agent\SystemPromptBuilder;
-use App\Agent\Tool\Permission;
 use App\Agent\Tool\Toolbox;
 use App\Config\Backend;
+use App\Config\ModelProfile;
 use App\Config\ModelResolver;
 use App\Config\ProviderName;
+use App\Mcp\McpException;
 use App\Mcp\McpRegistry;
+use App\Mcp\PromptArguments;
 use App\Memory\ContextStore;
 use App\Memory\FactExtractor;
 use App\Permission\ProjectPermissions;
 use App\Permission\SessionPermissions;
+use App\Platform\ModelResidency;
 use App\Platform\SwitchablePlatform;
-use App\Project\Project;
 use App\Project\DockerConfig;
 use App\Project\DockerWrapper;
+use App\Project\Project;
 use App\Project\ProjectQuestions;
 use App\Project\ProjectStore;
 use App\Project\WorkingProject;
 use App\Runtime\Interrupt;
+use App\Session\SavedSession;
 use App\Session\SessionStore;
-use App\Mcp\McpException;
-use App\Mcp\PromptArguments;
 use App\Skills\Skill;
 use App\Skills\SkillRegistry;
 use App\Tool\BackgroundJobs;
 use App\Tool\Sandbox;
-use App\Agent\PlanMode;
 use App\TUI\ChatPane;
 use App\TUI\LineEditor;
+use App\TUI\Scrollback;
 use App\TUI\StatusBar;
 use App\TUI\Terminal;
-use App\TUI\Scrollback;
 use App\Update\UpdateNotice;
 use App\Usage\TokenCapReached;
 use App\Usage\UsageMeter;
@@ -47,6 +51,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
+use Throwable;
 
 #[AsCommand(name: 'sherpa', description: 'Sherpa — a development agent in your terminal')]
 class SherpaCommand extends Command
@@ -128,7 +133,7 @@ class SherpaCommand extends Command
         // Whatever happens — Ctrl+C, an uncaught error, a fatal — the tty must
         // not be handed back in raw mode. A shutdown function covers the paths
         // a signal handler cannot.
-        register_shutdown_function(function () {
+        register_shutdown_function(function (): void {
             $this->terminal->restoreSane();
             // MCP servers and background jobs are child processes. Whatever
             // ends the session — /exit, Ctrl+C, a fatal — they are not left
@@ -139,7 +144,7 @@ class SherpaCommand extends Command
 
         // Ctrl+C cancels the turn while one is running; at an idle prompt, or on
         // a second press, it quits through here.
-        $this->interrupt->install(function () {
+        $this->interrupt->install(function (): void {
             $this->terminal->restoreSane();
             echo "\n";
             exit(0);
@@ -166,7 +171,7 @@ class SherpaCommand extends Command
         $flagged = is_string($flag) && trim($flag) !== '';
         $requested = $flagged ? Backend::parse($flag) : null;
 
-        if ($flagged && $requested === null) {
+        if ($flagged && !$requested instanceof Backend) {
             echo Terminal::RED . "✗ Unknown backend: {$flag}. Possible values: api, ollama.\n" . Terminal::RESET;
 
             return Command::FAILURE;
@@ -224,8 +229,9 @@ class SherpaCommand extends Command
             $backend,
             rememberAsDefault: !$flagged,
         );
-        if ($profile === null) {
+        if (!$profile instanceof ModelProfile) {
             echo Terminal::GRAY . "Goodbye.\n" . Terminal::RESET;
+
             return Command::SUCCESS;
         }
 
@@ -263,11 +269,11 @@ class SherpaCommand extends Command
         $this->lineEditor->useCompletions(fn(): array => [
             ...SlashCommands::catalogue(),
             ...array_values(array_map(
-                fn(Skill $skill) => ['name' => '/' . $skill->name, 'hint' => '[request]', 'description' => 'skill · ' . $skill->description],
-                array_filter($this->skillRegistry->all(), fn(Skill $skill) => !$this->isCommand('/' . $skill->name)),
+                fn(Skill $skill): array => ['name' => '/' . $skill->name, 'hint' => '[request]', 'description' => 'skill · ' . $skill->description],
+                array_filter($this->skillRegistry->all(), fn(Skill $skill): bool => !$this->isCommand('/' . $skill->name)),
             )),
             ...array_map(
-                fn(array $prompt) => [
+                fn(array $prompt): array => [
                     'name'        => $prompt['command'],
                     'hint'        => PromptArguments::usage($prompt['arguments']),
                     'description' => 'MCP prompt · ' . $prompt['description'],
@@ -316,7 +322,7 @@ class SherpaCommand extends Command
 
         // Commands run on this machine, not in a container: where they may
         // write, or that nothing keeps them in.
-        if ($this->sandbox !== null && !($project->docker->enabled && $project->docker->container !== '') && !is_file('/.dockerenv')) {
+        if ($this->sandbox instanceof Sandbox && (!$project->docker->enabled || $project->docker->container === '') && !is_file('/.dockerenv')) {
             echo $this->sandbox->kind() === null
                 ? Terminal::YELLOW . '  ⚠ Commands run without a sandbox: ' . $this->sandbox->why()
                     . Terminal::GRAY . " — they can write anywhere you can.\n" . Terminal::RESET
@@ -327,7 +333,7 @@ class SherpaCommand extends Command
         $resume = $input->getOption('resume');
         if ($resume !== false) {
             $this->commands->resume(is_string($resume) ? trim($resume) : '', $bag, $project);
-        } elseif (($last = $this->sessions->latest()) !== null) {
+        } elseif (($last = $this->sessions->latest()) instanceof SavedSession) {
             // A feature nobody knows about does not exist. The conversation
             // left behind is named, with how to get it back, and nothing more:
             // opening a new one is still what an empty prompt means.
@@ -358,14 +364,14 @@ class SherpaCommand extends Command
                 $this->chat->showInfo(
                     'The projects configuration changed on disk. '
                     . 'This session keeps what it read at startup — '
-                    . 'restart Sherpa to pick up a changed path, container or stack.'
+                    . 'restart Sherpa to pick up a changed path, container or stack.',
                 );
             }
 
             $this->renderStatus($project, $bag);
             $userInput = $this->readUserInput();
 
-            if ($userInput === null || $userInput === '/exit' || $userInput === '/quit') {
+            if (in_array($userInput, [null, '/exit', '/quit'], true)) {
                 break;
             }
 
@@ -436,14 +442,14 @@ class SherpaCommand extends Command
                 } elseif ($result->repeatedError !== null) {
                     $this->chat->showError(
                         "Every call came back with the same error; turn stopped:\n  {$result->repeatedError}\n"
-                        . 'It is likely something only you can fix. Once it is, ask again.'
+                        . 'It is likely something only you can fix. Once it is, ask again.',
                     );
                 } elseif ($result->repliedBeforeStop) {
                     $this->chat->showInfo('The model kept repeating a tool call after its reply; turn stopped there.');
                 } elseif ($result->repetitionDetected) {
                     $this->chat->showError(
                         'The model kept repeating the same tool call without getting anywhere; turn stopped. '
-                        . 'Rephrase, or give it what it is missing.'
+                        . 'Rephrase, or give it what it is missing.',
                     );
                 } elseif ($result->maxIterationsReached) {
                     $this->chat->showError('Iteration limit reached.');
@@ -451,7 +457,7 @@ class SherpaCommand extends Command
             } catch (TokenCapReached $e) {
                 // Not a failure of anything: the limit the user set, doing its job.
                 $this->chat->showInfo($e->getMessage());
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 $this->chat->showError('Error: ' . $e->getMessage());
             } finally {
                 $this->terminal->endQuietInput();
@@ -493,6 +499,7 @@ class SherpaCommand extends Command
         if ($this->extractFacts && !$forgotten) {
             $this->chat->showInfo('Extracting the lasting facts... (Ctrl+C to skip)');
             $this->interrupt->beginTurn();
+
             try {
                 $this->chat->showInfo($this->factExtractor->extract($bag)->summary());
             } finally {
@@ -508,6 +515,7 @@ class SherpaCommand extends Command
         }
 
         echo Terminal::GRAY . "\nSession over. Good luck!\n" . Terminal::RESET;
+
         return Command::SUCCESS;
     }
 
@@ -524,7 +532,7 @@ class SherpaCommand extends Command
         $this->warnedAboutSessions = true;
         $this->chat->showError(
             'Cannot save the conversation in ' . ($this->sessions->directory() ?? '?')
-            . ': it will not be resumable.'
+            . ': it will not be resumable.',
         );
     }
 
@@ -570,7 +578,7 @@ class SherpaCommand extends Command
     {
         $residency = $this->platform->residency();
 
-        if ($residency === null || !$residency->isLoaded() || $residency->isFullyOnGpu()) {
+        if (!$residency instanceof ModelResidency || !$residency->isLoaded() || $residency->isFullyOnGpu()) {
             return;
         }
 
@@ -580,7 +588,7 @@ class SherpaCommand extends Command
             // only surprising on a machine bought for the other one.
             $this->chat->showInfo(
                 'The model runs entirely on the processor. '
-                . 'Expected with no graphics card; otherwise it could not be loaded onto it.'
+                . 'Expected with no graphics card; otherwise it could not be loaded onto it.',
             );
 
             return;
@@ -614,7 +622,7 @@ class SherpaCommand extends Command
         }
 
         $known = $this->projectStore->forDirectory($directory);
-        if ($known !== null) {
+        if ($known instanceof Project) {
             $this->working->open($known);
 
             return true;
@@ -642,7 +650,6 @@ class SherpaCommand extends Command
         );
     }
 
-
     /** Whether $name is one of Sherpa's own commands, which a skill of that name does not shadow. */
     private function isCommand(string $name): bool
     {
@@ -667,7 +674,7 @@ class SherpaCommand extends Command
         }
 
         $skill = $this->skillRegistry->get(substr($word, 1));
-        if ($skill === null) {
+        if (!$skill instanceof Skill) {
             return null;
         }
 
@@ -678,5 +685,4 @@ class SherpaCommand extends Command
     {
         return $this->lineEditor->prompt('❯ ', Terminal::BOLD . Terminal::GREEN);
     }
-
 }

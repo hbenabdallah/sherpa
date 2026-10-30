@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 // Answers ProjectQuestions::ask() from stdin, as a person at the keyboard
 // would, and prints the draft it made — so the questions can be tested
 // without a terminal. Usage: php ask_project.php <directory>

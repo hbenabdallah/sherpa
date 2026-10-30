@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Agent\Tool;
 
-#[\Attribute(\Attribute::TARGET_CLASS)]
+use Attribute;
+
+#[Attribute(Attribute::TARGET_CLASS)]
 final readonly class AsTool
 {
     public function __construct(

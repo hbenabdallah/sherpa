@@ -1,8 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Tool;
 
 use Symfony\Component\Process\Process;
+use Throwable;
 
 /**
  * What a container looks like from outside: where it mounts the host, and where
@@ -48,7 +51,7 @@ class ContainerInspector
 
         try {
             $process->run();
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // No docker binary here, most likely. The caller says so properly.
             return null;
         }
@@ -130,7 +133,7 @@ class ContainerInspector
 
         try {
             $process->run();
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return $this->homes[$key] = null;
         }
 

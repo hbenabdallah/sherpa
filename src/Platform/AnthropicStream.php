@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Platform;
 
+use RuntimeException;
+
 /**
  * One streamed reply of Anthropic's Messages API, read event by event: text is
  * handed on as it comes, tool calls and thinking blocks are assembled from
@@ -20,12 +22,17 @@ final class AnthropicStream
     private array $inputs = [];
 
     private int $input = 0;
+
     private int $cacheRead = 0;
+
     private int $cacheWrite = 0;
+
     private int $output = 0;
+
     private bool $counted = false;
 
     private ?string $stopReason = null;
+
     private ?float $firstTokenAt = null;
 
     /**
@@ -40,7 +47,7 @@ final class AnthropicStream
     /**
      * One SSE line. The `event:` lines only repeat the type the data carries.
      *
-     * @throws \RuntimeException on an error event, mid-stream
+     * @throws RuntimeException on an error event, mid-stream
      */
     public function line(string $line): void
     {
@@ -59,7 +66,7 @@ final class AnthropicStream
             'content_block_start' => $this->start((int) ($event['index'] ?? 0), $event['content_block'] ?? []),
             'content_block_delta' => $this->delta((int) ($event['index'] ?? 0), $event['delta'] ?? []),
             'message_delta'       => $this->end($event),
-            'error'               => throw StreamFailed::from((string) ($event['error']['message'] ?? 'the stream reported an error') . ' (' . (string) ($event['error']['type'] ?? 'error') . ')'),
+            'error'               => throw StreamFailed::from(($event['error']['message'] ?? 'the stream reported an error') . ' (' . ($event['error']['type'] ?? 'error') . ')'),
             default               => null,
         };
     }
@@ -100,9 +107,9 @@ final class AnthropicStream
     {
         match ($delta['type'] ?? '') {
             'text_delta'       => $this->text((string) ($delta['text'] ?? '')),
-            'input_json_delta' => $this->inputs[$index] = ($this->inputs[$index] ?? '') . (string) ($delta['partial_json'] ?? ''),
-            'thinking_delta'   => $this->blocks[$index]['thinking'] = ($this->blocks[$index]['thinking'] ?? '') . (string) ($delta['thinking'] ?? ''),
-            'signature_delta'  => $this->blocks[$index]['signature'] = ($this->blocks[$index]['signature'] ?? '') . (string) ($delta['signature'] ?? ''),
+            'input_json_delta' => $this->inputs[$index] = ($this->inputs[$index] ?? '') . ($delta['partial_json'] ?? ''),
+            'thinking_delta'   => $this->blocks[$index]['thinking'] = ($this->blocks[$index]['thinking'] ?? '') . ($delta['thinking'] ?? ''),
+            'signature_delta'  => $this->blocks[$index]['signature'] = ($this->blocks[$index]['signature'] ?? '') . ($delta['signature'] ?? ''),
             default            => null,
         };
     }

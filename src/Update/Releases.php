@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Update;
 
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Throwable;
 
 /**
  * Sherpa's releases on GitHub: which is the latest, and where each executable
@@ -12,16 +13,16 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * tag — rather than through the API, which allows sixty requests an hour per
  * address and answers a shared office's sixty-first with an error.
  */
-final class Releases
+final readonly class Releases
 {
-    public const URL = 'https://github.com/hbenabdallah/sherpa/releases';
+    public const string URL = 'https://github.com/hbenabdallah/sherpa/releases';
 
     /** A release number as tagged: three numbers, nothing after. */
-    public const VERSION = '/^\d+\.\d+\.\d+$/';
+    public const string VERSION = '/^\d+\.\d+\.\d+$/';
 
     public function __construct(
-        private readonly HttpClientInterface $client,
-        private readonly string $url = self::URL,
+        private HttpClientInterface $client,
+        private string $url = self::URL,
     ) {}
 
     /** The latest release's number ("1.0.2"), or null when GitHub cannot say in time. */
@@ -34,7 +35,7 @@ final class Releases
                 'max_duration'  => $timeout,
             ]);
             $location = $response->getHeaders(false)['location'][0] ?? '';
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return null;
         }
 

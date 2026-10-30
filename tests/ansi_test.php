@@ -1,19 +1,28 @@
 <?php
+
+declare(strict_types=1);
+
+use App\Agent\Tool\Permission;
+use App\Agent\Tool\ToolCall;
+use App\Agent\Tool\ToolDefinition;
+use App\Platform\ModelInfo;
+use App\Platform\OllamaPlatform;
+use App\TUI\LineEditor;
+use App\TUI\ModelSelector;
+use Symfony\Component\HttpClient\MockHttpClient;
+
 // Terminal escape handling: what gets stripped from untrusted text, and the
 // display behaviours that depend on it.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
-use App\Agent\Tool\ToolCall;
-use App\Agent\Tool\ToolDefinition;
-use App\Agent\Tool\Permission;
+use App\Tool\FilePatchTool;
+use App\Tool\FileWriteTool;
+use App\Tool\ShellExecTool;
 use App\TUI\ChatPane;
 use App\TUI\ConfirmOverlay;
 use App\TUI\MarkdownRenderer;
 use App\TUI\Terminal;
-use App\Tool\FilePatchTool;
-use App\Tool\FileWriteTool;
-use App\Tool\ShellExecTool;
 
 $pass = 0;
 $fail = 0;
@@ -55,13 +64,13 @@ $pane = new ChatPane(new Terminal(), new MarkdownRenderer());
 $opened = captured(fn() => $pane->beginAssistantMessage());
 check('a turn opens on a waiting line', str_contains($opened, 'Sherpa is thinking'), json_encode($opened));
 
-$thinking = captured(function () use ($pane) {
+$thinking = captured(function () use ($pane): void {
     usleep(110_000);
     $pane->showWaiting(true);
 });
 check('a reasoning model is said to be reasoning', str_contains($thinking, 'Sherpa is reasoning'), json_encode($thinking));
 
-$first = captured(function () use ($pane) {
+$first = captured(function () use ($pane): void {
     $pane->appendToken('Bonjour');
     $pane->flushBuffer();
 });
@@ -70,8 +79,10 @@ check('once, not before every line after', !str_contains(captured(fn() => $pane-
 
 $toolOnly = new ChatPane(new Terminal(), new MarkdownRenderer());
 captured(fn() => $toolOnly->beginAssistantMessage());
-check('a turn that only calls a tool clears it too',
-    str_starts_with(captured(fn() => $toolOnly->showToolCall('file_read', ['path' => 'a.php'])), $clear));
+check(
+    'a turn that only calls a tool clears it too',
+    str_starts_with(captured(fn() => $toolOnly->showToolCall('file_read', ['path' => 'a.php'])), $clear),
+);
 
 // ---- Terminal::plain -------------------------------------------------------
 check('plain text is untouched', Terminal::plain('hello world') === 'hello world');
@@ -134,23 +145,29 @@ check(
 );
 
 // ---- tables and headings -----------------------------------------------------
-$plainOf = fn(string $s) => Terminal::plain($s);
+$plainOf = fn(string $s): string => Terminal::plain($s);
 $table = "| Method | Pros |\n|---|---|\n| External tool | No code to write, works at once, shows in the Tools menu. |\n| Plugin | A window of its own. |";
-$drawn = $plainOf((new MarkdownRenderer(41))->render($table));
+$drawn = $plainOf(new MarkdownRenderer(41)->render($table));
 check('a table is drawn with borders, not left as pipes', str_contains($drawn, '┌') && str_contains($drawn, '└') && !str_contains($drawn, '|---'), $drawn);
 check('its cells keep their text', str_contains($drawn, 'External tool') && str_contains($drawn, 'A window of its own.'), $drawn);
-check('it fits the terminal, long cells wrapped',
-    max(array_map('mb_strwidth', explode("\n", $drawn))) <= 40 && str_contains($drawn, 'works at once,'), $drawn);
+check(
+    'it fits the terminal, long cells wrapped',
+    max(array_map(mb_strwidth(...), explode("\n", $drawn))) <= 40 && str_contains($drawn, 'works at once,'),
+    $drawn,
+);
 
-$aligned = $plainOf((new MarkdownRenderer(80))->render("| a | n |\n|:---|---:|\n| x | 7 |\n| **yy** | `123` |"));
+$aligned = $plainOf(new MarkdownRenderer(80)->render("| a | n |\n|:---|---:|\n| x | 7 |\n| **yy** | `123` |"));
 check('right-aligned columns line up on the right', str_contains($aligned, '│   7 │') && str_contains($aligned, '│ 123 │'), $aligned);
 check('markdown inside a cell shows as its text', preg_match('/│ yy +│/u', $aligned) === 1 && !str_contains($aligned, '**'), $aligned);
 
-$wide = $plainOf((new MarkdownRenderer(220))->render("| What works | Why |\n|---|---|\n| " . str_repeat('word ', 60) . "| lines 1-9 |"));
-check('on a very wide terminal a table stays readable, 120 columns at most',
-    max(array_map('mb_strwidth', explode("\n", $wide))) <= 120, (string) max(array_map('mb_strwidth', explode("\n", $wide))));
-$exact = $plainOf((new MarkdownRenderer(30))->render("| a | b |\n|---|---|\n| " . str_repeat('x ', 20) . "| y |"));
-check('and never fills the terminal to its last column', max(array_map('mb_strwidth', explode("\n", $exact))) < 30, $exact);
+$wide = $plainOf(new MarkdownRenderer(220)->render("| What works | Why |\n|---|---|\n| " . str_repeat('word ', 60) . "| lines 1-9 |"));
+check(
+    'on a very wide terminal a table stays readable, 120 columns at most',
+    max(array_map(mb_strwidth(...), explode("\n", $wide))) <= 120,
+    (string) max(array_map(mb_strwidth(...), explode("\n", $wide))),
+);
+$exact = $plainOf(new MarkdownRenderer(30)->render("| a | b |\n|---|---|\n| " . str_repeat('x ', 20) . "| y |"));
+check('and never fills the terminal to its last column', max(array_map(mb_strwidth(...), explode("\n", $exact))) < 30, $exact);
 
 $heading = $plainOf($md->render('### Summary of the options'));
 check('a heading loses its # marks', $heading === 'Summary of the options', json_encode($heading));
@@ -175,7 +192,7 @@ $out = captured(fn() => pane()->addUserMessage("ab\e[A\e[D"));
 check('the echoed user line carries no escape movement', !str_contains($out, "\e[A") && !str_contains($out, "\e[D"), bin2hex($out));
 check('the echoed user line keeps its text', str_contains($out, 'ab'));
 
-$out = captured(function () {
+$out = captured(function (): void {
     $p = pane();
     $p->showToolResult('file_read', "\e[2J\e[Hcontenu du fichier\nligne 2");
 });
@@ -183,17 +200,22 @@ check('tool output cannot clear the screen', !str_contains($out, "\e[2J"), bin2h
 check('tool output keeps its first line', str_contains($out, 'contenu du fichier'));
 check('a multi-line tool result is marked as truncated', str_contains($out, '…'));
 
-$out = captured(function () {
+$out = captured(function (): void {
     $p = pane();
     $p->showToolCall('file_write', ['path' => "x\e[2J.php"]);
 });
 check('tool arguments cannot clear the screen', !str_contains($out, "\e[2J"), bin2hex($out));
 
 // A model's name and details come from the server, and are shown as text.
-$selector = new App\TUI\ModelSelector(new Terminal(), new App\TUI\LineEditor(), new App\Platform\OllamaPlatform(
-    new Symfony\Component\HttpClient\MockHttpClient(), 'http://ollama.test', 'x'));
-$heading = (new ReflectionMethod($selector, 'heading'))->invoke($selector,
-    new App\Platform\ModelInfo("piège\e[2J\nfaux", 8192, ["tools\e]0;titre\x07"], null, "7B\e[31m"));
+$selector = new ModelSelector(new Terminal(), new LineEditor(), new OllamaPlatform(
+    new MockHttpClient(),
+    'http://ollama.test',
+    'x',
+));
+$heading = new ReflectionMethod($selector, 'heading')->invoke(
+    $selector,
+    new ModelInfo("piège\e[2J\nfaux", 8192, ["tools\e]0;titre\x07"], null, "7B\e[31m"),
+);
 check('a model name from the server cannot clear the screen', !str_contains($heading, "\e[2J") && !str_contains($heading, "\e]0;"), bin2hex($heading));
 check('nor draw a line of its own', !str_contains($heading, "piège\n"), $heading);
 check('and its details are still shown', str_contains(Terminal::plain($heading), 'piège') && str_contains(Terminal::plain($heading), '7B'), $heading);
@@ -208,10 +230,13 @@ $wide = new class extends Terminal {
     }
 };
 $render = new ReflectionMethod($selector, 'render');
-$long = [new App\Platform\ModelInfo('nvidia/llama-3.3-nemotron-super-49b-v1.5-instruct', 131072), new App\Platform\ModelInfo('qwen/qwen3-coder', 262144)];
+$long = [new ModelInfo('nvidia/llama-3.3-nemotron-super-49b-v1.5-instruct', 131072), new ModelInfo('qwen/qwen3-coder', 262144)];
 $drawn = static function () use ($render, $wide, $long): string {
-    $selector = new App\TUI\ModelSelector($wide, new App\TUI\LineEditor(), new App\Platform\OllamaPlatform(
-        new Symfony\Component\HttpClient\MockHttpClient(), 'http://ollama.test', 'x'));
+    $selector = new ModelSelector($wide, new LineEditor(), new OllamaPlatform(
+        new MockHttpClient(),
+        'http://ollama.test',
+        'x',
+    ));
     ob_start();
     $render->invoke($selector, $long, 0, null, false);
 
@@ -222,7 +247,7 @@ $wide->cols = 60;
 check('and cut, marked, on a narrow one', str_contains($drawn(), 'nvidia/llama-3.3-nemo') && str_contains($drawn(), '…'), $drawn());
 
 // The label is owed only if something is actually streamed.
-$out = captured(function () {
+$out = captured(function (): void {
     $p = pane();
     $p->beginAssistantMessage();
     $p->flushBuffer();
@@ -230,7 +255,7 @@ $out = captured(function () {
 check('a tool-only turn prints no orphan label', !str_contains(settled($out), 'Sherpa'), bin2hex($out));
 
 // Some models send "\n" as the content of every tool-calling reply.
-$out = captured(function () {
+$out = captured(function (): void {
     $p = pane();
     $p->beginAssistantMessage();
     $p->appendToken("\n");
@@ -239,7 +264,7 @@ $out = captured(function () {
 });
 check('a reply of blank lines prints no orphan label either', !str_contains(settled($out), 'Sherpa'), bin2hex($out));
 
-$out = captured(function () {
+$out = captured(function (): void {
     $p = pane();
     $p->beginAssistantMessage();
     $p->appendToken("\n\n");
@@ -255,7 +280,7 @@ check('nor one that failed silently', !str_contains($out, '✓'), $out);
 $out = captured(fn() => pane()->showToolResult('shell_exec', "OK (12 tests)"));
 check('one that succeeded still is', str_contains($out, '✓'), $out);
 
-$out = captured(function () {
+$out = captured(function (): void {
     $p = pane();
     $p->beginAssistantMessage();
     $p->appendToken("bonjour\n");
@@ -264,7 +289,7 @@ $out = captured(function () {
 check('a turn that streams text does print the label', str_contains($out, 'Sherpa'));
 check('and the streamed text with it', str_contains($out, 'bonjour'));
 
-$out = captured(function () {
+$out = captured(function (): void {
     $p = pane();
     $p->beginAssistantMessage();
     $p->appendToken('sans saut de ligne final');
@@ -276,7 +301,7 @@ check('and its last line is flushed', str_contains($out, 'sans saut de ligne fin
 // ---- withholding a reply that opens like a tool call -----------------------
 $json = '{"name": "file_read", "arguments": {"path": "src/Widget.php"}}';
 
-$out = captured(function () use ($json) {
+$out = captured(function () use ($json): void {
     $p = pane();
     $p->beginAssistantMessage();
     foreach (str_split($json, 7) as $chunk) {
@@ -287,7 +312,7 @@ $out = captured(function () use ($json) {
 check('a recovered tool call is never shown as raw JSON', !str_contains($out, 'file_read'), bin2hex($out));
 check('and it leaves no orphan label behind', !str_contains(settled($out), 'Sherpa'), bin2hex($out));
 
-$out = captured(function () use ($json) {
+$out = captured(function () use ($json): void {
     $p = pane();
     $p->beginAssistantMessage();
     $p->appendToken($json);
@@ -296,7 +321,7 @@ $out = captured(function () use ($json) {
 check('JSON that was not a tool call is still shown', str_contains($out, 'file_read'));
 
 // A reply opening with the tag split across tokens must be held just the same.
-$out = captured(function () {
+$out = captured(function (): void {
     $p = pane();
     $p->beginAssistantMessage();
     foreach (['<', 'tool', '_call', '>', '{"name":"x"}'] as $t) {
@@ -307,7 +332,7 @@ $out = captured(function () {
 check('a tool_call tag split across tokens is withheld', trim(settled($out)) === '', bin2hex($out));
 
 // Prose must not pay for any of this: it appears before the flush.
-$duringStream = captured(function () {
+$duringStream = captured(function (): void {
     $p = pane();
     $p->beginAssistantMessage();
     $p->appendToken("La classe est ZorbulonCalculator.\n");
@@ -315,7 +340,7 @@ $duringStream = captured(function () {
 check('ordinary prose is still streamed, not buffered', str_contains($duringStream, 'ZorbulonCalculator'), bin2hex($duringStream));
 
 // ---- box interiors ---------------------------------------------------------
-$out = captured(fn() => (new Terminal())->box(1, 1, 12, 4));
+$out = captured(fn() => new Terminal()->box(1, 1, 12, 4));
 check(
     'the box blanks its interior',
     str_contains($out, Terminal::V . Terminal::RESET . str_repeat(' ', 10)),
@@ -324,7 +349,7 @@ check(
 
 // ---- confirmation overlay --------------------------------------------------
 $overlay = new ConfirmOverlay(new Terminal(), new FileWriteTool(), new FilePatchTool(), new ShellExecTool());
-$summarize = (new ReflectionClass($overlay))->getMethod('summarizeArgs');
+$summarize = new ReflectionClass($overlay)->getMethod('summarizeArgs');
 
 $summary = $summarize->invoke($overlay, ['command' => "rm -rf /\e[2J\e[H"], 200);
 check('the approval screen cannot be repainted from arguments', !str_contains($summary, "\e"), bin2hex($summary));
@@ -333,12 +358,12 @@ check('the approval screen still shows the command', str_contains($summary, 'rm 
 // What is approved is what is seen. The preview was cut at the box's width and
 // at 18 lines, with nothing to say so: the end of a long command — after a run
 // of spaces, or on its twenty-first line — was approved without being shown.
-$call = new App\Agent\Tool\ToolCall('c1', 'shell_exec', []);
-$def = new App\Agent\Tool\ToolDefinition('shell_exec', 'Run a command', [], App\Agent\Tool\Permission::CONFIRM, new stdClass());
+$call = new ToolCall('c1', 'shell_exec', []);
+$def = new ToolDefinition('shell_exec', 'Run a command', [], Permission::CONFIRM, new stdClass());
 $padded = Terminal::plain($overlay->frame($call, $def, ['$ ls; ' . str_repeat(' ', 150) . 'rm -rf ~/projet'], 60));
 // The rows' contents, end to end: a wrapped line reads across them.
 $contents = implode('', array_map(
-    fn(string $row) => preg_match('/│ (.*) │/u', $row, $m) === 1 ? rtrim($m[1]) : '',
+    fn(string $row): string => preg_match('/│ (.*) │/u', $row, $m) === 1 ? rtrim($m[1]) : '',
     explode("\n", $padded),
 ));
 check('the end of a long line is shown, wrapped rather than cut', str_contains($contents, 'rm -rf ~/projet'), $padded);
@@ -346,7 +371,7 @@ check('the end of a long line is shown, wrapped rather than cut', str_contains($
 $long = array_merge(['$ ' . str_repeat("echo ok\n", 1)], array_fill(0, 25, 'echo ok'), ['rm -rf ~/projet']);
 $tall = Terminal::plain($overlay->frame($call, $def, $long, 60));
 check('lines past what the box holds are said to be hidden, with how many', (bool) preg_match('/(\d+) more lines? not shown/', $tall), $tall);
-check('every row stays inside the box', max(array_map('mb_strwidth', explode("\n", rtrim($tall)))) <= 62, $tall);
+check('every row stays inside the box', max(array_map(mb_strwidth(...), explode("\n", rtrim($tall)))) <= 62, $tall);
 $tabbed = Terminal::plain($overlay->frame($call, $def, ["\$ a\t\t\t\t\t\t\t\t\t\tb"], 40));
 check('a tab is not a way to push text past the border', !str_contains($tabbed, "\t"), json_encode($tabbed));
 

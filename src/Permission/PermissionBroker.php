@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Permission;
 
 use App\Agent\Tool\Permission;
@@ -39,7 +41,7 @@ class PermissionBroker
      */
     public function check(ToolCall $call, ?ToolDefinition $def): bool
     {
-        if ($def === null) {
+        if (!$def instanceof ToolDefinition) {
             return true; // tool not found, let Toolbox handle the error
         }
 

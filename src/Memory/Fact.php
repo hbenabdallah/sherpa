@@ -1,22 +1,26 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Memory;
 
-final class Fact
+use DateTimeImmutable;
+
+final readonly class Fact
 {
     public function __construct(
-        public readonly int $id,
-        public readonly string $key,
-        public readonly string $value,
-        public readonly \DateTimeImmutable $createdAt,
-        public readonly \DateTimeImmutable $updatedAt,
+        public int $id,
+        public string $key,
+        public string $value,
+        public DateTimeImmutable $createdAt,
+        public DateTimeImmutable $updatedAt,
         /** Set when a later fact replaced this one; the row is kept regardless. */
-        public readonly ?\DateTimeImmutable $supersededAt = null,
+        public ?DateTimeImmutable $supersededAt = null,
         /** How often the model went looking for this fact on purpose. */
-        public readonly int $recalledCount = 0,
-        public readonly ?\DateTimeImmutable $lastRecalledAt = null,
+        public int $recalledCount = 0,
+        public ?DateTimeImmutable $lastRecalledAt = null,
         /** Who wrote it, and what the session had read from outside by then; null before it was kept. */
-        public readonly ?string $source = null,
+        public ?string $source = null,
     ) {}
 
     /** Written after the session read a web page or an MCP answer: possibly that text's doing. */
@@ -26,10 +30,10 @@ final class Fact
     }
 
     /** How a source says what had been read from outside. */
-    public const AFTER = ', after reading ';
+    public const string AFTER = ', after reading ';
 
     public function isCurrent(): bool
     {
-        return $this->supersededAt === null;
+        return !$this->supersededAt instanceof DateTimeImmutable;
     }
 }

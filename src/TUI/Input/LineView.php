@@ -25,7 +25,7 @@ final class LineView
     public static function window(array $chars, int $cursor, int $available): array
     {
         $available = max(1, $available);
-        $widths = array_map(static fn(string $c) => mb_strwidth($c), $chars);
+        $widths = array_map(mb_strwidth(...), $chars);
 
         // Slide the start right until the cursor, plus a cell to stand on, fits.
         $start = 0;
@@ -43,6 +43,6 @@ final class LineView
             $used += $widths[$i];
         }
 
-        return [$shown, (int) array_sum(array_slice($widths, $start, $cursor - $start))];
+        return [$shown, array_sum(array_slice($widths, $start, $cursor - $start))];
     }
 }

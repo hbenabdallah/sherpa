@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Agent;
 
 class MessageBag
@@ -12,6 +14,7 @@ class MessageBag
         foreach ($this->messages as $i => $msg) {
             if ($msg['role'] === 'system') {
                 $this->messages[$i]['content'] = $content;
+
                 return;
             }
         }
@@ -119,7 +122,7 @@ class MessageBag
     {
         return count(array_filter(
             $this->messages,
-            static fn(array $message) => ($message['role'] ?? '') !== 'system',
+            static fn(array $message): bool => ($message['role'] ?? '') !== 'system',
         ));
     }
 
@@ -131,6 +134,7 @@ class MessageBag
             $content = $msg['content'] ?? '';
             $lines[] = "[{$role}] {$content}";
         }
+
         return implode("\n\n", $lines);
     }
 }

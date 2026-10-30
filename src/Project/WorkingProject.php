@@ -8,6 +8,7 @@ use App\Memory\MemoryStore;
 use App\Permission\ProjectPermissions;
 use App\Session\SessionStore;
 use App\Tool\ShellExecTool;
+use LogicException;
 
 /**
  * The project this session works in: the directory Sherpa was launched from,
@@ -22,7 +23,9 @@ use App\Tool\ShellExecTool;
 class WorkingProject
 {
     private ?Project $project = null;
+
     private bool $saved = false;
+
     private bool $forgotten = false;
 
     public function __construct(
@@ -108,7 +111,7 @@ class WorkingProject
 
     public function project(): Project
     {
-        return $this->project ?? throw new \LogicException('No project is open.');
+        return $this->project ?? throw new LogicException('No project is open.');
     }
 
     public function isSaved(): bool
@@ -126,7 +129,7 @@ class WorkingProject
     {
         // A forgotten project stays forgotten: saving it again now would undo
         // what the user just asked for.
-        if ($this->saved || $this->forgotten || $this->project === null) {
+        if ($this->saved || $this->forgotten || !$this->project instanceof Project) {
             return false;
         }
 
@@ -151,7 +154,7 @@ class WorkingProject
      */
     public function forget(): bool
     {
-        if (!$this->saved || $this->project === null) {
+        if (!$this->saved || !$this->project instanceof Project) {
             return false;
         }
 

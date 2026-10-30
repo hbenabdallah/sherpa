@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 // Writes the files Sherpa v0.1.0 kept, with v0.1.0's own code, for
 // compat_test.php. In the container:
 //   mkdir -p var/compat && git archive v0.1.0 src | tar -x -C var/compat
@@ -13,7 +16,9 @@ $old = $argv[1] ?? exit("usage: generate.php <v0.1.0 src directory>\n");
 spl_autoload_register(function (string $class) use ($old) {
     if (str_starts_with($class, 'App\\')) {
         $file = $old . '/' . str_replace('\\', '/', substr($class, 4)) . '.php';
-        if (is_file($file)) { require $file; }
+        if (is_file($file)) {
+            require $file;
+        }
     }
 }, true, true);
 

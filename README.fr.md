@@ -434,6 +434,7 @@ Docker :
 
 ```sh
 make test       # toutes les suites, contre des faux — aucun modèle appelé
+make check      # le formateur, Rector et PHPStan, puis toutes les suites : ce que lance la CI
 make lint       # les scripts shell
 make bench      # des tâches réalistes contre un vrai modèle (coûte un peu)
 make release VERSION=1.2.0        # l'exécutable pour cette machine, vérifié de bout en bout
@@ -443,7 +444,8 @@ make release-all VERSION=1.2.0    # l'exécutable pour chaque plateforme
 `make release` emballe Sherpa dans un phar collé derrière le runtime PHP statique
 `micro` de la plateforme (`PLATFORM=linux-aarch64` en construit une autre),
 épinglé par somme de contrôle, puis le lance contre un faux fournisseur
-(`tests/release/smoke.sh`) quand la plateforme est celle de la machine. Un tag
+(`tests/release/smoke.sh`) quand la plateforme est celle de la machine. Il emballe `vendor/` tel quel :
+installez d'abord sans les dépendances de dev (`composer install --no-dev`). Un tag
 `v1.2.0` construit toutes les plateformes en CI, lance chaque exécutable sur sa
 propre plateforme, puis les publie avec leur somme SHA-256 et
 `THIRD-PARTY-NOTICES.md` dans les

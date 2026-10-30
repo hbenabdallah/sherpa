@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Tool;
 
 use App\Agent\ContextBudget;
@@ -8,7 +10,14 @@ use App\Agent\Tool\Param;
 use App\Agent\Tool\Permission;
 use App\Project\PathSuggestions;
 use App\Project\ProjectPathResolver;
+use FilesystemIterator;
+use RecursiveCallbackFilterIterator;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
+use RuntimeException;
+use SplFileInfo;
 use Symfony\Component\Process\Process;
+use Throwable;
 
 #[AsTool(
     name: 'file_find',
@@ -18,13 +27,16 @@ use Symfony\Component\Process\Process;
 class FileFindTool
 {
     /** Walked past when the project is not a git repository, as list_dir does. */
-    private const SKIPPED = ['vendor', 'node_modules', '.git', 'var', '.idea', '.vscode', '.claude', '__pycache__', '.venv', 'target'];
+    private const array SKIPPED = ['vendor', 'node_modules', '.git', 'var', '.idea', '.vscode', '.claude', '__pycache__', '.venv', 'target'];
 
     /** Floors and ceiling on paths listed, scaled with the window like list_dir's lines. */
-    private const MIN_PATHS = 100;
-    private const MAX_PATHS = 1000;
-    private const SHARE = 0.04;
-    private const CHARS_PER_PATH = 50;
+    private const int MIN_PATHS = 100;
+
+    private const int MAX_PATHS = 1000;
+
+    private const float SHARE = 0.04;
+
+    private const int CHARS_PER_PATH = 50;
 
     public function __construct(
         private readonly ProjectPathResolver $paths = new ProjectPathResolver(),
@@ -32,18 +44,20 @@ class FileFindTool
     ) {}
 
     public function __invoke(
-        #[Param('Glob pattern: * within a directory, ** across directories, ?, {a,b}, [abc]. Without a "/", it matches file names anywhere')] string $pattern,
-        #[Param('Directory to search in, relative to the project root (optional, defaults to the root)')] ?string $path = null,
+        #[Param('Glob pattern: * within a directory, ** across directories, ?, {a,b}, [abc]. Without a "/", it matches file names anywhere')]
+        string $pattern,
+        #[Param('Directory to search in, relative to the project root (optional, defaults to the root)')]
+        ?string $path = null,
     ): string {
         $pattern = trim($pattern);
         if ($pattern === '') {
-            throw new \RuntimeException('an empty pattern finds nothing: give one, like "*Test.php" or "src/**/*.php"');
+            throw new RuntimeException('an empty pattern finds nothing: give one, like "*Test.php" or "src/**/*.php"');
         }
 
         $root = $this->paths->root();
         $base = $path === null || trim($path) === '' || trim($path) === '.' ? $root : $this->paths->resolve($path);
         if (!is_dir($base)) {
-            throw new \RuntimeException("directory not found: {$path}" . PathSuggestions::hint($root, (string) $path, directory: true));
+            throw new RuntimeException("directory not found: {$path}" . PathSuggestions::hint($root, (string) $path, directory: true));
         }
 
         $regex = self::toRegex(str_contains($pattern, '/') ? ltrim($pattern, '/') : '**/' . $pattern);
@@ -64,7 +78,7 @@ class FileFindTool
         }
 
         // Most recently changed first: what someone is working on.
-        uksort($found, fn(string $a, string $b) => [$found[$b], $a] <=> [$found[$a], $b]);
+        uksort($found, fn(string $a, string $b): int => [$found[$b], $a] <=> [$found[$a], $b]);
         $paths = array_keys($found);
 
         $cap = $this->cap();
@@ -99,7 +113,7 @@ class FileFindTool
                 $out .= '[^/]';
             } elseif ($char === '{' && ($close = strpos($glob, '}', $i)) !== false) {
                 $options = explode(',', substr($glob, $i + 1, $close - $i - 1));
-                $out .= '(?:' . implode('|', array_map(fn(string $o) => self::toRegexBody($o), $options)) . ')';
+                $out .= '(?:' . implode('|', array_map(self::toRegexBody(...), $options)) . ')';
                 $i = $close;
             } elseif ($char === '[' && ($close = strpos($glob, ']', $i + 1)) !== false) {
                 $class = substr($glob, $i + 1, $close - $i - 1);
@@ -132,19 +146,19 @@ class FileFindTool
             if ($git->isSuccessful()) {
                 return array_values(array_filter(
                     explode("\0", $git->getOutput()),
-                    fn(string $p) => $p !== '' && is_file("{$base}/{$p}"),
+                    fn(string $p): bool => $p !== '' && is_file("{$base}/{$p}"),
                 ));
             }
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // No git: the disk it is.
         }
 
         $files = [];
-        $directories = new \RecursiveCallbackFilterIterator(
-            new \RecursiveDirectoryIterator($base, \FilesystemIterator::SKIP_DOTS),
-            static fn(\SplFileInfo $file) => !($file->isDir() && in_array($file->getFilename(), self::SKIPPED, true)),
+        $directories = new RecursiveCallbackFilterIterator(
+            new RecursiveDirectoryIterator($base, FilesystemIterator::SKIP_DOTS),
+            static fn(SplFileInfo $file): bool => !$file->isDir() || !in_array($file->getFilename(), self::SKIPPED, true),
         );
-        foreach (new \RecursiveIteratorIterator($directories) as $file) {
+        foreach (new RecursiveIteratorIterator($directories) as $file) {
             if ($file->isFile()) {
                 $files[] = substr($file->getPathname(), strlen($base) + 1);
             }
@@ -155,7 +169,7 @@ class FileFindTool
 
     private function cap(): int
     {
-        if ($this->budget === null) {
+        if (!$this->budget instanceof ContextBudget) {
             return self::MIN_PATHS;
         }
 

@@ -7,6 +7,7 @@ namespace App\Agent;
 use App\Memory\ContextStore;
 use App\Platform\PlatformInterface;
 use App\Runtime\Interrupt;
+use Throwable;
 
 /**
  * Keeps the conversation inside the context window, two ways: elide old tool
@@ -19,16 +20,16 @@ use App\Runtime\Interrupt;
  * the trigger: rewriting history invalidates the server's prefix cache, so
  * compact rarely and deeply. The system message is never touched.
  */
-final class HistoryCompactor
+final readonly class HistoryCompactor
 {
     /** Recent messages left completely intact — the model is still working with these. */
-    private const KEEP_RECENT = 6;
+    private const int KEEP_RECENT = 6;
 
     /** Tool outputs longer than this become a stub when they age out. */
-    private const ELIDE_OVER_CHARS = 600;
+    private const int ELIDE_OVER_CHARS = 600;
 
     /** Exchanges kept verbatim after a summarisation. */
-    private const KEEP_AFTER_SUMMARY = 6;
+    private const int KEEP_AFTER_SUMMARY = 6;
 
     /**
      * How long a summarising pass may take before it stops being the better
@@ -36,20 +37,20 @@ final class HistoryCompactor
      * front of a silent terminal: 20 s is a 30B model reading a full window on
      * a mid-range card, and a fraction of the same pass on a laptop CPU.
      */
-    private const SUMMARY_BUDGET_SECONDS = 20.0;
+    private const float SUMMARY_BUDGET_SECONDS = 20.0;
 
     public function __construct(
-        private readonly PlatformInterface $platform,
-        private readonly ContextBudget $budget,
+        private PlatformInterface $platform,
+        private ContextBudget $budget,
         // Optional only because they follow a defaulted signature elsewhere in
         // the codebase; services.yaml autowires both and context_test builds a
         // compactor without them to assert the unmeasured path still works.
-        private readonly ?InferenceSpeed $speed = null,
-        private readonly ?Interrupt $interrupt = null,
+        private ?InferenceSpeed $speed = null,
+        private ?Interrupt $interrupt = null,
         // Where an elided body goes instead of nowhere. Optional: without it
         // elision is the straight loss it always was, which is what the older
         // tests construct and assert.
-        private readonly ?ContextStore $context = null,
+        private ?ContextStore $context = null,
     ) {}
 
     /**
@@ -94,7 +95,7 @@ final class HistoryCompactor
      */
     private function summaryIsAffordable(MessageBag $bag): bool
     {
-        if ($this->speed === null || !$this->speed->isMeasured()) {
+        if (!$this->speed instanceof InferenceSpeed || !$this->speed->isMeasured()) {
             return false;
         }
 
@@ -273,7 +274,7 @@ final class HistoryCompactor
                 ],
                 ['role' => 'user', 'content' => implode("\n\n", $transcript)],
             ]);
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return null;
         }
 

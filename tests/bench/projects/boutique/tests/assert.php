@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 function assert_same(mixed $expected, mixed $actual, string $message = ''): void
 {
     if ($expected !== $actual) {

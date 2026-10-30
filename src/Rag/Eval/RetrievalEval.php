@@ -18,7 +18,7 @@ use App\Rag\Retriever;
 final class RetrievalEval
 {
     /** How deep MRR looks: a passage found at rank 30 was not found. */
-    private const DEPTH = 10;
+    private const int DEPTH = 10;
 
     /**
      * @param list<array{kind: string, q: string, expect: list<array{path: string, section: string}>}> $questions
@@ -51,7 +51,7 @@ final class RetrievalEval
 
         $kinds = [];
         foreach (array_unique(array_column($rows, 'kind')) as $kind) {
-            $kinds[$kind] = self::score(array_values(array_filter($rows, static fn(array $r) => $r['kind'] === $kind)), $k);
+            $kinds[$kind] = self::score(array_values(array_filter($rows, static fn(array $r): bool => $r['kind'] === $kind)), $k);
         }
 
         return ['overall' => self::score($rows, $k), 'kinds' => $kinds, 'misses' => $misses];

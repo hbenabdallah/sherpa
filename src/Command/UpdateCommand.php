@@ -9,6 +9,7 @@ use App\Update\Releases;
 use App\Update\SelfUpdater;
 use App\Update\UpdateFailed;
 use App\Version;
+use Phar;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Formatter\OutputFormatter;
@@ -22,12 +23,19 @@ use Symfony\Component\Console\Output\OutputInterface;
  * done behind the user's back — a tool that changes under a session, or on
  * the say-so of whoever controls the release, is not one to trust with code.
  */
-#[AsCommand(name: 'update', description: 'Install the latest Sherpa, or the version named')]
+#[AsCommand(name: 'update', description: 'Install the latest Sherpa, or the version named', help: <<<'TXT'
+Downloads the executable for this machine from the GitHub release, checks it
+against the release's SHA-256, and puts it in place of this one. Nothing is
+touched when anything fails.
+
+From the source, update with git pull instead.
+TXT)]
 final class UpdateCommand extends Command
 {
     /** Asked for, so worth waiting for longer than the start-up notice does. */
-    private const LATEST_TIMEOUT = 15.0;
-    private const NOTES_LINES = 40;
+    private const float LATEST_TIMEOUT = 15.0;
+
+    private const int NOTES_LINES = 40;
 
     public function __construct(
         private readonly Releases $releases,
@@ -44,19 +52,12 @@ final class UpdateCommand extends Command
     protected function configure(): void
     {
         $this
-            ->addArgument('version', InputArgument::OPTIONAL, 'A release to install instead of the latest, to go back to one: 1.0.1')
-            ->setHelp(<<<'HELP'
-                Downloads the executable for this machine from the GitHub release, checks it
-                against the release's SHA-256, and puts it in place of this one. Nothing is
-                touched when anything fails.
-
-                From the source, update with git pull instead.
-                HELP);
+            ->addArgument('version', InputArgument::OPTIONAL, 'A release to install instead of the latest, to go back to one: 1.0.1');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $executable = $this->executable ?? (\Phar::running(false) ?: null);
+        $executable = $this->executable ?? (Phar::running(false) ?: null);
         if ($executable === null) {
             return $this->fail($output, 'Sherpa runs from its source here: update it with git pull.');
         }
@@ -94,13 +95,14 @@ final class UpdateCommand extends Command
         // and only copied to the screen once the new one is in place.
         $said = [];
         $formatter = $output->getFormatter();
+
         try {
             $this->updater->install($version, $platform, $executable, function (?string $notes) use (&$said, $formatter, $version, $executable, $current): void {
                 $lines = ["<info>✓</info> Sherpa {$version} installed in " . OutputFormatter::escape($executable) . " (was {$current})."];
                 if ($notes !== null) {
                     $lines = [...$lines, '', ...self::shown($notes)];
                 }
-                $said = array_map(fn(string $line) => $formatter->format($line) . "\n", $lines);
+                $said = array_map(fn(string $line): string => $formatter->format($line) . "\n", $lines);
             });
         } catch (UpdateFailed $e) {
             return $this->fail($output, $e->getMessage() . '. Nothing was changed.');
@@ -110,7 +112,7 @@ final class UpdateCommand extends Command
 
         // Nothing is left to do: stop here, before the console's own teardown
         // loads anything else.
-        if ($executable === \Phar::running(false)) {
+        if ($executable === Phar::running(false)) {
             exit(Command::SUCCESS);
         }
 
@@ -126,7 +128,7 @@ final class UpdateCommand extends Command
     private static function shown(string $notes): array
     {
         $lines = array_map(
-            fn(string $line) => OutputFormatter::escape(Terminal::plain($line, singleLine: true)),
+            fn(string $line): string => OutputFormatter::escape(Terminal::plain($line, singleLine: true)),
             explode("\n", trim($notes)),
         );
 

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Boutique\Support\Str;
 
 function test_truncate_keeps_short_text(): void

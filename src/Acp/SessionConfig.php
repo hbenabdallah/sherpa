@@ -1,10 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Acp;
 
 use App\Config\ModelProfile;
 use App\Platform\ModelInfo;
 use App\Platform\SwitchablePlatform;
+use Throwable;
 
 /**
  * What an editor shows beside its prompt box and lets the user change: the
@@ -14,10 +17,11 @@ use App\Platform\SwitchablePlatform;
  */
 final class SessionConfig
 {
-    public const MODE = 'mode';
-    public const MODEL = 'model';
+    public const string MODE = 'mode';
 
-    private const MODES = [
+    public const string MODEL = 'model';
+
+    private const array MODES = [
         'default' => ['Default', 'Reads freely; asks before anything that writes or runs'],
         'plan'    => ['Plan', 'Reads and proposes a plan; nothing is changed until you approve it'],
     ];
@@ -73,7 +77,7 @@ final class SessionConfig
             'options'      => $modes,
         ]];
 
-        if ($model !== null) {
+        if ($model instanceof ModelProfile) {
             $options[] = [
                 'id'           => self::MODEL,
                 'name'         => 'Model',
@@ -98,7 +102,7 @@ final class SessionConfig
             throw AcpError::invalidParams('The model is missing.');
         }
 
-        if ($current !== null && $current->model === $name) {
+        if ($current instanceof ModelProfile && $current->model === $name) {
             return $current;
         }
 
@@ -158,7 +162,7 @@ final class SessionConfig
      */
     public function seesImages(?ModelProfile $model): bool
     {
-        if ($model === null) {
+        if (!$model instanceof ModelProfile) {
             return true;
         }
 
@@ -211,7 +215,7 @@ final class SessionConfig
 
         try {
             $models = array_values($this->platform->catalogue());
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             fwrite(STDERR, 'sherpa acp: the list of models: ' . $e->getMessage() . "\n");
             $models = [];
         }

@@ -1,13 +1,22 @@
 <?php
+
+declare(strict_types=1);
+
+use App\Agent\Tool\Toolbox;
+use App\Agent\Tool\ToolCall;
+use App\Project\ProjectPathResolver;
+use App\Tool\FileReadTool;
+use App\Tool\ProjectGrepTool;
+
 // Retrieval that does not cost a turn: what compaction takes out of the window
 // and can hand back, and the situational signals that rank the memory block
 // before anyone has asked anything.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\ContextBudget;
-use App\Memory\ContextStore;
 use App\Agent\SearchTrace;
+use App\Memory\ContextStore;
 use App\Memory\MemoryStore;
 use App\Project\RecentActivity;
 use App\Tool\ContextRecallTool;
@@ -92,17 +101,29 @@ $fresh = new ContextStore();
 $fresh->open();
 $tool = new ContextRecallTool($fresh, new ContextBudget(contextWindow: 32768));
 
-check('with nothing elided, the tool says so plainly',
-    str_contains($tool('anything at all'), 'Nothing has been taken out'), $tool('x'));
+check(
+    'with nothing elided, the tool says so plainly',
+    str_contains($tool('anything at all'), 'Nothing has been taken out'),
+    $tool('x'),
+);
 
 $fresh->keep('project_grep', "src/Payment/Checkout.php:42:    private StripeClient \$stripe;\n");
 check('a keyword search reaches the store', str_contains($tool('stripe'), 'StripeClient'), $tool('stripe'));
-check('a search with no match is reported, not thrown',
-    str_contains($tool('mongodb'), 'No passage matches'), $tool('mongodb'));
-check('an empty call asks for something to go on',
-    str_contains($tool(), 'keywords'), $tool());
-check('a bad id falls back to suggesting a search',
-    str_contains($tool(null, 9999), 'context_recall'), $tool(null, 9999));
+check(
+    'a search with no match is reported, not thrown',
+    str_contains($tool('mongodb'), 'No passage matches'),
+    $tool('mongodb'),
+);
+check(
+    'an empty call asks for something to go on',
+    str_contains($tool(), 'keywords'),
+    $tool(),
+);
+check(
+    'a bad id falls back to suggesting a search',
+    str_contains($tool(null, 9999), 'context_recall'),
+    $tool(null, 9999),
+);
 
 // ---- RecentActivity: the situation as a query ------------------------------
 $activity = new RecentActivity();
@@ -126,10 +147,14 @@ $terms = $activity->termsFrom(['src/Mailer/Transport.php'], '/home/x/projet', '/
 check('the launch directory is a term', in_array('invoicing', $terms, true), implode(',', $terms));
 check('and it outranks what git reported', array_search('invoicing', $terms, true) < array_search('mailer', $terms, true), implode(',', $terms));
 
-check('a launch outside the project contributes nothing',
-    !in_array('ailleurs', $activity->termsFrom([], '/home/x/projet', '/home/x/ailleurs'), true));
-check('launching at the project root contributes nothing',
-    $activity->termsFrom([], '/home/x/projet', '/home/x/projet') === []);
+check(
+    'a launch outside the project contributes nothing',
+    !in_array('ailleurs', $activity->termsFrom([], '/home/x/projet', '/home/x/ailleurs'), true),
+);
+check(
+    'launching at the project root contributes nothing',
+    $activity->termsFrom([], '/home/x/projet', '/home/x/projet') === [],
+);
 
 // A project with no repository must cost the ranking its boost and nothing else.
 $bare = sys_get_temp_dir() . '/sherpa-norepo-' . bin2hex(random_bytes(4));
@@ -144,8 +169,11 @@ $statDir = sys_get_temp_dir() . '/sherpa-trace-' . bin2hex(random_bytes(4));
 $mem = new MemoryStore();
 $mem->open($statDir . '/memory.db');
 
-check('a project starts with nothing counted', $mem->searchStats() === ['hits' => 0, 'misses' => 0, 'direct' => 0, 'groping' => 0],
-    json_encode($mem->searchStats()));
+check(
+    'a project starts with nothing counted',
+    $mem->searchStats() === ['hits' => 0, 'misses' => 0, 'direct' => 0, 'groping' => 0],
+    json_encode($mem->searchStats()),
+);
 
 $trace = new SearchTrace($mem);
 
@@ -222,11 +250,17 @@ $pdo = null;
 
 $upgraded = new MemoryStore();
 $upgraded->open($v3);
-check('counters recorded under the old table name survive', $upgraded->recallStats()['misses'] === 7,
-    json_encode($upgraded->recallStats()));
+check(
+    'counters recorded under the old table name survive',
+    $upgraded->recallStats()['misses'] === 7,
+    json_encode($upgraded->recallStats()),
+);
 $upgraded->bump('grep_misses');
-check('and the renamed table takes the new ones', $upgraded->searchStats()['misses'] === 1,
-    json_encode($upgraded->searchStats()));
+check(
+    'and the renamed table takes the new ones',
+    $upgraded->searchStats()['misses'] === 1,
+    json_encode($upgraded->searchStats()),
+);
 
 $reopened = new MemoryStore();
 $reopened->open($v3);
@@ -245,13 +279,15 @@ exec('rm -rf ' . escapeshellarg($statDir) . ' ' . escapeshellarg($v3Dir));
 // miss counter records a vocabulary gap that was a syntax one.
 $grepDir = sys_get_temp_dir() . '/sherpa-grep-' . bin2hex(random_bytes(4));
 mkdir($grepDir . '/src', 0777, true);
-file_put_contents($grepDir . '/src/User.php',
-    "<?php\nclass User\n{\n    public function createUser() {}\n    public function registerUser() {}\n}\n");
-$grepPaths = new App\Project\ProjectPathResolver();
+file_put_contents(
+    $grepDir . '/src/User.php',
+    "<?php\nclass User\n{\n    public function createUser() {}\n    public function registerUser() {}\n}\n",
+);
+$grepPaths = new ProjectPathResolver();
 $grepPaths->setRoot($grepDir);
 $grepStore = new MemoryStore();
 $grepStore->open($statDir . '-grep/memory.db');
-$grep = new App\Tool\ProjectGrepTool($grepPaths, null, $grepStore);
+$grep = new ProjectGrepTool($grepPaths, null, $grepStore);
 
 $both = $grep('createUser|registerUser');
 check('an alternation finds both sides', str_contains($both, 'createUser') && str_contains($both, 'registerUser'), $both);
@@ -267,54 +303,65 @@ check('while a real miss still is', $grepStore->searchStats()['misses'] === 1, j
 // Seen in the benchmark: `ext: env` looked for *.env and missed .env.example.
 file_put_contents($grepDir . '/.env.example', "DATABASE_URL=postgresql://db/boutique\n");
 file_put_contents($grepDir . '/phpunit.xml.dist', "<phpunit bootstrap=\"autoload.php\"/>\n");
-check('an extension filter finds the template of a config file',
-    str_contains($grep('DATABASE_URL', null, 'env'), '.env.example'));
+check(
+    'an extension filter finds the template of a config file',
+    str_contains($grep('DATABASE_URL', null, 'env'), '.env.example'),
+);
 check('and a .dist file with the extension before it', str_contains($grep('bootstrap', null, 'xml'), 'phpunit.xml.dist'));
 check('while still filtering out other files', str_starts_with($grep('createUser', null, 'env'), 'No matches'));
 
 $dashed = $grep('-f /etc/passwd');
-check('a pattern starting with a dash is searched for, not obeyed as an option',
-    str_starts_with($dashed, 'No matches found'), $dashed);
+check(
+    'a pattern starting with a dash is searched for, not obeyed as an option',
+    str_starts_with($dashed, 'No matches found'),
+    $dashed,
+);
 
 // ---- a read that failed has not found anything ----------------------------
 // file_read used to return its errors as ordinary text, so SearchTrace could
 // not tell a path that does not exist from one that did: a groping turn was
 // recorded as direct the moment the model guessed a file name.
-$missing = (new App\Agent\Tool\Toolbox([new App\Tool\FileReadTool($grepPaths)]))
-    ->execute(new App\Agent\Tool\ToolCall('c1', 'file_read', ['path' => 'src/Absent.php']));
+$missing = new Toolbox([new FileReadTool($grepPaths)])
+    ->execute(new ToolCall('c1', 'file_read', ['path' => 'src/Absent.php']));
 check('a missing file comes back flagged as an error', $missing->isError, $missing->content);
 check('with the same text as before', $missing->content === 'Error: file not found: src/Absent.php', $missing->content);
 
 // A guessed name next to the real one: `.env` beside `.env.example`, or a bare
 // file name for one in a subdirectory.
 file_put_contents($grepDir . '/.env.example', "APP_ENV=prod\n");
-$reader = new App\Agent\Tool\Toolbox([new App\Tool\FileReadTool($grepPaths)]);
-$dotenv = $reader->execute(new App\Agent\Tool\ToolCall('c3', 'file_read', ['path' => '.env']));
-check('a missing .env points to the .env.example that exists',
-    $dotenv->isError && str_contains($dotenv->content, 'did you mean .env.example?'), $dotenv->content);
-$bare = $reader->execute(new App\Agent\Tool\ToolCall('c4', 'file_read', ['path' => 'User.php']));
+$reader = new Toolbox([new FileReadTool($grepPaths)]);
+$dotenv = $reader->execute(new ToolCall('c3', 'file_read', ['path' => '.env']));
+check(
+    'a missing .env points to the .env.example that exists',
+    $dotenv->isError && str_contains($dotenv->content, 'did you mean .env.example?'),
+    $dotenv->content,
+);
+$bare = $reader->execute(new ToolCall('c4', 'file_read', ['path' => 'User.php']));
 check('a bare file name points to its directory', str_contains($bare->content, 'did you mean src/User.php?'), $bare->content);
 
 // Seen live: a model asked to read the project root. file() on a directory
 // printed a PHP notice into the terminal and came back empty, as a success.
-$directory = (new App\Agent\Tool\Toolbox([new App\Tool\FileReadTool($grepPaths)]))
-    ->execute(new App\Agent\Tool\ToolCall('c2', 'file_read', ['path' => 'src']));
-check('reading a directory is an error, not an empty file',
-    $directory->isError && str_contains($directory->content, 'is a directory'), $directory->content);
+$directory = new Toolbox([new FileReadTool($grepPaths)])
+    ->execute(new ToolCall('c2', 'file_read', ['path' => 'src']));
+check(
+    'reading a directory is an error, not an empty file',
+    $directory->isError && str_contains($directory->content, 'is a directory'),
+    $directory->content,
+);
 
 // Seen in the bench: file_read on config/routes, then a list_dir to learn what
 // was in it. Said with the refusal, the next call can be the right read.
 mkdir($grepDir . '/src/Routes');
 file_put_contents($grepDir . '/src/Routes/courses.yaml', "courses: ~\n");
-$listed = (new App\Agent\Tool\Toolbox([new App\Tool\FileReadTool($grepPaths)]))
-    ->execute(new App\Agent\Tool\ToolCall('c5', 'file_read', ['path' => 'src']))->content;
+$listed = new Toolbox([new FileReadTool($grepPaths)])
+    ->execute(new ToolCall('c5', 'file_read', ['path' => 'src']))->content;
 check('and it names what the directory holds, as paths to read', str_contains($listed, '  src/User.php') && str_contains($listed, '  src/Routes/'), $listed);
 check('subdirectories first', strpos($listed, 'src/Routes/') < strpos($listed, 'src/User.php'), $listed);
 for ($i = 0; $i < 45; $i++) {
     touch(sprintf('%s/src/Routes/r%02d.yaml', $grepDir, $i));
 }
-$crowded = (new App\Agent\Tool\Toolbox([new App\Tool\FileReadTool($grepPaths)]))
-    ->execute(new App\Agent\Tool\ToolCall('c6', 'file_read', ['path' => 'src/Routes/']))->content;
+$crowded = new Toolbox([new FileReadTool($grepPaths)])
+    ->execute(new ToolCall('c6', 'file_read', ['path' => 'src/Routes/']))->content;
 check('a crowded directory is cut and the rest counted', str_contains($crowded, '… and 6 more') && !str_contains($crowded, 'r44.yaml'), $crowded);
 exec('rm -rf ' . escapeshellarg($grepDir . '/src/Routes'));
 
@@ -327,8 +374,11 @@ $failedRead->observe('project_grep');
 $failedRead->observe('project_grep');
 $failedRead->observe('file_read');
 $failedRead->endTurn();
-check('a failed read is one more guess, not the end of the search',
-    $grepStore->searchStats()['groping'] === $before + 1, json_encode($grepStore->searchStats()));
+check(
+    'a failed read is one more guess, not the end of the search',
+    $grepStore->searchStats()['groping'] === $before + 1,
+    json_encode($grepStore->searchStats()),
+);
 
 exec('rm -rf ' . escapeshellarg($grepDir) . ' ' . escapeshellarg($statDir . '-grep'));
 

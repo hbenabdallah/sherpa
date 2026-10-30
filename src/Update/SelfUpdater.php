@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Update;
 
+use Closure;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Throwable;
 
 /**
  * Replace the running executable with a release, the way install.sh does:
@@ -12,22 +14,22 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * then a rename over the old one — whole or not at all, never half a file
  * where Sherpa was.
  */
-final class SelfUpdater
+final readonly class SelfUpdater
 {
     public function __construct(
-        private readonly HttpClientInterface $client,
-        private readonly Releases $releases,
+        private HttpClientInterface $client,
+        private Releases $releases,
     ) {}
 
     /**
-     * @param (\Closure(?string): void)|null $beforeReplace given what the
+     * @param (Closure(?string): void)|null $beforeReplace given what the
      *        release changed, for a release that says so, once everything is
      *        downloaded and checked and just before the executable is
      *        replaced: the last moment this process may load anything from it
      *
      * @throws UpdateFailed with the reason, the executable left as it was
      */
-    public function install(string $version, string $platform, string $target, ?\Closure $beforeReplace = null): void
+    public function install(string $version, string $platform, string $target, ?Closure $beforeReplace = null): void
     {
         $dir = dirname($target);
         if (!is_writable($dir) || (is_file($target) && !is_writable($target))) {
@@ -57,7 +59,7 @@ final class SelfUpdater
             throw new UpdateFailed("could not write in {$dir}");
         }
 
-        if ($beforeReplace !== null) {
+        if ($beforeReplace instanceof Closure) {
             $beforeReplace($notes);
         }
 
@@ -79,8 +81,8 @@ final class SelfUpdater
             return $response->getContent();
         } catch (UpdateFailed $e) {
             throw $e;
-        } catch (\Throwable $e) {
-            throw new UpdateFailed("{$missing}: {$e->getMessage()}");
+        } catch (Throwable $e) {
+            throw new UpdateFailed("{$missing}: {$e->getMessage()}", $e->getCode(), $e);
         }
     }
 }

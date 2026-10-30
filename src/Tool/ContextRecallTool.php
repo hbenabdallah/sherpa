@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Tool;
 
 use App\Agent\ContextBudget;
@@ -16,9 +18,11 @@ use App\Memory\ContextStore;
 class ContextRecallTool
 {
     /** Share of the prompt window one recall may occupy. */
-    private const SHARE = 0.08;
-    private const MIN_CHARS = 4000;
-    private const MAX_CHARS = 40000;
+    private const float SHARE = 0.08;
+
+    private const int MIN_CHARS = 4000;
+
+    private const int MAX_CHARS = 40000;
 
     public function __construct(
         private readonly ContextStore $store,
@@ -26,8 +30,10 @@ class ContextRecallTool
     ) {}
 
     public function __invoke(
-        #[Param('Keywords to look for in earlier tool output, in any order')] ?string $search = null,
-        #[Param('Id of an elided output, as quoted in the "[… elided]" message (optional)')] ?int $id = null,
+        #[Param('Keywords to look for in earlier tool output, in any order')]
+        ?string $search = null,
+        #[Param('Id of an elided output, as quoted in the "[… elided]" message (optional)')]
+        ?int $id = null,
     ): string {
         if ($this->store->count() === 0) {
             return 'Nothing has been taken out of the context in this session: everything read is still visible above.';

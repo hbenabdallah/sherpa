@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Memory;
 
 /**
@@ -9,14 +11,14 @@ namespace App\Memory;
  * every failure, so "nothing worth remembering" and "the model returned
  * garbage" and "Ollama was gone" all looked identical: silence.
  */
-final class Extraction
+final readonly class Extraction
 {
     private function __construct(
-        public readonly int $created = 0,
-        public readonly int $alreadyKnown = 0,
-        public readonly int $rejected = 0,
-        public readonly ?string $skipped = null,
-        public readonly ?string $error = null,
+        public int $created = 0,
+        public int $alreadyKnown = 0,
+        public int $rejected = 0,
+        public ?string $skipped = null,
+        public ?string $error = null,
     ) {}
 
     public static function of(int $created, int $alreadyKnown, int $rejected): self

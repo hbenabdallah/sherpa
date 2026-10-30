@@ -1,14 +1,19 @@
 <?php
+
+declare(strict_types=1);
+
+use App\Agent\Tool\ToolResult;
+
 // Verification that filesystem tools cannot escape the project root.
 //
 // file_read runs at AUTO permission — no confirmation prompt stands between a
 // model and whatever it asks for — and Sherpa runs with the user's home mounted.
 // Escapes here are silent and total, so these cases are deliberately adversarial.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
-use App\Agent\Tool\ToolCall;
 use App\Agent\Tool\Toolbox;
+use App\Agent\Tool\ToolCall;
 use App\Project\PathOutsideProjectException;
 use App\Project\ProjectPathResolver;
 use App\Tool\FilePatchTool;
@@ -33,6 +38,7 @@ function blocked(ProjectPathResolver $r, string $path): bool
 {
     try {
         $r->resolve($path);
+
         return false;
     } catch (PathOutsideProjectException) {
         return true;
@@ -107,7 +113,7 @@ $patch = new FilePatchTool($r);
 $grep = new ProjectGrepTool($r);
 
 $toolbox = new Toolbox([$read, $write, $patch, $grep]);
-$exec = fn(string $name, array $args) => $toolbox->execute(new ToolCall('id', $name, $args));
+$exec = fn(string $name, array $args): ToolResult => $toolbox->execute(new ToolCall('id', $name, $args));
 
 $res = $exec('file_read', ['path' => '/etc/passwd']);
 check('file_read refuses /etc/passwd', $res->isError && !str_contains($res->content, 'root:'), $res->content);

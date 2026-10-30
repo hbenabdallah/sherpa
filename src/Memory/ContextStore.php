@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Memory;
 
+use DateTimeImmutable;
+use DateTimeInterface;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\ParameterType;
 use Symfony\Component\String\UnicodeString;
+use Throwable;
 
 /**
  * What compaction took out of the window, still reachable: elision is a swap
@@ -22,24 +25,25 @@ use Symfony\Component\String\UnicodeString;
 final class ContextStore
 {
     /** Lines of context kept either side of a hit. */
-    private const CONTEXT_LINES = 2;
+    private const int CONTEXT_LINES = 2;
 
     /** Separate excerpts returned for one search, at most. */
-    private const MAX_EXCERPTS = 6;
+    private const int MAX_EXCERPTS = 6;
 
     /**
      * Lines one excerpt may contribute before it stops being an excerpt: a grep
      * where every line matches is the whole file. The overflow is counted, not
      * dropped — that is what tells the model to narrow its question.
      */
-    private const MAX_EXCERPT_LINES = 40;
+    private const int MAX_EXCERPT_LINES = 40;
 
     private ?Connection $conn = null;
+
     private bool $fullText = false;
 
     public function open(): void
     {
-        if ($this->conn !== null) {
+        if ($this->conn instanceof Connection) {
             return;
         }
 
@@ -79,7 +83,7 @@ final class ContextStore
                 'c'   => $content,
                 'l'   => substr_count($content, "\n") + 1,
                 'n'   => mb_strlen($content),
-                'now' => (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM),
+                'now' => new DateTimeImmutable()->format(DateTimeInterface::ATOM),
             ],
         );
 
@@ -182,7 +186,7 @@ final class ContextStore
     private function matchingRows(array $words): array
     {
         if ($this->fullText) {
-            $expression = implode(' OR ', array_map(fn(string $w) => '"' . $w . '"', $words));
+            $expression = implode(' OR ', array_map(fn(string $w): string => '"' . $w . '"', $words));
 
             try {
                 return $this->conn->fetchAllAssociative(
@@ -193,14 +197,14 @@ final class ContextStore
                     ['q' => $expression, 'limit' => self::MAX_EXCERPTS],
                     ['limit' => ParameterType::INTEGER],
                 );
-            } catch (\Throwable) {
+            } catch (Throwable) {
                 // A malformed expression degrades to a worse search, never to a
                 // broken tool call in the middle of a turn.
             }
         }
 
         $where = implode(' OR ', array_map(
-            static fn(int $i) => 'content LIKE :w' . $i,
+            static fn(int $i): string => 'content LIKE :w' . $i,
             array_keys($words),
         ));
 
@@ -286,13 +290,13 @@ final class ContextStore
     {
         preg_match_all('/[\p{L}\p{N}_]+/u', mb_strtolower(trim($query)), $matches);
 
-        return array_values(array_filter($matches[0], static fn(string $w) => mb_strlen($w) > 1));
+        return array_values(array_filter($matches[0], static fn(string $w): bool => mb_strlen($w) > 1));
     }
 
     private static function fold(string $text): string
     {
         return preg_match('/[^\x00-\x7F]/', $text) === 1
-            ? strtolower((new UnicodeString($text))->ascii()->toString())
+            ? strtolower(new UnicodeString($text)->ascii()->toString())
             : strtolower($text);
     }
 
@@ -316,7 +320,7 @@ final class ContextStore
             SQL);
 
             return true;
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return false;
         }
     }
@@ -324,7 +328,7 @@ final class ContextStore
     /** The conversation these belonged to is gone; so are they. */
     public function clear(): void
     {
-        if ($this->conn === null) {
+        if (!$this->conn instanceof Connection) {
             return;
         }
 
@@ -338,12 +342,12 @@ final class ContextStore
      */
     public function export(): array
     {
-        if ($this->conn === null) {
+        if (!$this->conn instanceof Connection) {
             return [];
         }
 
         return array_map(
-            static fn(array $row) => [
+            static fn(array $row): array => [
                 'id'         => (int) $row['id'],
                 'tool'       => (string) $row['tool'],
                 'content'    => (string) $row['content'],
@@ -381,7 +385,7 @@ final class ContextStore
                     'c'  => $content,
                     'l'  => substr_count($content, "\n") + 1,
                     'n'  => mb_strlen($content),
-                    'at' => (string) ($excerpt['created_at'] ?? (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM)),
+                    'at' => (string) ($excerpt['created_at'] ?? new DateTimeImmutable()->format(DateTimeInterface::ATOM)),
                 ],
                 ['id' => ParameterType::INTEGER],
             );

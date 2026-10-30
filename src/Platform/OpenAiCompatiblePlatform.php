@@ -6,7 +6,12 @@ namespace App\Platform;
 
 use App\Config\ApiEndpoint;
 use App\Runtime\Interrupt;
+use Closure;
+use RuntimeException;
+use stdClass;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Symfony\Contracts\HttpClient\ResponseInterface;
+use Throwable;
 
 /**
  * Any backend that speaks OpenAI's /chat/completions: one class, since that
@@ -26,34 +31,34 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
     use LastCall;
 
     /** Liveness and catalogue probes: they answer at once or not at all. */
-    private const PROBE_TIMEOUT = 10;
+    private const int PROBE_TIMEOUT = 10;
 
     /** Texts per /embeddings request. */
-    private const EMBED_BATCH = 32;
+    private const int EMBED_BATCH = 32;
 
     /** How often to surface control while the server is silent — as Ollama. */
-    private const POLL_SECONDS = 0.5;
+    private const float POLL_SECONDS = 0.5;
 
     /** Attempts for a request the server said to retry (429, 500, 502, 503, 504, 529). */
-    private const MAX_ATTEMPTS = 3;
+    private const int MAX_ATTEMPTS = 3;
 
     /** Longest wait between those attempts, whatever Retry-After asks for. */
-    private const MAX_BACKOFF_SECONDS = 20;
+    private const int MAX_BACKOFF_SECONDS = 20;
 
     /**
      * A rate limit counts requests over a window, a minute on most free tiers:
      * three tries within half a minute all land in the same window, and the
      * turn is lost for want of waiting. More tries, longer waits, for a 429 only.
      */
-    private const RATE_LIMIT_ATTEMPTS = 5;
+    private const int RATE_LIMIT_ATTEMPTS = 5;
 
-    private const MAX_RATE_LIMIT_WAIT_SECONDS = 60;
+    private const int MAX_RATE_LIMIT_WAIT_SECONDS = 60;
 
     /** Requests at once to a provider with room to spare. */
-    private const CONCURRENCY = 3;
+    private const int CONCURRENCY = 3;
 
     /** How long one at a time holds after the provider said slow down. */
-    private const STRAINED_SECONDS = 120;
+    private const int STRAINED_SECONDS = 120;
 
     /** @var array{prompt: int, completion: int}|null */
     private ?array $lastUsage {
@@ -76,7 +81,9 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
      * rejections, once per session, rather than configured per provider.
      */
     private bool $sendsTemperature = true;
+
     private bool $sendsStreamOptions = true;
+
     private string $maxTokensField = 'max_tokens';
 
     /** A provider's own key, over the environment's; null to use that one. */
@@ -93,7 +100,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
     private array $conversations = [];
 
     /** Conversations followed at once; the oldest is forgotten past this. */
-    private const CONVERSATIONS_KEPT = 8;
+    private const int CONVERSATIONS_KEPT = 8;
 
     /** What the provider last said about its limits; null when it never did. */
     private ?RateLimits $rateLimits = null;
@@ -135,7 +142,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
         /** What to call this backend in a message; the host, by default. */
         private readonly ?string $label = null,
         /** How a wait passes, in seconds; tests make it instant. */
-        private readonly ?\Closure $sleep = null,
+        private readonly ?Closure $sleep = null,
     ) {
         $this->baseUrl = rtrim($this->baseUrl, '/');
     }
@@ -185,7 +192,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
             $status = $this->statusOf($response);
 
             if ($status >= 400) {
-                $body = (string) $response->getContent(throw: false);
+                $body = $response->getContent(throw: false);
                 $response->cancel();
 
                 // The server describing its own dialect. Retried once per
@@ -194,7 +201,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
                     return $this->attempt($payload, $onToken, $onWait, $negotiations + 1);
                 }
 
-                throw new \RuntimeException($this->explain($status, $body));
+                throw new RuntimeException($this->explain($status, $body));
             }
 
             $this->noteLimits($response);
@@ -320,10 +327,10 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
      *
      * @param array<string, mixed> $payload
      */
-    private function send(array $payload, string $path = '/chat/completions', string $accept = 'text/event-stream', ?callable $onWait = null): \Symfony\Contracts\HttpClient\ResponseInterface
+    private function send(array $payload, string $path = '/chat/completions', string $accept = 'text/event-stream', ?callable $onWait = null): ResponseInterface
     {
         if ($this->baseUrl === '') {
-            throw new \RuntimeException('No API address configured: set SHERPA_API_URL.');
+            throw new RuntimeException('No API address configured: set SHERPA_API_URL.');
         }
 
         $headers = $this->headers($accept);
@@ -334,7 +341,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
             // out. Cut short, the refusal is the answer — or, with none yet,
             // a request the next wait cancels at once.
             $held = $this->limitedUntil - microtime(true);
-            if ($held > 0 && !$this->pause((int) ceil($held), 'Rate limit reached', $onWait) && $refused !== null) {
+            if ($held > 0 && !$this->pause((int) ceil($held), 'Rate limit reached', $onWait) && $refused instanceof ResponseInterface) {
                 return $refused;
             }
 
@@ -381,7 +388,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
      * since its window is usually a minute. Null for a rate limit that asks for
      * longer than that: a quota spent for the day, not worth waiting at a prompt.
      */
-    private function retryAfter(\Symfony\Contracts\HttpClient\ResponseInterface $response, int $attempt, bool $limited): ?int
+    private function retryAfter(ResponseInterface $response, int $attempt, bool $limited): ?int
     {
         $header = trim((string) ($response->getHeaders(throw: false)['retry-after'][0] ?? ''));
 
@@ -407,7 +414,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
      */
     private function pause(int $seconds, string $why, ?callable $onWait): bool
     {
-        $sleep = $this->sleep ?? static fn(float $s) => usleep((int) ($s * 1_000_000));
+        $sleep = $this->sleep ?? static fn(float $s): null => usleep((int) ($s * 1_000_000));
 
         for ($left = (float) $seconds; $left > 0; $left -= Interrupt::poll(self::POLL_SECONDS)) {
             if ($this->interrupt?->requested()) {
@@ -432,7 +439,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
      *
      * @return bool false when the user cut it short
      */
-    private function awaitHeaders(\Symfony\Contracts\HttpClient\ResponseInterface $response, ?callable $onWait): bool
+    private function awaitHeaders(ResponseInterface $response, ?callable $onWait): bool
     {
         while (true) {
             try {
@@ -447,7 +454,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
                     // The first chunk is the headers; the body is read later.
                     return true;
                 }
-            } catch (\Throwable) {
+            } catch (Throwable) {
                 return true; // a transport failure, which the status reports
             }
 
@@ -459,11 +466,11 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
         }
     }
 
-    private function noteLimits(\Symfony\Contracts\HttpClient\ResponseInterface $response): void
+    private function noteLimits(ResponseInterface $response): void
     {
         try {
             $this->rateLimits = RateLimits::fromHeaders($response->getHeaders(throw: false)) ?? $this->rateLimits;
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // No headers to read is no news.
         }
     }
@@ -486,11 +493,11 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
     }
 
     /** A transport failure reads as a status of 0 rather than as an exception. */
-    private function statusOf(\Symfony\Contracts\HttpClient\ResponseInterface $response): int
+    private function statusOf(ResponseInterface $response): int
     {
         try {
             return $response->getStatusCode();
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return 0;
         }
     }
@@ -562,7 +569,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
      * @return array<string, mixed>
      */
     private function consume(
-        \Symfony\Contracts\HttpClient\ResponseInterface $response,
+        ResponseInterface $response,
         ?callable $onToken,
         ?callable $onWait,
         float $startedAt,
@@ -595,7 +602,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
      *
      * @return bool false when the user cut it short
      */
-    private function pump(\Symfony\Contracts\HttpClient\ResponseInterface $response, ?callable $onWait, callable $onLine): bool
+    private function pump(ResponseInterface $response, ?callable $onWait, callable $onLine): bool
     {
         $buffer = '';
         $silence = true;
@@ -820,7 +827,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
         $streamed = microtime(true) - $firstTokenAt;
 
         return [
-            'prefill' => $waited > 0.0 ? (float) ($this->lastUsage['prompt'] / $waited) : 0.0,
+            'prefill' => $waited > 0.0 ? $this->lastUsage['prompt'] / $waited : 0.0,
             'decode'  => $streamed > 0.0 ? (float) ($this->lastUsage['completion'] / $streamed) : 0.0,
         ];
     }
@@ -874,7 +881,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
                         'name'      => (string) ($call['function']['name'] ?? ''),
                         'arguments' => is_string($arguments)
                             ? $arguments
-                            : (json_encode($arguments === [] ? new \stdClass() : $arguments) ?: '{}'),
+                            : (json_encode($arguments === [] ? new stdClass() : $arguments) ?: '{}'),
                     ],
                 ];
                 // Handed back as it came, and only by the provider that sent it.
@@ -931,7 +938,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
             $status = $this->statusOf($response);
 
             if ($status >= 400) {
-                $body = (string) $response->getContent(throw: false);
+                $body = $response->getContent(throw: false);
                 $response->cancel();
 
                 // Thinking blocks bound to a history that has since changed —
@@ -946,7 +953,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
                     continue;
                 }
 
-                throw new \RuntimeException($this->explain($status, $body));
+                throw new RuntimeException($this->explain($status, $body));
             }
 
             $this->noteLimits($response);
@@ -1031,7 +1038,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
         foreach (array_chunk($texts, self::EMBED_BATCH) as $batch) {
             $response = $this->send(['model' => $model, 'input' => $batch], '/embeddings', 'application/json');
             $status = $this->statusOf($response);
-            $body = (string) $response->getContent(throw: false);
+            $body = $response->getContent(throw: false);
 
             // 400, 404, 422: the request was well formed, so it is the model
             // this provider does not have — which detection needs to tell apart.
@@ -1039,18 +1046,18 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
                 throw new UnknownEmbeddingModel('Embeddings: ' . $this->explain($status, $body, $model));
             }
             if ($status >= 400) {
-                throw new \RuntimeException('Embeddings: ' . $this->explain($status, $body, $model));
+                throw new RuntimeException('Embeddings: ' . $this->explain($status, $body, $model));
             }
 
             $rows = json_decode($body, true)['data'] ?? null;
             if (!is_array($rows) || count($rows) !== count($batch)) {
-                throw new \RuntimeException("Embeddings: unexpected answer from {$this->name()} for \"{$model}\".");
+                throw new RuntimeException("Embeddings: unexpected answer from {$this->name()} for \"{$model}\".");
             }
 
             // Answers carry their index; nothing promises they come in order.
-            usort($rows, static fn(array $a, array $b) => ($a['index'] ?? 0) <=> ($b['index'] ?? 0));
+            usort($rows, static fn(array $a, array $b): int => ($a['index'] ?? 0) <=> ($b['index'] ?? 0));
             foreach ($rows as $row) {
-                $vectors[] = array_map('floatval', (array) ($row['embedding'] ?? []));
+                $vectors[] = array_map(floatval(...), (array) ($row['embedding'] ?? []));
             }
         }
 
@@ -1118,7 +1125,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
     {
         $response = $this->probe('/models');
 
-        if ($response === null) {
+        if (!$response instanceof ResponseInterface) {
             return false;
         }
 
@@ -1150,13 +1157,13 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
         // Anthropic pages its list, twenty by default.
         $response = $this->probe($this->isAnthropic() ? '/models?limit=1000' : '/models');
 
-        if ($response === null || $this->statusOf($response) !== 200) {
+        if (!$response instanceof ResponseInterface || $this->statusOf($response) !== 200) {
             return null;
         }
 
         try {
             $data = $response->toArray(throw: false);
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return null;
         }
 
@@ -1170,7 +1177,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
             $models[] = $this->describeEntry($entry);
         }
 
-        usort($models, fn(ModelInfo $a, ModelInfo $b) => strcmp($a->name, $b->name));
+        usort($models, fn(ModelInfo $a, ModelInfo $b): int => strcmp($a->name, $b->name));
 
         return $models;
     }
@@ -1184,10 +1191,10 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
 
         $response = $this->probe('/models/' . rawurlencode($model));
 
-        if ($response !== null && $this->statusOf($response) === 200) {
+        if ($response instanceof ResponseInterface && $this->statusOf($response) === 200) {
             try {
                 $data = $response->toArray(throw: false);
-            } catch (\Throwable) {
+            } catch (Throwable) {
                 $data = [];
             }
 
@@ -1235,7 +1242,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
      * A metadata request, or null when there is nowhere to send one: no
      * address, or one the client cannot parse. Both mean "not available".
      */
-    private function probe(string $path): ?\Symfony\Contracts\HttpClient\ResponseInterface
+    private function probe(string $path): ?ResponseInterface
     {
         if ($this->baseUrl === '') {
             return null;
@@ -1249,7 +1256,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
                 'headers' => $headers,
                 'timeout' => self::PROBE_TIMEOUT,
             ]);
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return null;
         }
     }

@@ -24,9 +24,10 @@ final class SearchTrace
      * guessing. Three is where "I had a couple of things to check" stops being
      * the likelier explanation.
      */
-    private const GROPING_THRESHOLD = 3;
+    private const int GROPING_THRESHOLD = 3;
 
     private int $searches = 0;
+
     private bool $settled = false;
 
     public function __construct(private readonly ?MemoryStore $store = null) {}

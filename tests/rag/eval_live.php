@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 // Retrieval measured with a real embedding model, on the same 32 questions as
 // tests/rag_eval_test.php. Not part of `make test`: it calls the provider and
 // costs a little — the corpus and the questions are a few thousand tokens.
@@ -35,23 +38,29 @@ if ($url === '' || $model === '') {
     exit(2);
 }
 
-$corpus = $argv[1] ?? dirname(__DIR__) . '/fixtures/rag/boutique';
-$questionFile = $argv[2] ?? (isset($argv[1]) ? $corpus . '/.sherpa/rag-questions.json' : dirname(__DIR__) . '/fixtures/rag/questions.json');
+$corpus = $argv[1] ?? __DIR__ . '/../fixtures/rag/boutique';
+$questionFile = $argv[2] ?? (isset($argv[1]) ? $corpus . '/.sherpa/rag-questions.json' : __DIR__ . '/../fixtures/rag/questions.json');
 $questions = json_decode((string) file_get_contents($questionFile), true);
 
 $index = new DocIndex();
 $index->open(':memory:');
-$report = (new Ingestor(new DocSource(), new Chunker()))->sync($corpus, $index);
+$report = new Ingestor(new DocSource(), new Chunker())->sync($corpus, $index);
 $counts = $index->counts();
 
 $embeddings = new FixedEmbeddings(new OpenAiCompatiblePlatform(HttpClient::create(), $url, 'inutile-ici', $key), $model);
 
 $started = microtime(true);
-$embedded = (new ChunkEmbedder())->embed($index, $embeddings);
+$embedded = new ChunkEmbedder()->embed($index, $embeddings);
 $indexing = microtime(true) - $started;
 
-printf("\n  Corpus: %d documents, %d passages · %d embedded in %.1f s with %s\n\n",
-    $counts['documents'], $counts['chunks'], $embedded, $indexing, $model);
+printf(
+    "\n  Corpus: %d documents, %d passages · %d embedded in %.1f s with %s\n\n",
+    $counts['documents'],
+    $counts['chunks'],
+    $embedded,
+    $indexing,
+    $model,
+);
 
 $bm25 = new Bm25Retriever($index);
 $stems = new Bm25Retriever($index, stemmed: true);

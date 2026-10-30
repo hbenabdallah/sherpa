@@ -1,11 +1,15 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Mcp;
 
 use App\Agent\Tool\Permission;
 use App\Agent\Tool\Toolbox;
 use App\Agent\Tool\ToolDefinition;
 use App\Runtime\Interrupt;
+use LogicException;
+use stdClass;
 
 /**
  * Brings the configured MCP servers into the session: their tools and a reader
@@ -44,13 +48,13 @@ class McpRegistry
      * sent with every request: enough for a paragraph of guidance, not for a
      * server to fill the window with its manual.
      */
-    private const INSTRUCTION_CHARS = 2000;
+    private const int INSTRUCTION_CHARS = 2000;
 
     /**
      * How much of the resource list goes into the reader's description: it is
      * sent with every request, so a server with hundreds is summarised.
      */
-    private const LISTED_RESOURCES = 20;
+    private const int LISTED_RESOURCES = 20;
 
     private bool $loaded = false;
 
@@ -176,7 +180,7 @@ class McpRegistry
                 ));
                 $this->toolNames[$server->name][] = $name;
                 $added++;
-            } catch (\LogicException) {
+            } catch (LogicException) {
                 $skipped[] = $tool['name'];
             }
         }
@@ -197,7 +201,7 @@ class McpRegistry
                 $this->toolNames[$server->name][] = $this->localName($server->name, 'read_resource');
                 $this->resources[$server->name] = $resources;
                 $this->templates[$server->name] = $templates;
-            } catch (\LogicException) {
+            } catch (LogicException) {
                 $skipped[] = 'read_resource';
             }
         }
@@ -249,7 +253,7 @@ class McpRegistry
      */
     private function localName(string $server, string $tool): string
     {
-        $clean = fn(string $s) => trim(preg_replace('/[^a-z0-9]+/', '_', strtolower($s)) ?? '', '_');
+        $clean = fn(string $s): string => trim(preg_replace('/[^a-z0-9]+/', '_', strtolower($s)) ?? '', '_');
 
         return 'mcp__' . $clean($server) . '__' . $clean($tool);
     }
@@ -285,7 +289,7 @@ class McpRegistry
             $type = $this->type($spec['type'] ?? 'string');
             $extra = array_diff_key($spec, ['type' => true, 'description' => true]);
             if ($type === 'array' && !isset($extra['items'])) {
-                $extra['items'] = new \stdClass();
+                $extra['items'] = new stdClass();
             }
 
             $parameters[(string) $name] = [
@@ -303,7 +307,7 @@ class McpRegistry
     private function type(mixed $type): string
     {
         if (is_array($type)) {
-            $type = array_values(array_filter($type, fn($t) => $t !== 'null'))[0] ?? 'string';
+            $type = array_values(array_filter($type, fn($t): bool => $t !== 'null'))[0] ?? 'string';
         }
 
         return in_array($type, ['string', 'integer', 'number', 'boolean', 'array', 'object'], true)
@@ -425,7 +429,7 @@ class McpRegistry
 
             $missing = array_values(array_filter(
                 $prompt['arguments'],
-                fn(array $argument) => $argument['required'] && ($arguments[$argument['name']] ?? '') === '',
+                fn(array $argument): bool => $argument['required'] && ($arguments[$argument['name']] ?? '') === '',
             ));
             if ($missing !== []) {
                 throw new McpException("{$word}: missing " . implode(', ', array_column($missing, 'name'))

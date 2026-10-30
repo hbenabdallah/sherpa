@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Tool;
 
 use App\Agent\Tool\AsTool;
@@ -17,7 +19,8 @@ class MemoryRecallTool
     public function __construct(private readonly MemoryStore $store) {}
 
     public function __invoke(
-        #[Param('Optional words to search for, in any order (leave empty for all recent facts)')] ?string $search = null,
+        #[Param('Optional words to search for, in any order (leave empty for all recent facts)')]
+        ?string $search = null,
     ): string {
         $facts = $this->store->recall($search, limit: 20);
 
@@ -28,7 +31,7 @@ class MemoryRecallTool
             $this->store->noteRecall($facts !== []);
         }
 
-        if (empty($facts)) {
+        if ($facts === []) {
             return $search
                 ? "No fact found for: {$search}"
                 : "Nothing remembered for this project.";

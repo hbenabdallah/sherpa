@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Agent\Tool;
 
 /**
@@ -11,10 +13,10 @@ namespace App\Agent\Tool;
  */
 final class SecretMask
 {
-    public const MARKER = '[secret masked:';
+    public const string MARKER = '[secret masked:';
 
     /** @var array<string, string> pattern => what it is */
-    private const PATTERNS = [
+    private const array PATTERNS = [
         '/-----BEGIN (?:[A-Z]+ )*PRIVATE KEY-----.*?-----END (?:[A-Z]+ )*PRIVATE KEY-----/s' => 'private key',
         '/\bsk-ant-[A-Za-z0-9_-]{20,}/' => 'Anthropic key',
         '/\bsk-(?:proj-|svcacct-|admin-)?[A-Za-z0-9_-]{32,}/' => 'OpenAI key',
@@ -38,7 +40,7 @@ final class SecretMask
             $text = (string) preg_replace_callback(
                 $pattern,
                 // The AWS secret keeps what comes before it: the name and the "=".
-                static fn (array $m): string => ($m[1] ?? '') . self::MARKER . " {$what}]",
+                static fn(array $m): string => ($m[1] ?? '') . self::MARKER . " {$what}]",
                 $text,
             );
         }

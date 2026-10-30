@@ -1,11 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Boutique\Billing;
 
 final class TaxCalculator
 {
     /** Taux de TVA par pays, en pourcentage. */
-    private const RATES = ['FR' => 20, 'DE' => 19, 'ES' => 21, 'LU' => 17];
+    private const array RATES = ['FR' => 20, 'DE' => 19, 'ES' => 21, 'LU' => 17];
 
     public function vatFor(int $amountCents, string $country): int
     {

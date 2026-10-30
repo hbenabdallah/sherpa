@@ -1,12 +1,16 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Boutique\Routing;
 
-#[\Attribute(\Attribute::TARGET_METHOD)]
-final class Route
+use Attribute;
+
+#[Attribute(Attribute::TARGET_METHOD)]
+final readonly class Route
 {
     public function __construct(
-        public readonly string $path,
-        public readonly string $method = 'GET',
+        public string $path,
+        public string $method = 'GET',
     ) {}
 }

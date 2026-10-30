@@ -1,8 +1,13 @@
 <?php
+
+declare(strict_types=1);
+
+use App\Permission\Offer;
+
 // Per-project permissions: they have to survive the process that granted them,
 // and they have to be revocable.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\Tool\Permission;
 use App\Agent\Tool\ToolCall;
@@ -56,8 +61,8 @@ $yaml = file_get_contents($home . '/.config/sherpa/projects.yaml');
 check('the grant reaches projects.yaml', str_contains($yaml, 'file_write'), $yaml);
 
 // The whole point: a different process must see it.
-$reloaded = (new ProjectStore(new StackDetector()))->get($project->slug);
-check('a fresh store reads the grant back', $reloaded !== null && in_array('file_write', $reloaded->allowedTools, true));
+$reloaded = new ProjectStore(new StackDetector())->get($project->slug);
+check('a fresh store reads the grant back', $reloaded instanceof Project && in_array('file_write', $reloaded->allowedTools, true));
 
 $store->allowTool($project, 'file_write');
 check('granting twice does not duplicate', count(array_keys($project->allowedTools, 'file_write', true)) === 1);
@@ -66,7 +71,7 @@ check('revoking a granted tool reports success', $store->revokeTool($project, 'f
 check('and it is gone from memory', !in_array('file_write', $project->allowedTools, true));
 check(
     'and gone from disk',
-    !in_array('file_write', (new ProjectStore(new StackDetector()))->get($project->slug)->allowedTools, true),
+    !in_array('file_write', new ProjectStore(new StackDetector())->get($project->slug)->allowedTools, true),
 );
 check('revoking what was never granted reports failure', !$store->revokeTool($project, 'web_fetch'));
 
@@ -94,7 +99,7 @@ check('a grant made earlier is visible once bound', $perms->isAllowed('file_writ
 check('an ungranted tool is still refused', !$perms->isAllowed('file_patch'));
 
 $perms->allow('file_patch');
-check('allow() persists through the store', in_array('file_patch', (new ProjectStore(new StackDetector()))->get($project->slug)->allowedTools, true));
+check('allow() persists through the store', in_array('file_patch', new ProjectStore(new StackDetector())->get($project->slug)->allowedTools, true));
 check('revoke() reports success', $perms->revoke('file_patch'));
 check('revoke() of an unknown tool reports failure', !$perms->revoke('file_patch'));
 
@@ -103,14 +108,15 @@ check('revoke() of an unknown tool reports failure', !$perms->revoke('file_patch
 final class ScriptedOverlay extends ConfirmOverlay
 {
     public int $asked = 0;
-    public ?App\Permission\Offer $offer = null;
+
+    public ?Offer $offer = null;
 
     public function __construct(private readonly ConfirmChoice $answer)
     {
         parent::__construct(new Terminal(), new FileWriteTool(), new FilePatchTool(), new ShellExecTool());
     }
 
-    public function show(ToolCall $call, ToolDefinition $def, App\Permission\Offer $offer = new App\Permission\Offer()): ConfirmChoice
+    public function show(ToolCall $call, ToolDefinition $def, Offer $offer = new Offer()): ConfirmChoice
     {
         $this->asked++;
         $this->offer = $offer;
@@ -162,7 +168,7 @@ check('"session" persists nothing', $perms->all() === [], json_encode($perms->al
 check('"always" allows the call', $b->check(call('file_write'), definition('file_write', Permission::CONFIRM)));
 $b->check(call('file_write'), definition('file_write', Permission::CONFIRM));
 check('"always" asks only once', $overlay->asked === 1);
-check('"always" persists to disk', in_array('file_write', (new ProjectStore(new StackDetector()))->get($project->slug)->allowedTools, true));
+check('"always" persists to disk', in_array('file_write', new ProjectStore(new StackDetector())->get($project->slug)->allowedTools, true));
 
 // The regression that started all this: a brand new session must honour it.
 $freshPerms = new ProjectPermissions($freshStore = new ProjectStore(new StackDetector()));
@@ -186,7 +192,7 @@ check('so the overlay is still consulted for others', $overlay->asked === 1);
 // A grant for shell_exec names the commands of the call, never the tool.
 $freshPerms->revokeAll();
 $shell = definition('shell_exec', Permission::CONFIRM);
-$run = fn (string $command) => new ToolCall('id', 'shell_exec', ['command' => $command]);
+$run = fn(string $command): ToolCall => new ToolCall('id', 'shell_exec', ['command' => $command]);
 
 [$b, $overlay] = broker(ConfirmChoice::Project, $freshPerms);
 check('a command allowed for good runs', $b->check($run('make test'), $shell));
@@ -211,7 +217,7 @@ check('"this session" for what is only allowed once grants nothing', $overlay->a
 
 // A grant of the tool itself, kept by an older Sherpa, is not read back.
 $reloadedStore->allowTool($reloadedStore->get($project->slug), 'shell_exec');
-$older = (new ProjectStore(new StackDetector()))->get($project->slug);
+$older = new ProjectStore(new StackDetector())->get($project->slug);
 check('a grant of shell_exec itself is not carried over', !in_array('shell_exec', $older->allowedTools, true), json_encode($older->allowedTools));
 
 // ---- unattended ---------------------------------------------------------------
@@ -222,7 +228,7 @@ check('unattended, a command runs unasked', $unattended->check(new ToolCall('u',
 check('and a write', $unattended->check(call('file_write'), definition('file_write', Permission::CONFIRM)) && $overlay->asked === 0);
 check('but what is refused stays refused', !$unattended->check(call('x'), definition('x', Permission::DENY)));
 check('and nothing is granted for later', $freshPerms->all() === $before);
-check('off unless set', (new PermissionBroker(new SessionPermissions(), $overlay, $freshPerms))->autoApproved() === (getenv('SHERPA_AUTO_APPROVE') === '1'));
+check('off unless set', new PermissionBroker(new SessionPermissions(), $overlay, $freshPerms)->autoApproved() === (getenv('SHERPA_AUTO_APPROVE') === '1'));
 
 // ---- cleanup ---------------------------------------------------------------
 if ($realHome !== null) {

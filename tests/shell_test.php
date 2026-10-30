@@ -1,12 +1,15 @@
 <?php
+
+declare(strict_types=1);
+
 // shell_exec: the tool that runs arbitrary commands, and the one with no test
 // until now.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
+use App\Project\DockerConfig;
 use App\Project\PathOutsideProjectException;
 use App\Project\ProjectPathResolver;
-use App\Project\DockerConfig;
 use App\Tool\ContainerInspector;
 use App\Tool\ShellExecTool;
 
@@ -43,11 +46,21 @@ check('a relative cwd is resolved inside the project', trim($tool('pwd', 'src/De
 // The command can of course escape once running — that is what the confirmation
 // is for — but the model may not silently start it somewhere else.
 $threw = false;
-try { $tool('pwd', '../../../etc'); } catch (PathOutsideProjectException) { $threw = true; }
+
+try {
+    $tool('pwd', '../../../etc');
+} catch (PathOutsideProjectException) {
+    $threw = true;
+}
 check('a working directory outside the project is refused', $threw);
 
 $threw = false;
-try { $tool('pwd', '/etc'); } catch (PathOutsideProjectException) { $threw = true; }
+
+try {
+    $tool('pwd', '/etc');
+} catch (PathOutsideProjectException) {
+    $threw = true;
+}
 check('an absolute path outside the project is refused too', $threw);
 
 // ---- what the model is told ------------------------------------------------
@@ -192,18 +205,18 @@ final class HomelessInspector extends ContainerInspector
 {
     public function __construct(private readonly string $home) {}
 
-    public function inspect(string $container): ?array
+    public function inspect(string $container): array
     {
         return ['workdir' => '/srv/app', 'mounts' => []];
     }
 
-    public function home(string $container, string $user): ?string
+    public function home(string $container, string $user): string
     {
         return $this->home;
     }
 }
 
-$command = fn(ShellExecTool $tool): array => (new ReflectionMethod($tool, 'buildCommand'))->invoke($tool, 'ls', $project);
+$command = fn(ShellExecTool $tool): array => new ReflectionMethod($tool, 'buildCommand')->invoke($tool, 'ls', $project);
 
 $explicit = new ShellExecTool($paths, new HomelessInspector('/home/www'));
 $explicit->setDockerContainer('c', 'www-data');

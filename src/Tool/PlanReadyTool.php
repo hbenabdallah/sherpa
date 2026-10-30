@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Tool;
 
 use App\Agent\PlanMode;
@@ -22,7 +24,8 @@ class PlanReadyTool
     ) {}
 
     public function __invoke(
-        #[Param('The plan, in Markdown: the changes, the files, the order, how they will be checked')] string $plan,
+        #[Param('The plan, in Markdown: the changes, the files, the order, how they will be checked')]
+        string $plan,
     ): string {
         if (!$this->planMode->isActive()) {
             return 'Not in plan mode: nothing to approve. Go ahead with the work.';

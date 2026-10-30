@@ -1,8 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Permission;
 
-enum ConfirmChoice {
+enum ConfirmChoice
+{
     case Once;
     case Session;
     case Project;

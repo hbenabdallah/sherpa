@@ -6,6 +6,8 @@ namespace App\Session;
 
 use App\Agent\PlanMode;
 use App\Project\Project;
+use DateTimeImmutable;
+use Throwable;
 
 /**
  * Conversations kept on disk, so closing the terminal is not the end of one:
@@ -19,12 +21,12 @@ use App\Project\Project;
 final class SessionStore
 {
     /** How many conversations a project keeps. Older ones are removed. */
-    public const KEEP = 20;
+    public const int KEEP = 20;
 
-    private const FORMAT = 1;
+    private const int FORMAT = 1;
 
     /** What an id looks like: the shape save() gives it, and nothing a path could hide in. */
-    private const ID = '/^\d{8}-\d{6}-[0-9a-f]{4}$/';
+    private const string ID = '/^\d{8}-\d{6}-[0-9a-f]{4}$/';
 
     /**
      * To the microsecond. "Most recently active" is what orders the list and
@@ -32,11 +34,13 @@ final class SessionStore
      * ordinary — two terminals on one project, or a resume followed at once by
      * a turn. At second precision those tie, and a tie is an order nobody chose.
      */
-    private const TIME = 'Y-m-d\\TH:i:s.uP';
+    private const string TIME = 'Y-m-d\\TH:i:s.uP';
 
     private ?string $dir = null;
+
     private ?string $id = null;
-    private ?\DateTimeImmutable $startedAt = null;
+
+    private ?DateTimeImmutable $startedAt = null;
 
     /**
      * Named once, after the first thing asked. Compacting the history folds
@@ -104,7 +108,7 @@ final class SessionStore
     public function reserve(): string
     {
         $this->startNew();
-        $this->startedAt = new \DateTimeImmutable();
+        $this->startedAt = new DateTimeImmutable();
 
         return $this->id = $this->startedAt->format('Ymd-His') . '-' . bin2hex(random_bytes(2));
     }
@@ -114,14 +118,14 @@ final class SessionStore
      * the same process uses it — an editor holds several — and put back with
      * resume().
      *
-     * @return array{0: ?string, 1: ?\DateTimeImmutable, 2: ?string, 3: ?int}
+     * @return array{0: ?string, 1: ?DateTimeImmutable, 2: ?string, 3: ?int}
      */
     public function cursor(): array
     {
         return [$this->id, $this->startedAt, $this->title, $this->inode];
     }
 
-    /** @param array{0: ?string, 1: ?\DateTimeImmutable, 2: ?string, 3: ?int} $cursor */
+    /** @param array{0: ?string, 1: ?DateTimeImmutable, 2: ?string, 3: ?int} $cursor */
     public function resume(array $cursor): void
     {
         [$this->id, $this->startedAt, $this->title, $this->inode] = $cursor;
@@ -142,7 +146,7 @@ final class SessionStore
 
         $conversation = array_values(array_map(
             self::withoutImages(...),
-            array_filter($messages, static fn(array $m) => ($m['role'] ?? '') !== 'system'),
+            array_filter($messages, static fn(array $m): bool => ($m['role'] ?? '') !== 'system'),
         ));
 
         $title = $this->title ?? $this->title($conversation);
@@ -155,7 +159,7 @@ final class SessionStore
             return false;
         }
 
-        $now = new \DateTimeImmutable();
+        $now = new DateTimeImmutable();
 
         // Written meanwhile from elsewhere: both stay, this one in a file of
         // its own under the same title, rather than one erasing the other.
@@ -220,12 +224,12 @@ final class SessionStore
 
         foreach (glob($this->dir . '/*.json') ?: [] as $file) {
             $session = $this->read($file);
-            if ($session !== null) {
+            if ($session instanceof SavedSession) {
                 $sessions[] = $session;
             }
         }
 
-        usort($sessions, static fn(SavedSession $a, SavedSession $b) => $b->updatedAt <=> $a->updatedAt);
+        usort($sessions, static fn(SavedSession $a, SavedSession $b): int => $b->updatedAt <=> $a->updatedAt);
 
         return $sessions;
     }
@@ -316,15 +320,15 @@ final class SessionStore
         try {
             return new SavedSession(
                 id: $data['id'],
-                startedAt: new \DateTimeImmutable((string) ($data['started_at'] ?? 'now')),
-                updatedAt: new \DateTimeImmutable((string) ($data['updated_at'] ?? 'now')),
+                startedAt: new DateTimeImmutable((string) ($data['started_at'] ?? 'now')),
+                updatedAt: new DateTimeImmutable((string) ($data['updated_at'] ?? 'now')),
                 backend: (string) ($data['backend'] ?? ''),
                 model: (string) ($data['model'] ?? ''),
                 title: (string) ($data['title'] ?? ''),
                 messages: array_values(array_filter($data['messages'], is_array(...))),
                 excerpts: array_values(array_filter($data['excerpts'] ?? [], is_array(...))),
             );
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return null;
         }
     }

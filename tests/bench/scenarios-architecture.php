@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 // Questions about how a real project is put together: who handles a request,
 // what reacts to an event, what a change would break. On a project of a few
 // files grep answers them; here the answer crosses a command bus, an event
@@ -12,13 +15,13 @@
 // tool's output. Only names that appear in the code are required, so a
 // correct answer passes whatever the wording.
 
-$readOnly = fn(BenchRun $run) => $run->modified() === [];
+$readOnly = fn(BenchRun $run): bool => $run->modified() === [];
 
 /** The names the answer has to contain, each one a check of its own. */
 $names = function (string ...$names): array {
     $checks = [];
     foreach ($names as $name) {
-        $checks["names {$name}"] = fn(BenchRun $r) => str_contains($r->answer(), $name);
+        $checks["names {$name}"] = fn(BenchRun $r): bool => str_contains($r->answer(), $name);
     }
 
     return $checks;

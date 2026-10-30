@@ -13,11 +13,11 @@ namespace App\Rag;
  * other words; that is what the embeddings phase is for, and what the
  * evaluation measures.
  */
-final class Bm25Retriever implements Retriever
+final readonly class Bm25Retriever implements Retriever
 {
     public function __construct(
-        private readonly DocIndex $index,
-        private readonly bool $stemmed = false,
+        private DocIndex $index,
+        private bool $stemmed = false,
     ) {}
 
     public function name(): string

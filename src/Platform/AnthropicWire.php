@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Platform;
 
+use stdClass;
+
 /**
  * Sherpa's history in the shape of Anthropic's Messages API, which differs
  * from the OpenAI dialect in ways the server enforces: the system prompt is a
@@ -22,13 +24,13 @@ namespace App\Platform;
  */
 final class AnthropicWire
 {
-    public const VERSION = '2023-06-01';
+    public const string VERSION = '2023-06-01';
 
     /** Where Sherpa keeps an assistant message's thinking blocks, verbatim. */
-    public const THINKING = 'anthropic_thinking';
+    public const string THINKING = 'anthropic_thinking';
 
     /** A reply needs room for the thinking that precedes it on current models. */
-    public const MAX_TOKENS = 16000;
+    public const int MAX_TOKENS = 16000;
 
     public static function handles(string $baseUrl): bool
     {
@@ -142,7 +144,7 @@ final class AnthropicWire
                         'type'  => 'tool_use',
                         'id'    => (string) ($call['id'] ?? ''),
                         'name'  => (string) ($call['function']['name'] ?? ''),
-                        'input' => is_array($arguments) && $arguments !== [] ? $arguments : new \stdClass(),
+                        'input' => is_array($arguments) && $arguments !== [] ? $arguments : new stdClass(),
                     ];
                 }
 
@@ -194,7 +196,7 @@ final class AnthropicWire
         $turns[$last]['content'] = array_merge($turns[$last]['content'], $blocks);
 
         if ($role === 'user') {
-            usort($turns[$last]['content'], static fn(array $a, array $b) => ($b['type'] === 'tool_result') <=> ($a['type'] === 'tool_result'));
+            usort($turns[$last]['content'], static fn(array $a, array $b): int => ($b['type'] === 'tool_result') <=> ($a['type'] === 'tool_result'));
         }
     }
 
@@ -207,7 +209,7 @@ final class AnthropicWire
     {
         $blocks = $message[self::THINKING] ?? [];
 
-        return is_array($blocks) ? array_values(array_filter($blocks, 'is_array')) : [];
+        return is_array($blocks) ? array_values(array_filter($blocks, is_array(...))) : [];
     }
 
     /**
@@ -221,10 +223,10 @@ final class AnthropicWire
         $schema = $function['parameters'] ?? [];
 
         if (!is_array($schema) || $schema === []) {
-            $schema = ['type' => 'object', 'properties' => new \stdClass()];
+            $schema = ['type' => 'object', 'properties' => new stdClass()];
         }
         if (($schema['properties'] ?? null) === []) {
-            $schema['properties'] = new \stdClass();
+            $schema['properties'] = new stdClass();
         }
 
         return [

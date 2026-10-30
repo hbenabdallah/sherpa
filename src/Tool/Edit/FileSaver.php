@@ -1,6 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Tool\Edit;
+
+use RuntimeException;
 
 /**
  * Where file_write and file_patch put a file on disk, and say why when they
@@ -15,7 +19,7 @@ namespace App\Tool\Edit;
  */
 final class FileSaver
 {
-    /** @throws \RuntimeException saying what to do about it */
+    /** @throws RuntimeException saying what to do about it */
     public static function save(string $resolved, string $path, string $content): void
     {
         $dir = dirname($resolved);
@@ -29,20 +33,20 @@ final class FileSaver
             }
 
             if (!is_dir($parent) || !is_writable($parent) || !@mkdir($dir, 0755, true) && !is_dir($dir)) {
-                throw new \RuntimeException(self::refusal($parent, $shown, 'directory', 'create ' . dirname($path)));
+                throw new RuntimeException(self::refusal($parent, $shown, 'directory', 'create ' . dirname($path)));
             }
         }
 
         if (file_exists($resolved) ? !is_writable($resolved) : !is_writable($dir)) {
             throw file_exists($resolved)
-                ? new \RuntimeException(self::refusal($resolved, $path, 'file', 'write it'))
-                : new \RuntimeException(self::refusal($dir, dirname($path), 'directory', 'create a file in it'));
+                ? new RuntimeException(self::refusal($resolved, $path, 'file', 'write it'))
+                : new RuntimeException(self::refusal($dir, dirname($path), 'directory', 'create a file in it'));
         }
 
         if (@file_put_contents($resolved, $content) === false) {
             $why = error_get_last()['message'] ?? 'no reason given';
 
-            throw new \RuntimeException("could not write {$path}: {$why}");
+            throw new RuntimeException("could not write {$path}: {$why}");
         }
     }
 

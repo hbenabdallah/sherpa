@@ -1,12 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Boutique\Catalog;
 
-final class Product
+final readonly class Product
 {
     public function __construct(
-        public readonly int $id,
-        public readonly string $name,
-        public readonly int $priceCents,
+        public int $id,
+        public string $name,
+        public int $priceCents,
     ) {}
 }

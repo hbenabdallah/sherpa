@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Acp;
 
 /**
@@ -11,7 +13,8 @@ namespace App\Acp;
 final class PromptText
 {
     /** What providers take: PNG, JPEG, GIF and WebP, 5 MB at most (Anthropic's limit, the strictest). */
-    private const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+    private const array IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+
     private const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
     /**

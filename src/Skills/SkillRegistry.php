@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Skills;
 
 class SkillRegistry
@@ -7,8 +9,10 @@ class SkillRegistry
     /** @var array<string, Skill> */
     private array $skills = [];
 
-    private string $globalDir;
+    private readonly string $globalDir;
+
     private ?string $projectDir = null;
+
     private ?string $projectRoot = null;
 
     public function __construct()
@@ -73,14 +77,16 @@ class SkillRegistry
             if ($line === '' || str_starts_with($line, '#')) {
                 continue;
             }
+
             return $line;
         }
+
         return '';
     }
 
     public function getIndex(): string
     {
-        if (empty($this->skills)) {
+        if ($this->skills === []) {
             return '(no skill loaded)';
         }
 
@@ -88,6 +94,7 @@ class SkillRegistry
         foreach ($this->skills as $name => $skill) {
             $lines[] = "- {$name} : {$skill->description}";
         }
+
         return implode("\n", $lines);
     }
 

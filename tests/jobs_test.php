@@ -1,7 +1,10 @@
 <?php
+
+declare(strict_types=1);
+
 // Background jobs: left running, read as they go, stopped with what they started.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\Tool\Permission;
 use App\Agent\Tool\Toolbox;
@@ -46,8 +49,11 @@ $alive = function (int $pid): bool {
 
 // A command that ends within the first look is reported like any command.
 $out = $shell('echo built; exit 3', background: true);
-check('a job that ends at once says so, with its exit code and output',
-    str_contains($out, 'already ended, exit code 3') && str_contains($out, 'built'), $out);
+check(
+    'a job that ends at once says so, with its exit code and output',
+    str_contains($out, 'already ended, exit code 3') && str_contains($out, 'built'),
+    $out,
+);
 
 // A server: still running after the first look, its first line shown.
 $started = microtime(true);
@@ -96,7 +102,12 @@ if (is_link("{$noSetsid}/perl")) {
 }
 
 $threw = false;
-try { $output(99); } catch (RuntimeException $e) { $threw = str_contains($e->getMessage(), 'no job 99'); }
+
+try {
+    $output(99);
+} catch (RuntimeException $e) {
+    $threw = str_contains($e->getMessage(), 'no job 99');
+}
 check('an unknown id is an error the model can act on', $threw);
 
 $listed = array_column($jobs->all(), 'command');
@@ -105,7 +116,7 @@ check('/jobs has every job, with its command', count($listed) >= 4 && str_contai
 // Sherpa exits: nothing left running behind it.
 $pids = array_filter(array_map(fn(array $j) => $j['running'] ? $j['id'] : null, $jobs->all()));
 $jobs->stopAll();
-check('stopAll leaves nothing running', array_filter($jobs->all(), fn(array $j) => $j['running']) === [], json_encode($jobs->all()));
+check('stopAll leaves nothing running', array_filter($jobs->all(), fn(array $j): bool => $j['running']) === [], json_encode($jobs->all()));
 
 // ---- a job in the project's container ---------------------------------------------
 // It is stopped in the container it was started in. /project edit can change the
@@ -114,12 +125,12 @@ check('stopAll leaves nothing running', array_filter($jobs->all(), fn(array $j) 
 
 final class RunningContainer extends ContainerInspector
 {
-    public function inspect(string $container): ?array
+    public function inspect(string $container): array
     {
         return ['workdir' => '/srv/app', 'mounts' => []];
     }
 
-    public function home(string $container, string $user): ?string
+    public function home(string $container, string $user): string
     {
         return '/home/dev';
     }
@@ -148,8 +159,11 @@ foreach (['another container' => ['new-app-1', 'www-data'], 'Docker turned off' 
     $inContainer->setDockerContainer($next, $nextUser);
     $containerJobs->stop($id);
     $kill = $kills()[0] ?? '';
-    check("after {$change}, a container job is stopped in the container it runs in",
-        str_contains($kill, 'old-app-1') && !str_contains($kill, 'new-app-1'), $kill ?: $out);
+    check(
+        "after {$change}, a container job is stopped in the container it runs in",
+        str_contains($kill, 'old-app-1') && !str_contains($kill, 'new-app-1'),
+        $kill ?: $out,
+    );
     check("as the user it runs as", str_contains($kill, '--user 1000:1000'), $kill);
 }
 
@@ -158,8 +172,10 @@ putenv("PATH={$savedPath}");
 // ---- permissions ----------------------------------------------------------------
 $toolbox = new Toolbox([$shell, $output, $stop]);
 check('starting a command still asks first', $toolbox->find('shell_exec')?->permission === Permission::CONFIRM);
-check('reading or stopping a job Sherpa started does not',
-    $toolbox->find('job_output')?->permission === Permission::AUTO && $toolbox->find('job_stop')?->permission === Permission::AUTO);
+check(
+    'reading or stopping a job Sherpa started does not',
+    $toolbox->find('job_output')?->permission === Permission::AUTO && $toolbox->find('job_stop')?->permission === Permission::AUTO,
+);
 check('shell_exec says background is an option', isset($toolbox->find('shell_exec')?->parameters['background']));
 
 exec('rm -rf ' . escapeshellarg($root));

@@ -1,9 +1,15 @@
 <?php
+
+declare(strict_types=1);
+
+use App\Agent\Tool\ToolCall;
+use App\Agent\Tool\ToolDefinition;
+
 // A turn about to run out — of tokens or of steps — asks the model for its
 // answer first. Before, it ended on the stop notice: in the benchmark, two
 // sessions had named the right classes and never said so.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\AgentLoop;
 use App\Agent\ContextBudget;
@@ -41,13 +47,23 @@ function check(string $label, bool $ok, string $detail = ''): void
 final class ReadIt
 {
     public int $ran = 0;
-    public function __invoke(#[Param('what')] string $what = ''): string { $this->ran++; return "read {$what}"; }
+
+    public function __invoke(#[Param('what')] string $what = ''): string
+    {
+        $this->ran++;
+
+        return "read {$what}";
+    }
 }
 
 final class AllowAll extends PermissionBroker
 {
     public function __construct() {}
-    public function check(App\Agent\Tool\ToolCall $call, ?App\Agent\Tool\ToolDefinition $def): bool { return true; }
+
+    public function check(ToolCall $call, ?ToolDefinition $def): bool
+    {
+        return true;
+    }
 }
 
 /**
@@ -58,6 +74,7 @@ final class AllowAll extends PermissionBroker
 final class Reader implements PlatformInterface
 {
     public int $requests = 0;
+
     /** @var array<int, array<int, array<string, mixed>>> */
     public array $seen = [];
 
@@ -73,17 +90,58 @@ final class Reader implements PlatformInterface
 
         return ($this->reply)($messages, $this->requests);
     }
-    public function concurrency(): int { return 1; }
-    public function lastUsage(): ?array { return null; }
-    public function lastTimings(): ?array { return null; }
-    public function residency(): ?ModelResidency { return null; }
-    public function modelName(): string { return 'r'; }
-    public function contextWindow(): int { return 1_000_000; }
-    public function catalogue(): array { return []; }
-    public function describeModel(string $model): ?ModelInfo { return null; }
+
+    public function concurrency(): int
+    {
+        return 1;
+    }
+
+    public function lastUsage(): ?array
+    {
+        return null;
+    }
+
+    public function lastTimings(): ?array
+    {
+        return null;
+    }
+
+    public function residency(): ?ModelResidency
+    {
+        return null;
+    }
+
+    public function modelName(): string
+    {
+        return 'r';
+    }
+
+    public function contextWindow(): int
+    {
+        return 1_000_000;
+    }
+
+    public function catalogue(): array
+    {
+        return [];
+    }
+
+    public function describeModel(string $model): ?ModelInfo
+    {
+        return null;
+    }
+
     public function useModel(string $model, int $contextWindow): void {}
-    public function name(): string { return 'r'; }
-    public function isAvailable(): bool { return true; }
+
+    public function name(): string
+    {
+        return 'r';
+    }
+
+    public function isAvailable(): bool
+    {
+        return true;
+    }
 }
 
 /**
@@ -108,13 +166,22 @@ function reader(bool $obeys, string $aside = ''): \Closure
 function turn(Reader $model, ReadIt $tool, ?UsageMeter $meter): array
 {
     $budget = new ContextBudget(contextWindow: 1_000_000);
-    $loop = new AgentLoop($model, new Toolbox([$tool]), new AllowAll(), new ChatPane(new Terminal(), new MarkdownRenderer()),
-        $budget, new HistoryCompactor($model, $budget), new Interrupt(), usage: $meter);
+    $loop = new AgentLoop(
+        $model,
+        new Toolbox([$tool]),
+        new AllowAll(),
+        new ChatPane(new Terminal(), new MarkdownRenderer()),
+        $budget,
+        new HistoryCompactor($model, $budget),
+        new Interrupt(),
+        usage: $meter,
+    );
     $bag = new MessageBag();
     $bag->system('S');
     $bag->user('why is the subtotal wrong?');
 
     ob_start();
+
     try {
         $result = $loop->run($bag);
     } catch (TokenCapReached $e) {
@@ -144,14 +211,19 @@ $tool = new ReadIt();
 $model = new Reader(reader(obeys: true), $meter, 3000);
 [$result, $screen] = turn($model, $tool, $meter);
 
-check('a turn about to hit the cap ends on an answer', $result instanceof Result && $result->content === 'Found it: Invoice::subtotal().',
-    $result instanceof Result ? $result->content : $result->getMessage());
+check(
+    'a turn about to hit the cap ends on an answer',
+    $result instanceof Result && $result->content === 'Found it: Invoice::subtotal().',
+    $result instanceof Result ? $result->content : $result->getMessage(),
+);
 check('asked for while there was still room for it', $model->requests === 3 && $meter->total() <= 10_000, "{$model->requests} requests, {$meter->total()} tokens");
 check('the tools it had called before ran', $tool->ran === 2, (string) $tool->ran);
 check('the user is told why the model stopped looking', str_contains($screen, 'the token budget of this session is nearly spent'), $screen);
 $last = end($model->seen);
-check('the model is told to answer without tools, and to say what it could not check',
-    str_contains(json_encode($last), 'without calling any tool') && str_contains(json_encode($last), 'could not check'));
+check(
+    'the model is told to answer without tools, and to say what it could not check',
+    str_contains(json_encode($last), 'without calling any tool') && str_contains(json_encode($last), 'could not check'),
+);
 
 // Without the meter, the same turn runs into the cap as before.
 $meter = new UsageMeter(cap: 10_000);
@@ -166,9 +238,11 @@ $model = new Reader(reader(obeys: false, aside: 'So far: Invoice::subtotal().'),
 [$result, , $bag] = turn($model, $tool, $meter);
 
 check('a call made after being told to answer is not run', $tool->ran === 4 && $model->requests === 5, "{$tool->ran} run, {$model->requests} requests");
-check('what the model wrote alongside it is the answer',
+check(
+    'what the model wrote alongside it is the answer',
     $result instanceof Result && $result->content === 'So far: Invoice::subtotal().',
-    $result instanceof Result ? $result->content : $result->getMessage());
+    $result instanceof Result ? $result->content : $result->getMessage(),
+);
 $history = json_encode($bag->all());
 check('the refused call is answered, so the history stays well formed', substr_count($history, 'Not run: there is no room left') === 1, $history);
 
@@ -176,26 +250,32 @@ $meter = new UsageMeter(cap: 100_000);
 $tool = new ReadIt();
 $model = new Reader(reader(obeys: false), $meter, 20_000);
 [$result] = turn($model, $tool, $meter);
-check('written nothing, the turn says why it stopped instead of running into the cap',
+check(
+    'written nothing, the turn says why it stopped instead of running into the cap',
     $result instanceof Result && str_contains($result->content, 'kept calling tools') && $model->requests === 5 && $tool->ran === 4,
-    ($result instanceof Result ? $result->content : $result->getMessage()) . " · {$model->requests} requests, {$tool->ran} run");
+    ($result instanceof Result ? $result->content : $result->getMessage()) . " · {$model->requests} requests, {$tool->ran} run",
+);
 
 // ---- the step limit too --------------------------------------------------------
 $tool = new ReadIt();
 $model = new Reader(reader(obeys: true));
 [$result, $screen] = turn($model, $tool, null);
-check('a turn at its last steps ends on an answer, not on "maximum iterations"',
+check(
+    'a turn at its last steps ends on an answer, not on "maximum iterations"',
     $result instanceof Result && $result->content === 'Found it: Invoice::subtotal().' && !$result->maxIterationsReached,
-    $result instanceof Result ? $result->content : '');
+    $result instanceof Result ? $result->content : '',
+);
 check('and says why', str_contains($screen, 'this turn has reached its limit of steps'));
 
 // Out of steps, not of tokens: a model that writes nothing is asked once more.
 $tool = new ReadIt();
 $model = new Reader(reader(obeys: false));
 [$result] = turn($model, $tool, null);
-check('out of steps, a silent model is asked once more before the turn ends',
+check(
+    'out of steps, a silent model is asked once more before the turn ends',
     $result instanceof Result && str_contains($result->content, 'kept calling tools') && $model->requests === 40 && $tool->ran === 38,
-    ($result instanceof Result ? $result->content : '') . " · {$model->requests} requests, {$tool->ran} run");
+    ($result instanceof Result ? $result->content : '') . " · {$model->requests} requests, {$tool->ran} run",
+);
 
 printf("\n%d passed, %d failed\n", $pass, $fail);
 exit($fail === 0 ? 0 : 1);

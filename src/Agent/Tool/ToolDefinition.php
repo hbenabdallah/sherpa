@@ -1,17 +1,21 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Agent\Tool;
 
-final class ToolDefinition
+use stdClass;
+
+final readonly class ToolDefinition
 {
     public function __construct(
-        public readonly string $name,
-        public readonly string $description,
-        public readonly array $parameters,
-        public readonly Permission $permission,
-        public readonly object $handler,
+        public string $name,
+        public string $description,
+        public array $parameters,
+        public Permission $permission,
+        public object $handler,
         /** Brings text from outside the project and the user; see Provenance. */
-        public readonly bool $untrusted = false,
+        public bool $untrusted = false,
     ) {}
 
     public function toFunctionSchema(): array
@@ -42,7 +46,7 @@ final class ToolDefinition
                     // whole request with a 400 over it — which no native tool
                     // ever triggered, because every one of them takes at least
                     // one argument. An MCP server's need not.
-                    'properties' => $properties === [] ? new \stdClass() : $properties,
+                    'properties' => $properties === [] ? new stdClass() : $properties,
                     'required'   => $required,
                 ],
             ],

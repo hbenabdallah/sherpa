@@ -1,8 +1,14 @@
 <?php
+
+declare(strict_types=1);
+
+use App\Project\Project;
+use Symfony\Component\Yaml\Yaml;
+
 // Project identity. A project is its directory — one per directory — and its
 // slug names the memory directory, so getting either wrong is not cosmetic.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Project\DockerConfig;
 use App\Project\ProjectStore;
@@ -69,11 +75,13 @@ check('the same unspellable name derives the same slug', $store->create('***', $
 $first = $store->create('Duplicata', $fresh(), $none);
 $second = $store->create('Duplicata', $fresh(), $none);
 check('a repeated name does not overwrite the first project', $first->slug !== $second->slug, "{$first->slug} vs {$second->slug}");
-check('both are still listed', count(array_filter($store->all(), fn($p) => $p->name === 'Duplicata')) === 2);
+check('both are still listed', count(array_filter($store->all(), fn(Project $p): bool => $p->name === 'Duplicata')) === 2);
 
 // Accents must not collide two different names into one slug either.
-check('accented and unaccented names stay distinct',
-    $store->create('Café', $fresh(), $none)->slug !== $store->create('Cafe', $fresh(), $none)->slug);
+check(
+    'accented and unaccented names stay distinct',
+    $store->create('Café', $fresh(), $none)->slug !== $store->create('Cafe', $fresh(), $none)->slug,
+);
 
 // ---- deleting takes the memory with it -------------------------------------
 // Slugs come from names, so re-adding a project called the same thing lands on
@@ -83,10 +91,10 @@ $doomed = $store->create('À supprimer', $fresh(), $none);
 $memoryDir = dirname($doomed->memoryDb);   // create() already made this
 file_put_contents($doomed->memoryDb, 'des faits');
 
-check('the project is gone from the list', (function () use ($store, $doomed) {
+check('the project is gone from the list', (function () use ($store, $doomed): bool {
     $store->delete($doomed->slug);
 
-    return $store->get($doomed->slug) === null;
+    return !$store->get($doomed->slug) instanceof Project;
 })());
 check('and its memory is gone from disk', !is_dir($memoryDir), $memoryDir);
 
@@ -125,7 +133,7 @@ check('the docker configuration changes', $after->docker->enabled && $after->doc
 check('commands run as the host user unless told otherwise', $after->docker->user === DockerConfig::USER_HOST, $after->docker->user);
 check('a project saved before the setting existed reads as the host user', DockerConfig::fromArray(['enabled' => true, 'container' => 'a'])->user === DockerConfig::USER_HOST);
 check('uid 0 is taken as root, not as an empty setting', DockerConfig::fromArray(['enabled' => true, 'container' => 'a', 'user' => 0])->user === '0');
-check('and the setting survives a save', DockerConfig::fromArray((new DockerConfig(true, 'a', '', 'www-data'))->toArray())->user === 'www-data');
+check('and the setting survives a save', DockerConfig::fromArray(new DockerConfig(true, 'a', '', 'www-data')->toArray())->user === 'www-data');
 
 // The slug names the memory directory and is what `sherpa -p` takes. Re-slugging
 // a rename would strand everything Sherpa has learned and break every alias.
@@ -137,8 +145,11 @@ check('the stack is re-detected at the new path', str_contains($after->stack, 'S
 check('creation date is preserved', $after->createdAt == $before->createdAt);
 
 $reloaded = new ProjectStore(new StackDetector());
-check('the change survives a reload', $reloaded->get($before->slug)?->name === 'Après déménagement',
-    (string) $reloaded->get($before->slug)?->name);
+check(
+    'the change survives a reload',
+    $reloaded->get($before->slug)?->name === 'Après déménagement',
+    (string) $reloaded->get($before->slug)?->name,
+);
 
 // Standing permissions belong to the project, not to its address.
 $store->allowTool($after, 'file_write');
@@ -162,19 +173,26 @@ $beta = $sessionB2->create('Beta', $fresh(), $none);
 $sessionA->allowTool($alpha, 'file_write');
 
 $reloaded = new ProjectStore(new StackDetector());
-check('a write in one session does not delete another session\'s project',
-    $reloaded->get($beta->slug) !== null, implode(',', array_map(fn($p) => $p->slug, $reloaded->all())));
-check('and its own change is still recorded',
+check(
+    'a write in one session does not delete another session\'s project',
+    $reloaded->get($beta->slug) instanceof Project,
+    implode(',', array_map(fn(Project $p): string => $p->slug, $reloaded->all())),
+);
+check(
+    'and its own change is still recorded',
     in_array('file_write', $reloaded->get($alpha->slug)?->allowedTools ?? [], true),
-    json_encode($reloaded->get($alpha->slug)?->allowedTools));
+    json_encode($reloaded->get($alpha->slug)?->allowedTools),
+);
 
 // The same guarantee for deletion: A deleting alpha must not resurrect or
 // remove anything of B's.
 $sessionA->delete($alpha->slug);
 $reloaded = new ProjectStore(new StackDetector());
-check('a deletion removes only what it deleted',
-    $reloaded->get($alpha->slug) === null && $reloaded->get($beta->slug) !== null,
-    implode(',', array_map(fn($p) => $p->slug, $reloaded->all())));
+check(
+    'a deletion removes only what it deleted',
+    !$reloaded->get($alpha->slug) instanceof Project && $reloaded->get($beta->slug) instanceof Project,
+    implode(',', array_map(fn(Project $p): string => $p->slug, $reloaded->all())),
+);
 
 // Hand-editing the file is currently the only way to change a project, and it
 // used to be reverted by the next write of any running session.
@@ -186,9 +204,11 @@ mkdir($gammaDir . '/deplace', 0777, true);
 
 $sessionB2->allowTool($beta, 'file_write');
 $afterEdit = new ProjectStore(new StackDetector());
-check('a hand edit to an untouched project survives a later write',
+check(
+    'a hand edit to an untouched project survives a later write',
     $afterEdit->get($gamma->slug)?->path === $gammaDir . '/deplace',
-    (string) $afterEdit->get($gamma->slug)?->path);
+    (string) $afterEdit->get($gamma->slug)?->path,
+);
 
 // ---- noticing that someone else wrote --------------------------------------
 $watcher = new ProjectStore(new StackDetector());
@@ -204,7 +224,7 @@ $watcher2->create('Nous', $fresh(), $none);
 check('our own write does not look like an external one', !$watcher2->changedOnDisk());
 
 foreach (['alpha', 'beta', 'gamma', 'surprise', 'nous'] as $slug) {
-    (new ProjectStore(new StackDetector()))->delete($slug);
+    new ProjectStore(new StackDetector())->delete($slug);
 }
 
 // ---- which project a directory belongs to ----------------------------------
@@ -221,19 +241,23 @@ check('an exact directory finds its project', $store->forDirectory($work . '/api
 check('a subdirectory finds the project above it', $store->forDirectory($work . '/api/config')?->slug === $api->slug);
 
 // A project nested inside another opens as itself, not as its parent.
-check('the deepest matching project wins',
+check(
+    'the deepest matching project wins',
     $store->forDirectory($work . '/api/src/Domain/Order')?->slug === $nested->slug,
-    (string) $store->forDirectory($work . '/api/src/Domain/Order')?->slug);
+    (string) $store->forDirectory($work . '/api/src/Domain/Order')?->slug,
+);
 
 // "api-legacy" starts with "api", and matching on the raw prefix would open
 // the wrong project entirely.
-check('a sibling with a shared prefix is not mistaken for it',
+check(
+    'a sibling with a shared prefix is not mistaken for it',
     $store->forDirectory($work . '/api-legacy')?->slug === $legacy->slug,
-    (string) $store->forDirectory($work . '/api-legacy')?->slug);
+    (string) $store->forDirectory($work . '/api-legacy')?->slug,
+);
 
 check('a trailing slash changes nothing', $store->forDirectory($work . '/api/')?->slug === $api->slug);
-check('a directory under no project finds none', $store->forDirectory('/tmp') === null);
-check('an empty directory finds none', $store->forDirectory('') === null);
+check('a directory under no project finds none', !$store->forDirectory('/tmp') instanceof Project);
+check('an empty directory finds none', !$store->forDirectory('') instanceof Project);
 
 $store->delete($api->slug);
 $store->delete($nested->slug);
@@ -249,21 +273,23 @@ $draft = $store->draft($newDir, 'Brouillon', $none);
 
 check('a draft writes nothing to projects.yaml', md5_file($yaml) === $before);
 check('nor creates its memory directory', !is_dir(dirname($draft->memoryDb)), dirname($draft->memoryDb));
-check('and is not found by its directory yet', $store->forDirectory($newDir) === null);
+check('and is not found by its directory yet', !$store->forDirectory($newDir) instanceof Project);
 
 $adopted = $store->adopt($draft);
-check('adopted, it is saved', (new ProjectStore(new StackDetector()))->forDirectory($newDir)?->slug === $adopted->slug);
+check('adopted, it is saved', new ProjectStore(new StackDetector())->forDirectory($newDir)?->slug === $adopted->slug);
 check('with its memory directory', is_dir(dirname($adopted->memoryDb)));
 
 // One project per directory, whatever else happens.
 $twin = $store->adopt($store->draft($newDir, 'Jumeau', $none));
 check('a second draft for the same directory is the same project', $twin->slug === $adopted->slug, "{$twin->slug} vs {$adopted->slug}");
-check('and adds no entry', count(array_filter($store->all(), fn($p) => $p->path === $adopted->path)) === 1);
+check('and adds no entry', count(array_filter($store->all(), fn(Project $p): bool => $p->path === $adopted->path)) === 1);
 
 symlink($newDir, $home . '/raccourci');
-check('reached through a symlink, it is still the same directory',
+check(
+    'reached through a symlink, it is still the same directory',
     $store->forDirectory($home . '/raccourci')?->slug === $adopted->slug,
-    (string) $store->forDirectory($home . '/raccourci')?->slug);
+    (string) $store->forDirectory($home . '/raccourci')?->slug,
+);
 $viaLink = $store->adopt($store->draft($home . '/raccourci', 'Par le lien', $none));
 check('and adopting it through the link finds the project instead of making a twin', $viaLink->slug === $adopted->slug);
 
@@ -276,8 +302,11 @@ $leftDraft = $left->draft($otherDir, 'Gauche', $none);
 $rightDraft = $right->draft($otherDir, 'Droite', $none);
 $leftProject = $left->adopt($leftDraft);
 $rightProject = $right->adopt($rightDraft);
-check('two sessions drafting one directory end up in one project',
-    $rightProject->slug === $leftProject->slug, "{$leftProject->slug} vs {$rightProject->slug}");
+check(
+    'two sessions drafting one directory end up in one project',
+    $rightProject->slug === $leftProject->slug,
+    "{$leftProject->slug} vs {$rightProject->slug}",
+);
 
 // ---- writing projects.yaml -------------------------------------------------
 // Rewritten in place, a second session reading during the write found an empty
@@ -299,7 +328,7 @@ if (posix_getuid() !== 0) {
     chmod($home . '/.config/sherpa', 0555);
     $warnings = [];
     // Those silenced with @ reach a handler too; PHP itself would not print them.
-    set_error_handler(function (int $no, string $message) use (&$warnings) {
+    set_error_handler(function (int $no, string $message) use (&$warnings): true {
         if ((error_reporting() & $no) !== 0) {
             $warnings[] = $message;
         }
@@ -318,8 +347,11 @@ if (posix_getuid() !== 0) {
     chmod($home . '/.config/sherpa', 0755);
     $locked->create('Ensuite', $fresh(), $none);
     $saved = (string) file_get_contents($configFile);
-    check('the change it kept is saved with the next one, once writable again',
-        str_contains($saved, 'Verrouillé') && str_contains($saved, 'Ensuite') && $locked->takeWriteError() === null, $saved);
+    check(
+        'the change it kept is saved with the next one, once writable again',
+        str_contains($saved, 'Verrouillé') && str_contains($saved, 'Ensuite') && $locked->takeWriteError() === null,
+        $saved,
+    );
     $locked->delete('verrouille');
     $locked->delete('ensuite');
 } else {
@@ -335,11 +367,11 @@ $config = $home . '/.config/sherpa';
 file_put_contents($config . '/keys.yaml', "groq: k-groq\n");
 mkdir($home . '/precieux', 0777, true);
 file_put_contents($home . '/precieux/travail.txt', 'ne pas perdre');
-$yaml = Symfony\Component\Yaml\Yaml::parseFile($config . '/projects.yaml') ?? [];
+$yaml = Yaml::parseFile($config . '/projects.yaml') ?? [];
 foreach (['..', '../../..', ''] as $i => $slug) {
     $yaml['projects'][$slug] = ['name' => "piégé {$i}", 'path' => $fresh()];
 }
-file_put_contents($config . '/projects.yaml', Symfony\Component\Yaml\Yaml::dump($yaml, 4, 2));
+file_put_contents($config . '/projects.yaml', Yaml::dump($yaml, 4, 2));
 $trap = new ProjectStore(new StackDetector());
 foreach (['..', '../../..', ''] as $slug) {
     $trap->delete($slug);
@@ -347,11 +379,11 @@ foreach (['..', '../../..', ''] as $slug) {
 check('a slug edited into ".." does not take the configuration with it', is_file($config . '/keys.yaml'));
 check('nor one into "../../.." the home directory', is_file($home . '/precieux/travail.txt'));
 check('nor an empty one every project\'s memory', is_dir($config . '/projects'));
-check('the entries themselves are forgotten all the same', !array_intersect(['..', '../../..', ''], array_map(fn($p) => $p->slug, (new ProjectStore(new StackDetector()))->all())));
+check('the entries themselves are forgotten all the same', !array_intersect(['..', '../../..', ''], array_map(fn(Project $p): string => $p->slug, new ProjectStore(new StackDetector())->all())));
 
 // ---- reload ----------------------------------------------------------------
 $reopened = new ProjectStore(new StackDetector());
-check('projects survive a reload with their slugs intact', $reopened->get('editeur-d-essai')?->name === "Éditeur d'essai", json_encode(array_map(fn($p) => $p->slug, $reopened->all())));
+check('projects survive a reload with their slugs intact', $reopened->get('editeur-d-essai')?->name === "Éditeur d'essai", json_encode(array_map(fn(Project $p): string => $p->slug, $reopened->all())));
 
 if ($realHome !== null) {
     $_SERVER['HOME'] = $realHome;

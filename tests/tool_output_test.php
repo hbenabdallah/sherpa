@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 // What a tool sends back goes into the model's window, and it has to fit.
 //
 // Seen in a real session: one project_grep matched a JSON test fixture written
@@ -6,7 +9,7 @@
 // request was refused for exceeding the model's window. file_read had no bound
 // at all. Both are now bounded in characters, not only in lines.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\ContextBudget;
 use App\Project\ProjectPathResolver;
@@ -50,8 +53,11 @@ check('a cut never leaves broken UTF-8', mb_check_encoding(LongLine::clip(str_re
 // ---- project_grep ---------------------------------------------------------------
 $grep = new ProjectGrepTool($paths);
 $found = $grep('support');
-check('grep on a minified file sends back a few hundred characters, not the line',
-    strlen($found) < 1500, (string) strlen($found));
+check(
+    'grep on a minified file sends back a few hundred characters, not the line',
+    strlen($found) < 1500,
+    (string) strlen($found),
+);
 check('with the match in it, and where it is', str_contains($found, 'support@example.test') && str_contains($found, 'fixtures/devis.json:1:'), $found);
 check('ordinary matches come back whole', str_contains($found, 'src/Mailer.php:2:// support address comes from the configuration'), $found);
 
@@ -59,8 +65,11 @@ for ($i = 0; $i < 40; $i++) {
     file_put_contents($root . "/fixtures/lot{$i}.json", str_repeat('x', 3000) . 'support' . str_repeat('y', 3000));
 }
 $many = $grep('support');
-check('many long matches stay within the search\'s share of the window',
-    strlen($many) < 50 * 110 + 800, (string) strlen($many));
+check(
+    'many long matches stay within the search\'s share of the window',
+    strlen($many) < 50 * 110 + 800,
+    (string) strlen($many),
+);
 check('and say that some were left out', str_contains($many, 'results shown'), substr($many, -200));
 
 // ---- file_read ---------------------------------------------------------------------
@@ -69,7 +78,7 @@ $minified = $read('fixtures/devis.json');
 check('reading a minified file sends back a bounded line', strlen($minified) < 3000, (string) strlen($minified));
 check('that says it was cut', str_contains($minified, '[line of'), substr($minified, 0, 200));
 
-$big = implode("\n", array_map(static fn(int $n) => sprintf('// ligne %05d %s', $n, str_repeat('-', 80)), range(1, 5000)));
+$big = implode("\n", array_map(static fn(int $n): string => sprintf('// ligne %05d %s', $n, str_repeat('-', 80)), range(1, 5000)));
 file_put_contents($root . '/src/Big.php', $big);
 $first = $read('src/Big.php');
 check('a large file is cut to the read\'s share of the window', strlen($first) < 60000, (string) strlen($first));

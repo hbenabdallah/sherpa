@@ -18,18 +18,23 @@ namespace App\Usage;
 final class UsageMeter
 {
     /** Share of the cap at which the user is told, once, that it is close. */
-    private const WARN_AT = 0.8;
+    private const float WARN_AT = 0.8;
 
     private int $requests = 0;
+
     private int $prompt = 0;
+
     private int $completion = 0;
+
     private int $cached = 0;
 
     /** Tokens of the most recent request, sent plus received. */
     private int $last = 0;
 
     private float $cost = 0.0;
+
     private int $unpriced = 0;
+
     private ?Price $price = null;
 
     private bool $warned = false;
@@ -63,7 +68,7 @@ final class UsageMeter
         $this->cached += $cached;
         $this->last = $prompt + $completion;
 
-        if ($this->price === null) {
+        if (!$this->price instanceof Price) {
             $this->unpriced++;
         } else {
             $this->cost += $this->price->of($prompt, $completion, $cached);
@@ -119,11 +124,30 @@ final class UsageMeter
         return $this->total() < $this->cap;
     }
 
-    public function requests(): int { return $this->requests; }
-    public function prompt(): int { return $this->prompt; }
-    public function completion(): int { return $this->completion; }
-    public function cached(): int { return $this->cached; }
-    public function cap(): int { return $this->cap; }
+    public function requests(): int
+    {
+        return $this->requests;
+    }
+
+    public function prompt(): int
+    {
+        return $this->prompt;
+    }
+
+    public function completion(): int
+    {
+        return $this->completion;
+    }
+
+    public function cached(): int
+    {
+        return $this->cached;
+    }
+
+    public function cap(): int
+    {
+        return $this->cap;
+    }
 
     public function total(): int
     {

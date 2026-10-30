@@ -1,12 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Agent\Tool;
 
-final class ToolResult
+final readonly class ToolResult
 {
     public function __construct(
-        public readonly string $callId,
-        public readonly string $content,
-        public readonly bool $isError = false,
+        public string $callId,
+        public string $content,
+        public bool $isError = false,
     ) {}
 }

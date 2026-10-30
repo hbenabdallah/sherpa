@@ -18,10 +18,10 @@ namespace App\Tool\Edit;
 final class TextPatch
 {
     /** Below this, the "closest line" is no longer close enough to be worth quoting. */
-    private const HINT_SIMILARITY = 50.0;
+    private const float HINT_SIMILARITY = 50.0;
 
     /** Lines quoted around the closest match. */
-    private const HINT_LINES = 6;
+    private const int HINT_LINES = 6;
 
     public static function apply(string $content, string $search, string $replace): PatchOutcome
     {
@@ -30,7 +30,7 @@ final class TextPatch
         }
 
         $exact = self::unique($content, $search, $replace, 'exact');
-        if ($exact !== null) {
+        if ($exact instanceof PatchOutcome) {
             return $exact;
         }
 
@@ -42,7 +42,7 @@ final class TextPatch
                 str_replace("\n", "\r\n", $replace),
                 'line endings',
             );
-            if ($crlf !== null) {
+            if ($crlf instanceof PatchOutcome) {
                 return $crlf;
             }
         }
@@ -57,13 +57,13 @@ final class TextPatch
                 str_replace('\\\\', '\\', $replace),
                 'doubled backslashes',
             );
-            if ($collapsed !== null) {
+            if ($collapsed instanceof PatchOutcome) {
                 return $collapsed;
             }
         }
 
         $indented = self::ignoringIndentation($content, $search, $replace);
-        if ($indented !== null) {
+        if ($indented instanceof PatchOutcome) {
             return $indented;
         }
 
@@ -110,12 +110,12 @@ final class TextPatch
     private static function ignoringIndentation(string $content, string $search, string $replace): ?PatchOutcome
     {
         $searchLines = explode("\n", rtrim($search, "\n"));
-        if (array_filter($searchLines, fn($l) => trim($l) !== '') === []) {
+        if (array_filter($searchLines, fn($l): bool => trim($l) !== '') === []) {
             return null;
         }
 
         $lines = explode("\n", $content);
-        $wanted = array_map('trim', $searchLines);
+        $wanted = array_map(trim(...), $searchLines);
         $n = count($wanted);
         $starts = [];
 
@@ -135,12 +135,12 @@ final class TextPatch
         if (count($starts) > 1) {
             return PatchOutcome::failed(
                 'search string matches ' . count($starts) . ' places once indentation is ignored (lines '
-                . implode(', ', array_map(fn($s) => $s + 1, $starts)) . ') — include more of the surrounding code',
+                . implode(', ', array_map(fn($s): int => $s + 1, $starts)) . ') — include more of the surrounding code',
             );
         }
 
         $start = $starts[0];
-        $first = array_key_first(array_filter($searchLines, fn($l) => trim($l) !== ''));
+        $first = array_key_first(array_filter($searchLines, fn($l): bool => trim($l) !== ''));
         $from = self::indentOf($searchLines[$first]);
         $to = self::indentOf($lines[$start + $first]);
 

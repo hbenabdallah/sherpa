@@ -8,12 +8,12 @@ namespace App\Rag\Embedding;
  * What detection concluded. Settled answers are recorded — a model, or none —
  * and an undetermined one is not, so the next launch looks again.
  */
-final class EmbeddingDetection
+final readonly class EmbeddingDetection
 {
     private function __construct(
-        public readonly ?string $model,
-        public readonly bool $settled,
-        public readonly string $reason,
+        public ?string $model,
+        public bool $settled,
+        public string $reason,
     ) {}
 
     public static function found(string $model): self

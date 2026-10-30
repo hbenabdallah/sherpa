@@ -12,7 +12,7 @@ use App\Platform\ModelInfo;
  * 32k model for 256k with nothing noticing; and a model name means nothing
  * without its backend, since the same string can be a tag and a hosted id.
  */
-final class ModelProfile
+final readonly class ModelProfile
 {
     /**
      * The window used when nothing better is known, deliberately modest: a
@@ -21,14 +21,14 @@ final class ModelProfile
      * paid API it is a spending decision. Starting low is the only order that
      * cannot silently ruin what someone came for.
      */
-    public const SAFE_CONTEXT = 32768;
+    public const int SAFE_CONTEXT = 32768;
 
     public function __construct(
-        public readonly string $model,
-        public readonly int $contextWindow,
+        public string $model,
+        public int $contextWindow,
         /** Where this came from, named for the user: "machine config", "-m", … */
-        public readonly string $source = '',
-        public readonly Backend $backend = Backend::DEFAULT,
+        public string $source = '',
+        public Backend $backend = Backend::DEFAULT,
     ) {}
 
     /**
@@ -64,7 +64,7 @@ final class ModelProfile
     /** Same model on the same backend: switching to it discards nothing. */
     public function sameModelAs(?self $other): bool
     {
-        return $other !== null && $other->backend === $this->backend && $other->model === $this->model;
+        return $other instanceof self && $other->backend === $this->backend && $other->model === $this->model;
     }
 
     public function describe(): string

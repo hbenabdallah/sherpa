@@ -1,8 +1,11 @@
 <?php
+
+declare(strict_types=1);
+
 // What a provider says about its limits, read from its headers and shown at
 // the bottom of the conversation — and nothing when it says nothing.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Platform\OpenAiCompatiblePlatform;
 use App\Platform\RateLimits;
@@ -33,9 +36,11 @@ $openai = RateLimits::fromHeaders([
     'x-ratelimit-remaining-tokens'   => ['6000'],
     'x-ratelimit-reset-tokens'       => ['6m0s'],
 ]);
-check('OpenAI-style headers are read, window by window',
+check(
+    'OpenAI-style headers are read, window by window',
     ($openai?->windows['requests']['remaining'] ?? null) === 499 && ($openai?->windows['tokens']['limit'] ?? null) === 30000,
-    json_encode($openai?->windows));
+    json_encode($openai?->windows),
+);
 check('the tightest window is the one shown', $openai?->tightest() === ['name' => 'tokens', 'percentLeft' => 20], json_encode($openai?->tightest()));
 check('with its reset, as the provider wrote it', ($openai?->windows['tokens']['reset'] ?? null) === '6m0s');
 
@@ -51,17 +56,26 @@ $mistral = RateLimits::fromHeaders([
     'x-ratelimit-limit-tokens-month'     => ['1000000000'],
     'x-ratelimit-remaining-tokens-month' => ['870000000'],
     'x-ratelimit-limit-tokens-minute'    => ['500000'],
-    'x-ratelimit-remaining-tokens-minute'=> ['499000'],
+    'x-ratelimit-remaining-tokens-minute' => ['499000'],
 ]);
-check('a monthly quota is named as one', isset($mistral?->windows['tokens/month']) && $mistral?->tightest()['name'] === 'tokens/month',
-    json_encode($mistral?->windows));
+check(
+    'a monthly quota is named as one',
+    isset($mistral?->windows['tokens/month']) && $mistral?->tightest()['name'] === 'tokens/month',
+    json_encode($mistral?->windows),
+);
+
+// A window named by a number becomes an integer key in a PHP array.
+$numbered = RateLimits::fromHeaders(['x-ratelimit-limit-60' => ['100'], 'x-ratelimit-remaining-60' => ['25']]);
+check('a window named by a number is read too', $numbered?->tightest()['percentLeft'] === 25, json_encode($numbered?->windows));
 
 $ietf = RateLimits::fromHeaders(['RateLimit-Limit' => ['100, 100;w=60'], 'RateLimit-Remaining' => ['40']]);
 check('the IETF draft form, header case and all', $ietf?->tightest() === ['name' => 'requests', 'percentLeft' => 40], json_encode($ietf?->windows));
 
-check('a provider that sends none gets no figure', RateLimits::fromHeaders(['content-type' => ['text/event-stream']]) === null);
-check('nor does a limit of zero, or a missing remainder',
-    RateLimits::fromHeaders(['x-ratelimit-limit-tokens' => ['0'], 'x-ratelimit-remaining-tokens' => ['0'], 'x-ratelimit-limit-requests' => ['9']]) === null);
+check('a provider that sends none gets no figure', !RateLimits::fromHeaders(['content-type' => ['text/event-stream']]) instanceof RateLimits);
+check(
+    'nor does a limit of zero, or a missing remainder',
+    !RateLimits::fromHeaders(['x-ratelimit-limit-tokens' => ['0'], 'x-ratelimit-remaining-tokens' => ['0'], 'x-ratelimit-limit-requests' => ['9']]) instanceof RateLimits,
+);
 
 // ---- caught from a real reply -----------------------------------------------
 $responses = [
@@ -72,19 +86,27 @@ $responses = [
     ]]),
     new MockResponse(['data: {"choices":[{"delta":{"content":"again"}}]}' . "\n\ndata: [DONE]\n\n"], ['response_headers' => ['content-type' => 'text/event-stream']]),
 ];
-$platform = new OpenAiCompatiblePlatform(new MockHttpClient(fn() => array_shift($responses)), 'https://api.example.com/v1', 'm', 'k');
-check('nothing before the first reply', $platform->rateLimits() === null);
-$platform->stream([['role' => 'user', 'content' => 'x']], [], fn() => null);
+$platform = new OpenAiCompatiblePlatform(new MockHttpClient(fn(): MockResponse => array_shift($responses)), 'https://api.example.com/v1', 'm', 'k');
+check('nothing before the first reply', !$platform->rateLimits() instanceof RateLimits);
+$platform->stream([['role' => 'user', 'content' => 'x']], [], fn(): null => null);
 check('the limits of the last reply are kept', $platform->rateLimits()?->tightest() === ['name' => 'tokens', 'percentLeft' => 25]);
-$platform->stream([['role' => 'user', 'content' => 'x']], [], fn() => null);
-check('a reply without headers does not erase what is known', $platform->rateLimits() !== null);
+$platform->stream([['role' => 'user', 'content' => 'x']], [], fn(): null => null);
+check('a reply without headers does not erase what is known', $platform->rateLimits() instanceof RateLimits);
 $platform->useEndpoint('https://other.example.com/v1');
-check("and another provider starts from nothing: its limits are not the last one's", $platform->rateLimits() === null);
+check("and another provider starts from nothing: its limits are not the last one's", !$platform->rateLimits() instanceof RateLimits);
 
 // ---- at the bottom of the conversation --------------------------------------
-$project = new Project(slug: 'p', name: 'p', path: '/tmp', memoryDb: '/tmp/m.db', docker: new DockerConfig(enabled: false),
-    stack: '', createdAt: new DateTimeImmutable(), lastUsedAt: new DateTimeImmutable());
-$bar = (new ReflectionClass(StatusBar::class))->newInstanceWithoutConstructor();
+$project = new Project(
+    slug: 'p',
+    name: 'p',
+    path: '/tmp',
+    memoryDb: '/tmp/m.db',
+    docker: new DockerConfig(enabled: false),
+    stack: '',
+    createdAt: new DateTimeImmutable(),
+    lastUsedAt: new DateTimeImmutable(),
+);
+$bar = new ReflectionClass(StatusBar::class)->newInstanceWithoutConstructor();
 $shown = function (?RateLimits $limits) use ($bar, $project): string {
     ob_start();
     $bar->render($project, 'm', 100, 1000, true, null, $limits);

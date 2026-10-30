@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * End-to-end check of project memory against a LIVE Ollama model.
  *
@@ -12,7 +15,7 @@
  * feature had never persisted a single fact outside a unit test.
  */
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\AgentLoop;
 use App\Agent\ContextBudget;
@@ -102,7 +105,7 @@ $writing = new MessageBag();
 $writing->system(
     'You are a development agent. You have memory_remember and memory_recall '
     . 'to keep durable facts about the project between sessions. '
-    . 'ALWAYS use these tools rather than answering from memory.'
+    . 'ALWAYS use these tools rather than answering from memory.',
 );
 [$transcript] = turn($loop, $writing, "Remember this for the next sessions: this project's database is PostgreSQL 16, and the listening port is 5433.");
 
@@ -122,7 +125,7 @@ echo "\n--- reading it back from a separate conversation ---\n";
 $reading = new MessageBag();
 $reading->system(
     'You are a development agent. Use memory_recall to find what was remembered '
-    . 'about this project. Never guess.'
+    . 'about this project. Never guess.',
 );
 [$transcript, $answer] = turn($loop, $reading, 'Which port does this project\'s database use? Look in your memory.');
 
@@ -142,15 +145,18 @@ for ($i = 0; $i < 30; $i++) {
 }
 
 $digest = $store->digest();
-check('the answer is out of sight, only its key is listed',
-    !str_contains($digest, '9187') && str_contains($digest, 'port_metrics'), $digest);
+check(
+    'the answer is out of sight, only its key is listed',
+    !str_contains($digest, '9187') && str_contains($digest, 'port_metrics'),
+    $digest,
+);
 
 $looking = new MessageBag();
 $looking->system(
     "# Standing memory (lasting facts about this project)\n{$digest}\n\n"
     . "This list may be partial. Use memory_recall(search) to retrieve a fact whose "
     . "key alone is quoted above, or to search by keywords.\n"
-    . 'Never guess: read the memory before answering.'
+    . 'Never guess: read the memory before answering.',
 );
 [$transcript, $answer] = turn($loop, $looking, 'Which port does the metrics server listen on?');
 

@@ -30,7 +30,7 @@ final class CommandLine
         for ($i = 0; $i < $length; $i++) {
             $char = $line[$i];
 
-            if ($char === ' ' || $char === "\t" || $char === "\n") {
+            if (in_array($char, [' ', "\t", "\n"], true)) {
                 if ($inWord) {
                     $words[] = $word;
                     $word = '';

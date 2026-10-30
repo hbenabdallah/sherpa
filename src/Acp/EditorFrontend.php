@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Acp;
 
 use App\Agent\AgentOutput;
@@ -16,6 +18,8 @@ use App\Tool\Edit\ProposedEdit;
 use App\Tool\ShellExecTool;
 use App\TUI\ChatPane;
 use App\TUI\Terminal;
+use stdClass;
+use Throwable;
 
 /**
  * A turn as an editor sees it: session/update notifications for the reply and
@@ -26,17 +30,17 @@ use App\TUI\Terminal;
 final class EditorFrontend implements AgentOutput, Approver
 {
     /** Tool output sent to the editor, at most: it shows it, the model has it all. */
-    private const MAX_RESULT_CHARS = 20_000;
+    private const int MAX_RESULT_CHARS = 20_000;
 
     /** Allowed for the session, or for good: both are an "always" to an editor. */
-    private const OPTIONS = [
+    private const array OPTIONS = [
         ['optionId' => 'allow-once', 'name' => 'Allow once', 'kind' => 'allow_once'],
         ['optionId' => 'allow-session', 'name' => 'Allow for this session', 'kind' => 'allow_always'],
         ['optionId' => 'allow-project', 'name' => 'Always allow in this project', 'kind' => 'allow_always'],
         ['optionId' => 'reject', 'name' => 'Refuse', 'kind' => 'reject_once'],
     ];
 
-    private const PLAN_OPTIONS = [
+    private const array PLAN_OPTIONS = [
         ['optionId' => 'plan-go', 'name' => 'Carry out this plan', 'kind' => 'allow_once'],
         ['optionId' => 'plan-keep', 'name' => 'Keep planning', 'kind' => 'reject_once'],
     ];
@@ -47,8 +51,11 @@ final class EditorFrontend implements AgentOutput, Approver
     private bool $notices = false;
 
     private string $messageId = '';
+
     private string $withheld = '';
+
     private bool $holding = false;
+
     private string $lastWait = '';
 
     /**
@@ -58,6 +65,7 @@ final class EditorFrontend implements AgentOutput, Approver
      * @var array<string, array{name: string, edit: ?ProposedEdit}>
      */
     private array $calls = [];
+
     private ?string $planCall = null;
 
     public function __construct(
@@ -177,9 +185,7 @@ final class EditorFrontend implements AgentOutput, Approver
     // ---- the tools --------------------------------------------------------------
 
     /** The editor shows the tool call as in progress already. */
-    public function showRunning(string $toolName, float $seconds): void
-    {
-    }
+    public function showRunning(string $toolName, float $seconds): void {}
 
     public function showToolCall(string $toolName, array $args = [], ?string $callId = null): void
     {
@@ -204,7 +210,7 @@ final class EditorFrontend implements AgentOutput, Approver
             'title'         => Lanes::prefix() . ToolDescriptions::title($toolName, $args),
             'kind'          => ToolDescriptions::kind($toolName),
             'status'        => 'pending',
-            'rawInput'      => $args === [] ? new \stdClass() : $args,
+            'rawInput'      => $args === [] ? new stdClass() : $args,
         ];
 
         $locations = $this->locations($args, $edit);
@@ -395,7 +401,7 @@ final class EditorFrontend implements AgentOutput, Approver
 
     private function sendPlan(): void
     {
-        $entries = array_map(static fn(array $task) => [
+        $entries = array_map(static fn(array $task): array => [
             'content'  => (string) $task['text'],
             'priority' => 'medium',
             'status'   => match ($task['status']) {
@@ -418,7 +424,7 @@ final class EditorFrontend implements AgentOutput, Approver
      */
     private function preview(string $toolName, array $args, ?ProposedEdit $edit): array
     {
-        if ($edit !== null) {
+        if ($edit instanceof ProposedEdit) {
             return [self::diff($edit)];
         }
 
@@ -440,7 +446,7 @@ final class EditorFrontend implements AgentOutput, Approver
      */
     private function locations(array $args, ?ProposedEdit $edit): array
     {
-        if ($edit !== null) {
+        if ($edit instanceof ProposedEdit) {
             return [['path' => $edit->path]];
         }
 
@@ -451,7 +457,7 @@ final class EditorFrontend implements AgentOutput, Approver
 
         try {
             $location = ['path' => $this->paths->resolve($path)];
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return [];
         }
 

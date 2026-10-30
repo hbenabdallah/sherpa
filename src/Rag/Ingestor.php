@@ -8,6 +8,7 @@ use App\Rag\Parser\DocumentParser;
 use App\Rag\Parser\HtmlParser;
 use App\Rag\Parser\MarkdownParser;
 use App\Rag\Parser\TextParser;
+use Throwable;
 
 /**
  * The project's documents into the index — only what changed since last time.
@@ -19,15 +20,15 @@ use App\Rag\Parser\TextParser;
  * and a stat per file, which is what lets it run before every search rather
  * than on a schedule someone has to remember.
  */
-final class Ingestor
+final readonly class Ingestor
 {
     /** @var list<DocumentParser> */
-    private readonly array $parsers;
+    private array $parsers;
 
     /** @param list<DocumentParser>|null $parsers */
     public function __construct(
-        private readonly DocSource $source,
-        private readonly Chunker $chunker,
+        private DocSource $source,
+        private Chunker $chunker,
         ?array $parsers = null,
     ) {
         $this->parsers = $parsers ?? [new MarkdownParser(), new TextParser(), new HtmlParser()];
@@ -63,7 +64,7 @@ final class Ingestor
             }
 
             $parser = $this->parserFor($path);
-            if ($parser === null) {
+            if (!$parser instanceof DocumentParser) {
                 continue;
             }
 
@@ -71,7 +72,7 @@ final class Ingestor
                 $document = $parser->parse($path, self::utf8($content));
                 $index->replace($path, $hash, $size, $mtime, $document, $this->chunker->chunk($document));
                 $known === null ? $report->added++ : $report->updated++;
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 // One document that will not parse costs itself, not the index.
                 $report->failed[$path] = $e->getMessage();
             }

@@ -1,16 +1,19 @@
 <?php
+
+declare(strict_types=1);
+
 // What is read goes to the model's provider. A file that usually holds secrets
 // is asked about every time before it is read, by file_read, grep or a
 // command, and a credential in any tool's output goes as a marker, not as
 // itself — which no file write can then put back in place of the real one.
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 use App\Agent\Tool\Permission;
 use App\Agent\Tool\SecretMask;
+use App\Agent\Tool\Toolbox;
 use App\Agent\Tool\ToolCall;
 use App\Agent\Tool\ToolDefinition;
-use App\Agent\Tool\Toolbox;
 use App\Permission\Approver;
 use App\Permission\CommandPolicy;
 use App\Permission\ConfirmChoice;
@@ -113,10 +116,23 @@ check('grep in .env itself is refused', str_contains($direct, 'Not searched') &&
 final class Answer implements Approver
 {
     public int $asked = 0;
+
     public ?Offer $offer = null;
+
     public function __construct(private readonly ConfirmChoice $choice) {}
-    public function confirm(ToolCall $call, ToolDefinition $def, Offer $offer): ConfirmChoice { $this->asked++; $this->offer = $offer; return $this->choice; }
-    public function approvePlan(string $plan): ?bool { return null; }
+
+    public function confirm(ToolCall $call, ToolDefinition $def, Offer $offer): ConfirmChoice
+    {
+        $this->asked++;
+        $this->offer = $offer;
+
+        return $this->choice;
+    }
+
+    public function approvePlan(string $plan): ?bool
+    {
+        return null;
+    }
 }
 $home = sys_get_temp_dir() . '/sherpa-secrets-home-' . bin2hex(random_bytes(3));
 mkdir($home . '/.config/sherpa/projects', 0777, true);

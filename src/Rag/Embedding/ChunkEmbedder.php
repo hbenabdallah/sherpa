@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Rag\Embedding;
 
 use App\Rag\DocIndex;
+use RuntimeException;
 
 /**
  * Gives every chunk of the index a vector, reusing the ones already made.
@@ -17,7 +18,7 @@ use App\Rag\DocIndex;
 final class ChunkEmbedder
 {
     /** Chunks per request to the provider. */
-    private const BATCH = 32;
+    private const int BATCH = 32;
 
     /** @return int how many chunks were embedded now */
     public function embed(DocIndex $index, EmbeddingProvider $embeddings): int
@@ -36,7 +37,7 @@ final class ChunkEmbedder
             $vectors = $embeddings->embed(array_column($pending, 'text'));
 
             if (count($vectors) !== count($pending)) {
-                throw new \RuntimeException("Embeddings: {$model} returned " . count($vectors) . ' vectors for ' . count($pending) . ' passages.');
+                throw new RuntimeException("Embeddings: {$model} returned " . count($vectors) . ' vectors for ' . count($pending) . ' passages.');
             }
 
             $index->storeVectors(array_combine(array_column($pending, 'id'), $vectors));

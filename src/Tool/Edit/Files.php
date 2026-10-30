@@ -1,6 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Tool\Edit;
+
+use Closure;
+use RuntimeException;
 
 /**
  * Where file_read, file_write and file_patch get a file's text and put it
@@ -10,21 +15,21 @@ namespace App\Tool\Edit;
  */
 class Files
 {
-    /** @var (\Closure(string): ?string)|null */
-    private ?\Closure $reader = null;
+    /** @var (Closure(string): ?string)|null */
+    private ?Closure $reader = null;
 
-    /** @var (\Closure(string, string): void)|null */
-    private ?\Closure $writer = null;
+    /** @var (Closure(string, string): void)|null */
+    private ?Closure $writer = null;
 
     /**
      * Read and write through an editor from now on. $reader answers null for
      * a file it cannot give, which is then read from disk; $writer throws
      * \RuntimeException saying why it could not write.
      *
-     * @param (\Closure(string): ?string)|null    $reader
-     * @param (\Closure(string, string): void)|null $writer
+     * @param (Closure(string): ?string)|null    $reader
+     * @param (Closure(string, string): void)|null $writer
      */
-    public function through(?\Closure $reader, ?\Closure $writer): void
+    public function through(?Closure $reader, ?Closure $writer): void
     {
         $this->reader = $reader;
         $this->writer = $writer;
@@ -33,7 +38,7 @@ class Files
     /** The text of the file at $resolved (absolute), or null when there is none to read. */
     public function read(string $resolved): ?string
     {
-        if ($this->reader !== null && ($text = ($this->reader)($resolved)) !== null) {
+        if ($this->reader instanceof Closure && ($text = ($this->reader)($resolved)) !== null) {
             return $text;
         }
 
@@ -49,11 +54,11 @@ class Files
     /**
      * @param string $path as the model named it, for what it is told on failure
      *
-     * @throws \RuntimeException
+     * @throws RuntimeException
      */
     public function write(string $resolved, string $path, string $content): void
     {
-        if ($this->writer !== null) {
+        if ($this->writer instanceof Closure) {
             ($this->writer)($resolved, $content);
 
             return;
@@ -79,6 +84,6 @@ class Files
             array_pop($lines);
         }
 
-        return array_map(static fn(string $line) => str_ends_with($line, "\r") ? substr($line, 0, -1) : $line, $lines);
+        return array_map(static fn(string $line): string => str_ends_with($line, "\r") ? substr($line, 0, -1) : $line, $lines);
     }
 }

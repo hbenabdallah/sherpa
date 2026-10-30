@@ -22,11 +22,13 @@ namespace App\TUI\Input;
  */
 final class LineBuffer
 {
-    public const SUBMIT = 'submit';
-    public const EOF = 'eof';
+    public const string SUBMIT = 'submit';
+
+    public const string EOF = 'eof';
 
     /** @var list<string> one entry per character, so the cursor never splits one */
     private array $chars = [];
+
     private int $cursor = 0;
 
     /** Position in history while walking it; null when editing the draft. */
@@ -48,22 +50,24 @@ final class LineBuffer
     private array $pastes = [];
 
     /** Past this many lines, or characters, a paste is shown as a label. */
-    public const PASTE_LINES_SHOWN = 5;
-    public const PASTE_CHARS_SHOWN = 1000;
+    public const int PASTE_LINES_SHOWN = 5;
+
+    public const int PASTE_CHARS_SHOWN = 1000;
 
     /**
      * Enter with a modifier, as terminals that tell it apart send it: Alt
      * (ESC then CR), and Shift/Ctrl/Alt in the xterm "modifyOtherKeys" and
      * kitty "CSI u" encodings.
      */
-    private const NEWLINE_KEYS = [
+    private const array NEWLINE_KEYS = [
         "\e\r", "\e\n",
         "\e[13;2u", "\e[13;3u", "\e[13;5u", "\e[13;6u",
         "\e[27;2;13~", "\e[27;3;13~", "\e[27;5;13~", "\e[27;6;13~",
     ];
 
-    public const PASTE_START = "\e[200~";
-    public const PASTE_END = "\e[201~";
+    public const string PASTE_START = "\e[200~";
+
+    public const string PASTE_END = "\e[201~";
 
     /** @param list<string> $history oldest first */
     public function __construct(private readonly array $history = []) {}
@@ -105,6 +109,7 @@ final class LineBuffer
 
                     return null;
                 }
+
                 return self::SUBMIT;
 
             case "\x04": // Ctrl+D: the end of input on an empty line, Delete otherwise
@@ -112,27 +117,32 @@ final class LineBuffer
                     return self::EOF;
                 }
                 $this->delete();
+
                 return null;
 
             case "\x7f":
             case "\x08":
                 $this->backspace();
+
                 return null;
 
             case "\e[3~":
                 $this->delete();
+
                 return null;
 
             case "\e[D":
             case "\eOD":
             case "\x02":
                 $this->cursor = max(0, $this->cursor - 1);
+
                 return null;
 
             case "\e[C":
             case "\eOC":
             case "\x06":
                 $this->cursor = min(count($this->chars), $this->cursor + 1);
+
                 return null;
 
             case "\e[H":
@@ -140,6 +150,7 @@ final class LineBuffer
             case "\e[1~":
             case "\x01":
                 $this->cursor = $this->lineStart();
+
                 return null;
 
             case "\e[F":
@@ -147,36 +158,43 @@ final class LineBuffer
             case "\e[4~":
             case "\x05":
                 $this->cursor = $this->lineEnd();
+
                 return null;
 
             case "\x0b": // Ctrl+K: to the end of the line
                 array_splice($this->chars, $this->cursor, $this->lineEnd() - $this->cursor);
+
                 return null;
 
             case "\x15": // Ctrl+U: to the start of the line
                 $start = $this->lineStart();
                 array_splice($this->chars, $start, $this->cursor - $start);
                 $this->cursor = $start;
+
                 return null;
 
             case "\x17": // Ctrl+W: the word before the cursor
                 $this->deleteWordBefore();
+
                 return null;
 
-            // Between the lines of a message; past its first or last line,
-            // through history, as on a single line.
+                // Between the lines of a message; past its first or last line,
+                // through history, as on a single line.
             case "\e[A":
             case "\eOA":
                 $this->lineStart() > 0 ? $this->verticalMove(-1) : $this->older();
+
                 return null;
 
             case "\e[B":
             case "\eOB":
                 $this->lineEnd() < count($this->chars) ? $this->verticalMove(1) : $this->newer();
+
                 return null;
 
             case "\t":
                 $this->insert('    ');
+
                 return null;
         }
 
