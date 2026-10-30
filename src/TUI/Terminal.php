@@ -114,7 +114,8 @@ class Terminal
 
     public function rawMode(): void
     {
-        $this->savedStty = shell_exec('stty -g 2>/dev/null') ?? '';
+        $saved = shell_exec('stty -g 2>/dev/null');
+        $this->savedStty = is_string($saved) ? $saved : '';
         // exec(), not system(): system() echoes the command's own stdout into
         // the middle of whatever is being drawn.
         exec('stty -echo -icanon min 1 time 0 2>/dev/null');
