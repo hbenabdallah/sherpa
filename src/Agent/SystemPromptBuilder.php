@@ -82,7 +82,7 @@ class SystemPromptBuilder
 
         $launchDir = $_SERVER['SHERPA_CWD'] ?? getenv('SHERPA_CWD') ?: null;
 
-        return $this->activity->terms($project->path, is_string($launchDir) && $launchDir !== '' ? $launchDir : null);
+        return $this->activity->terms($project->path, is_string($launchDir) ? $launchDir : null);
     }
 
     /**

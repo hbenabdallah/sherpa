@@ -160,6 +160,9 @@ final class ContextBudget
      *
      * Smoothed, because a single turn is noisy — one large tool result can skew
      * the density badly in either direction.
+     *
+     * @param array<int, array<string, mixed>> $messages
+     * @param array<int, array<string, mixed>> $toolSchemas
      */
     public function calibrate(int $actualPromptTokens, array $messages, array $toolSchemas = []): void
     {

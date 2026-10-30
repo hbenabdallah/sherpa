@@ -14,6 +14,12 @@ use App\Rag\Retriever;
  * broken down by kind of question, since a strategy perfect on exact references
  * and blind to rephrasing averages to a number describing neither. Without
  * them, every change of chunking, model or ranking is a bet.
+ *
+ * @phpstan-type Run array{
+ *   overall: array{n: int, r1: float, rk: float, mrr: float},
+ *   kinds: array<string, array{n: int, r1: float, rk: float, mrr: float}>,
+ *   misses: list<array{kind: string, q: string, top: string}>
+ * }
  */
 final class RetrievalEval
 {
@@ -23,11 +29,7 @@ final class RetrievalEval
     /**
      * @param list<array{kind: string, q: string, expect: list<array{path: string, section: string}>}> $questions
      *
-     * @return array{
-     *   overall: array{n: int, r1: float, rk: float, mrr: float},
-     *   kinds: array<string, array{n: int, r1: float, rk: float, mrr: float}>,
-     *   misses: list<array{kind: string, q: string, top: string}>
-     * }
+     * @return Run
      */
     public function run(Retriever $retriever, array $questions, int $k = 5): array
     {
@@ -108,7 +110,7 @@ final class RetrievalEval
     /**
      * The results side by side, one line per strategy per kind.
      *
-     * @param array<string, array{overall: array, kinds: array}> $results strategy name => run()
+     * @param array<string, Run> $results strategy name => run()
      */
     public static function table(array $results, int $k = 5): string
     {

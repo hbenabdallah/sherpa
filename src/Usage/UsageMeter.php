@@ -174,7 +174,7 @@ final class UsageMeter
             return null;
         }
 
-        $currency = $this->price?->currency ?? '$';
+        $currency = $this->price->currency ?? '$';
 
         return '~' . number_format($cost, $cost < 1 ? 4 : 2, '.', ',') . ' ' . $currency;
     }

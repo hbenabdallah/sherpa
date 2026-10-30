@@ -6,6 +6,7 @@ namespace App\Tool\Edit;
 
 use ParseError;
 use Phar;
+use PhpToken;
 use Symfony\Component\Process\Process;
 use Throwable;
 
@@ -110,7 +111,7 @@ class SyntaxGuard
     private function parse(string $path, string $content): ?string
     {
         try {
-            token_get_all($content, TOKEN_PARSE);
+            PhpToken::tokenize($content, TOKEN_PARSE);
         } catch (ParseError $e) {
             return sprintf('PHP Parse error: %s in %s on line %d', $e->getMessage(), $path, $e->getLine());
         } catch (Throwable) {

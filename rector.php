@@ -18,9 +18,6 @@ return RectorConfig::configure()
         // It promotes a property with the parameter's type, narrower than the property's:
         // Frontend could no longer take the editor's output in place of the terminal's.
         ClassPropertyAssignToConstructorPromotionRector::class,
-        // Its parser shares state with closures by reference, which Rector reads as never changing:
-        // it emptied the closure that ends a word, and every grant check with it.
-        __DIR__ . '/src/Permission/ShellCommand.php',
     ])
     ->withCache(__DIR__ . '/var/rector')
     ->withPhpSets()

@@ -357,7 +357,7 @@ HELP . Terminal::RESET;
                 echo Terminal::BOLD . "\nContext:\n" . Terminal::RESET;
                 $this->row('model', "%s", $this->platform->modelName());
                 $this->row('backend', "%s", $this->model->whereItRuns($this->platform->backend()));
-                $this->row('chosen from', "%s", $this->model->profile()?->source ?? '(unknown)');
+                $this->row('chosen from', "%s", $this->model->profile()->source ?? '(unknown)');
                 $this->row('messages', "%d", $bag->count());
                 $this->row('history', "~%d tokens", $this->budget->estimateMessages($bag->all()));
                 $this->row('tool schemas', "~%d tokens", $this->budget->estimateTools($schemas));
@@ -516,7 +516,7 @@ HELP . Terminal::RESET;
     private function handlePermissions(string $args): void
     {
         $parts = explode(' ', trim($args), 2);
-        $action = $parts[0] ?? '';
+        $action = $parts[0];
         $target = trim($parts[1] ?? '');
 
         // Both scopes at once: "[p] Always" grants for the session too, and a

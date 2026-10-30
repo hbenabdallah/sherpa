@@ -191,7 +191,11 @@ final class McpCommand extends Command
         return $pairs;
     }
 
-    /** The names only: values are where the tokens are. @param array<int, string> $names */
+    /**
+     * The names only: values are where the tokens are.
+     *
+     * @param array<int, string> $names
+     */
     private function hidden(string $label, array $names): string
     {
         return $names === [] ? '' : "  <comment>{$label}: " . OutputFormatter::escape(implode(', ', $names)) . '</comment>';

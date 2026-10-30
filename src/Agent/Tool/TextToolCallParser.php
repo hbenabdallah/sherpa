@@ -28,7 +28,7 @@ final class TextToolCallParser
     /**
      * @param  string[]                                                          $knownToolNames
      * @param  array<string, array{params: list<string>, required: list<string>}> $signatures by tool name, for arguments written without one
-     * @return array<int, array{function: array{name: string, arguments: array}}>
+     * @return array<int, array{function: array{name: string, arguments: array<string, mixed>}}>
      */
     public function parse(string $content, array $knownToolNames, array $signatures = []): array
     {
@@ -77,7 +77,7 @@ final class TextToolCallParser
      *
      * @param array<string, array{params: list<string>, required: list<string>}> $signatures
      *
-     * @return array<int, array{function: array{name: string, arguments: array}}>
+     * @return array<int, array{function: array{name: string, arguments: array<string, mixed>}}>
      */
     private function nameless(string $content, array $signatures): array
     {

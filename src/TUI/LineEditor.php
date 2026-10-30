@@ -44,7 +44,7 @@ class LineEditor
     /** Entries the history held when read: what follows was typed here. */
     private int $historyRead = 0;
 
-    /** Past lines, oldest first, when there is no libreadline to keep them. */
+    /** @var list<string> past lines, oldest first, when there is no libreadline to keep them */
     private array $history = [];
 
     /**
@@ -530,7 +530,7 @@ class LineEditor
         $lines = is_file($file) ? @file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) : false;
 
         return is_array($lines)
-            ? array_map(fn(string $e): string => str_replace(self::NEWLINE_IN_HISTORY, "\n", $e), array_slice(array_values($lines), -self::MAX_HISTORY))
+            ? array_map(fn(string $e): string => str_replace(self::NEWLINE_IN_HISTORY, "\n", $e), array_slice($lines, -self::MAX_HISTORY))
             : [];
     }
 }

@@ -111,7 +111,7 @@ class ProjectQuestions
         // works from this machine, and inside the container — with no docker
         // client there — it cannot work at all.
         $wrapper = ($composed || $running !== []) ? DockerWrapper::in($path) : null;
-        $likely = $current?->enabled ?? (($composed || $running !== []) && $wrapper === null);
+        $likely = $current->enabled ?? (($composed || $running !== []) && $wrapper === null);
 
         if (!$current instanceof DockerConfig && ($composed || $running !== [])) {
             echo Terminal::GRAY . '  ' . ($running !== []
@@ -146,7 +146,7 @@ class ProjectQuestions
             dbContainer: $this->askWithDefault('  DB container (optional)', $current?->dbContainer ?: $this->pick($running, self::DB_HINTS, required: false)),
             // Not asked: the default is right almost everywhere, and the rest
             // is one line of projects.yaml.
-            user: $current?->user ?? DockerConfig::USER_HOST,
+            user: $current->user ?? DockerConfig::USER_HOST,
         );
     }
 

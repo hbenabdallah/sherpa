@@ -32,7 +32,7 @@ final class MarkdownParser implements DocumentParser
 
         // Front matter: blanked rather than removed, so line numbers still
         // point at the right place in the file.
-        if (($lines[0] ?? '') === '---') {
+        if ($lines[0] === '---') {
             for ($i = 1, $n = count($lines); $i < $n; $i++) {
                 if (preg_match('/^title:\s*["\']?(.+?)["\']?\s*$/', $lines[$i], $m) === 1) {
                     $title = $m[1];

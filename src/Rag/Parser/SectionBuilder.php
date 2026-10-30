@@ -29,9 +29,14 @@ final class SectionBuilder
      */
     public static function build(array $lines, callable $headingAt, ?callable $opensVerbatim = null): array
     {
+        // Shared by reference with $flush, which tools read at the type a variable has here.
+        /** @var list<Section> $sections */
         $sections = [];
-        $stack = [];               // level => heading text
+        /** @var array<int, string> $stack level => heading text */
+        $stack = [];
+        /** @var list<string> $buffer */
         $buffer = [];
+        /** @var int $start */
         $start = 1;
         $fence = null;
 

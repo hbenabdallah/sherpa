@@ -6,7 +6,6 @@ namespace App\DI;
 
 use App\Agent\Tool\AsTool;
 use ReflectionClass;
-use ReflectionException;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 
@@ -21,11 +20,7 @@ class ToolboxPass implements CompilerPassInterface
                 continue;
             }
 
-            try {
-                $ref = new ReflectionClass($class);
-            } catch (ReflectionException) {
-                continue;
-            }
+            $ref = new ReflectionClass($class);
 
             if (!empty($ref->getAttributes(AsTool::class))) {
                 $definition->addTag('agent.tool');

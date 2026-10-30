@@ -30,6 +30,7 @@ final class Project
         public array $allowedTools = [],
     ) {}
 
+    /** @param array<string, mixed> $data as projects.yaml holds it */
     public static function fromArray(string $slug, array $data): self
     {
         return new self(
@@ -51,6 +52,9 @@ final class Project
         );
     }
 
+    /**
+     * @return array{name: string, path: string, memory_db: string, docker: array{enabled: bool, container: string, db_container: string, user: string}, stack: string, created_at: string, last_used_at: string, allowed_tools: list<string>}
+     */
     public function toArray(): array
     {
         return [
@@ -77,8 +81,8 @@ final class Project
 
     public function shortPath(): string
     {
-        $home = $_SERVER['HOME'] ?? getenv('HOME') ?? '';
+        $home = $_SERVER['HOME'] ?? getenv('HOME');
 
-        return $home ? str_replace($home, '~', $this->path) : $this->path;
+        return is_string($home) && $home !== '' ? str_replace($home, '~', $this->path) : $this->path;
     }
 }

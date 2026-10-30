@@ -158,6 +158,8 @@ final class Connection
      * an object even with nothing in it.
      *
      * @param array<string, mixed> $value
+     *
+     * @return array<string, mixed>|stdClass
      */
     private static function object(array $value): array|stdClass
     {

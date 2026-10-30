@@ -60,7 +60,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
     /** How long one at a time holds after the provider said slow down. */
     private const int STRAINED_SECONDS = 120;
 
-    /** @var array{prompt: int, completion: int}|null */
+    /** @var array{prompt: int, completion: int, cached?: int}|null */
     private ?array $lastUsage {
         get => $this->lastOf('usage');
         set(?array $value) {
@@ -141,7 +141,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
         private readonly int $maxTokens = 4096,
         /** What to call this backend in a message; the host, by default. */
         private readonly ?string $label = null,
-        /** How a wait passes, in seconds; tests make it instant. */
+        /** @var (Closure(float): void)|null how a wait passes, in seconds; tests make it instant */
         private readonly ?Closure $sleep = null,
     ) {
         $this->baseUrl = rtrim($this->baseUrl, '/');
@@ -245,6 +245,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
      * screen; a second reply would print after the first half.
      *
      * @return bool false when the user cut the wait short
+     * @param (callable(bool, ?string=): void)|null $onWait
      */
     private function waitBeforeRetry(StreamFailed $e, bool $shown, int $try, ?callable $onWait): bool
     {
@@ -326,6 +327,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
      * request would only repeat, at the same price.
      *
      * @param array<string, mixed> $payload
+     * @param (callable(bool, ?string=): void)|null $onWait
      */
     private function send(array $payload, string $path = '/chat/completions', string $accept = 'text/event-stream', ?callable $onWait = null): ResponseInterface
     {
@@ -411,6 +413,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
      * how long, and Ctrl+C is heard — a minute is too long to be deaf.
      *
      * @return bool false when the user cut it short
+     * @param (callable(bool, ?string=): void)|null $onWait
      */
     private function pause(int $seconds, string $why, ?callable $onWait): bool
     {
@@ -438,6 +441,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
      * and Ctrl+C unheard.
      *
      * @return bool false when the user cut it short
+     * @param (callable(bool, ?string=): void)|null $onWait
      */
     private function awaitHeaders(ResponseInterface $response, ?callable $onWait): bool
     {
@@ -567,6 +571,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
      * @param (callable(string): void)|null $onToken
      *
      * @return array<string, mixed>
+     * @param (callable(bool, ?string=): void)|null $onWait
      */
     private function consume(
         ResponseInterface $response,
@@ -601,6 +606,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
      * @param callable(string): void $onLine
      *
      * @return bool false when the user cut it short
+     * @param (callable(bool, ?string=): void)|null $onWait
      */
     private function pump(ResponseInterface $response, ?callable $onWait, callable $onLine): bool
     {
@@ -650,6 +656,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
      *
      * @param array<int|string, array<string, mixed>> $toolCalls
      * @param (callable(string): void)|null           $onToken
+     * @param (callable(bool, ?string=): void)|null $onWait
      */
     private function consumeLine(
         string $line,
@@ -745,7 +752,7 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
      * fragment belongs to. The id and name come once, in the opening fragment.
      *
      * @param array<int|string, array<string, mixed>> $acc
-     * @param array<int, array<string, mixed>>        $deltas
+     * @param array<int|string, mixed>               $deltas the provider's JSON, as decoded
      */
     private function accumulateToolCalls(array &$acc, array $deltas): void
     {
@@ -907,6 +914,8 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
      * @param array<int, array<string, mixed>> $tools
      *
      * @return array<string, mixed>
+     * @param (callable(string): void)|null $onToken
+     * @param (callable(bool, ?string=): void)|null $onWait
      */
     private function streamAnthropic(array $messages, array $tools, ?callable $onToken, ?callable $onWait): array
     {

@@ -256,7 +256,11 @@ final class CommandPolicy
         };
     }
 
-    /** Whether an interpreter is given no script of its own, so runs its input. @param list<string> $args */
+    /**
+     * Whether an interpreter is given no script of its own, so runs its input.
+     *
+     * @param list<string> $args
+     */
     private static function readsStdin(array $args): bool
     {
         foreach ($args as $arg) {

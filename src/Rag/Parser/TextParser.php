@@ -45,7 +45,11 @@ final class TextParser implements DocumentParser
         return new ParsedDocument($path, $title, $type, $sections);
     }
 
-    /** @param list<string> $lines */
+    /**
+     * @param list<string> $lines
+     *
+     * @return array{level: int, text: string, lines: int}|null
+     */
     private static function asciidoc(int $i, array $lines): ?array
     {
         if (preg_match('/^(={1,6})\s+(.+?)\s*$/', $lines[$i], $m) === 1) {
@@ -59,6 +63,8 @@ final class TextParser implements DocumentParser
      * reStructuredText decides nothing by character: whichever underline comes
      * first is level one, the next new one level two. So the order is learned
      * while reading.
+     *
+     * @return callable(int, list<string>): (array{level: int, text: string, lines: int}|null)
      */
     private static function restructured(): callable
     {

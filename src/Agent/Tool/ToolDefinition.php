@@ -8,6 +8,10 @@ use stdClass;
 
 final readonly class ToolDefinition
 {
+    /**
+     * @param array<string, array{type: string, description: string, required?: bool, schema?: array<string, mixed>}> $parameters
+     *        by name; 'schema' is the rest of an MCP server's JSON Schema for it
+     */
     public function __construct(
         public string $name,
         public string $description,
@@ -18,6 +22,9 @@ final readonly class ToolDefinition
         public bool $untrusted = false,
     ) {}
 
+    /**
+     * @return array{type: 'function', function: array{name: string, description: string, parameters: array{type: 'object', properties: array<string, array<string, mixed>>|stdClass, required: list<string>}}}
+     */
     public function toFunctionSchema(): array
     {
         $properties = [];
