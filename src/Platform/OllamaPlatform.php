@@ -283,6 +283,9 @@ class OllamaPlatform implements PlatformInterface, EmbeddingBackend
     private function accumulateToolCalls(array &$acc, array $deltas): void
     {
         foreach ($deltas as $position => $delta) {
+            if (!is_array($delta)) {
+                continue;
+            }
             $function = $delta['function'] ?? [];
             $arguments = $function['arguments'] ?? null;
 

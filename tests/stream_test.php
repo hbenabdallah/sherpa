@@ -55,6 +55,12 @@ check('single tool call captured', 1, count($msg['tool_calls'] ?? []));
 check('tool name preserved', 'file_read', $msg['tool_calls'][0]['function']['name']);
 check('object arguments preserved', ['path' => 'a.php'], $msg['tool_calls'][0]['function']['arguments']);
 
+// ---- 3b. A tool call that is not an object ---------------------------------
+$msg = platform([
+    '{"message":{"tool_calls":["junk",{"function":{"name":"file_read","arguments":{"path":"a.php"}}}]},"done":true}',
+])->stream([]);
+check('a tool call that is not an object is dropped, the others kept', ['file_read'], array_map(fn(array $call): string => $call['function']['name'], $msg['tool_calls'] ?? []));
+
 // ---- 4. THE REGRESSION: two tool calls arriving in separate chunks ---------
 $msg = platform([
     '{"message":{"tool_calls":[{"function":{"name":"file_read","arguments":{"path":"a.php"}}}]}}' . "\n",
