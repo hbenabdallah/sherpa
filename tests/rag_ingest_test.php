@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Rag\Chunk;
 use App\Rag\DocSource;
 use App\Rag\Section;

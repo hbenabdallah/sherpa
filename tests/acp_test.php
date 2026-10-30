@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // `sherpa acp` end to end, as an editor drives it: the real command in a
 // subprocess, a scripted provider behind it, and this script in the editor's
 // seat — initialize, open a session, prompt, answer the permission questions,

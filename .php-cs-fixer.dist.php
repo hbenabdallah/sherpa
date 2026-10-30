@@ -6,7 +6,7 @@ $finder = (new PhpCsFixer\Finder())
     ->in([__DIR__ . '/src', __DIR__ . '/tests'])
     ->ignoreVCSIgnored(true);
 
-// declare_strict_types, final_class, strict_comparison, strict_param and date_time_immutable change behaviour, not layout:
+// final_class, strict_comparison, strict_param and date_time_immutable change behaviour, not layout:
 // each is turned on by its own change, with the suites run on the result.
 return (new PhpCsFixer\Config())
     ->setRiskyAllowed(true)
@@ -14,6 +14,7 @@ return (new PhpCsFixer\Config())
     ->setRules([
         '@PER-CS2.0' => true,
         '@PER-CS2.0:risky' => true,
+        'declare_strict_types' => true,
         'modernize_types_casting' => true,
         'no_unused_imports' => true,
         'ordered_imports' => ['imports_order' => ['class', 'function', 'const']],

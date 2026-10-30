@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // The first-run question about the API, run on its own with its answers piped
 // in, as a person would type them. Used by first_run_test.php.
 //

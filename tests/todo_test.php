@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Agent\Tool\Permission;
 use App\Agent\Tool\Toolbox;
 use App\Agent\Tool\ToolDefinition;

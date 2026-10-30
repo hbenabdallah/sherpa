@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // file_find: files by name pattern, confined to the project, newest first.
 
 require __DIR__ . '/../vendor/autoload.php';

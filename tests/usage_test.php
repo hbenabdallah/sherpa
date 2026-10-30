@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // What a session consumes, what it costs, and the cap that stops it — now that
 // the default backend bills by the token.
 

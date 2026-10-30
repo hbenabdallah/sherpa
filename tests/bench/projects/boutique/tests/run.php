@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // Lance chaque fonction test_* de tests/*Test.php.
 
 require __DIR__ . '/../autoload.php';

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Config\Backend;
 use App\Platform\ModelInfo;
 use App\Platform\ModelResidency;

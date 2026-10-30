@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Rag\Hit;
 
 // Retrieval, measured. A small documentation corpus written for this purpose,

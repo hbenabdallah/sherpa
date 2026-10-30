@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Agent\Tool\ToolResult;
 
 // list_dir: the one tool that shows how a project is laid out. Before it, the

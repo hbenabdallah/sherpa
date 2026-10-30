@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Agent\Result;
 use App\Agent\Tool\TextToolCallParser;
 use Symfony\Component\Console\Command\LazyCommand;

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // The tasks the benchmark gives Sherpa. Each one is something a person would
 // actually ask of a coding agent, on a project it has never seen, and each is
 // scored on what happened to the project — files, tests, the answer given —

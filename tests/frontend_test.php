@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Agent\Tool\Permission;
 use App\Permission\Offer;
 use App\Tool\Edit\ProposedEdit;

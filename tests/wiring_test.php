@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Agent\AgentLoop;
 use App\Agent\ContextBudget;
 use App\Agent\HistoryCompactor;

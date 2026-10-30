@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // Ctrl+C cancels the turn, not the session — and leaves the conversation in a
 // state the next request can actually be built from.
 

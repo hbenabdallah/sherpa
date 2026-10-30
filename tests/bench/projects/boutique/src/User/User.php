@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Boutique\User;
 
 final readonly class User

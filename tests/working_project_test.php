@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Project\Project;
 use App\Project\ProjectQuestions;
 use App\TUI\LineEditor;

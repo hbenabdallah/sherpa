@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // shell_exec: the tool that runs arbitrary commands, and the one with no test
 // until now.
 

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // Writes the files Sherpa v0.1.0 kept, with v0.1.0's own code, for
 // compat_test.php. In the container:
 //   mkdir -p var/compat && git archive v0.1.0 src | tar -x -C var/compat

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // Verification of OllamaPlatform::stream() tool-call accumulation.
 require __DIR__ . '/../vendor/autoload.php';
 

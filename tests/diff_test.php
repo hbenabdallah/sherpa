@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // The diff the confirmation shows for file_patch and file_write: the lines
 // that change and where, as git shows them — the screen an edit is approved
 // from has to say what the edit does.

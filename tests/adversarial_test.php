@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // A hostile session from end to end: a model that has read a poisoned page
 // and tries, one call after another, to keep a malicious fact, to run more than
 // it was allowed, to read the project's secrets, to write outside the project

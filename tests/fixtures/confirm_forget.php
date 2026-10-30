@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // Answers ProjectQuestions::confirmForget() from stdin and prints the verdict,
 // so the one question before an irreversible delete can be tested without a
 // terminal. Usage: php confirm_forget.php

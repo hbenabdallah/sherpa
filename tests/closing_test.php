@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Agent\Tool\ToolCall;
 use App\Agent\Tool\ToolDefinition;
 

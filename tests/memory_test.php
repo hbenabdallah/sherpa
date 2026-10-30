@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Agent\PlanMode;
 
 // Project memory: what gets kept, what gets found again, and what must never be

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Permission\Offer;
 
 // Verification of ConfirmOverlay previews resolving against the project root.

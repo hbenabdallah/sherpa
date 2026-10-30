@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Acp\SessionConfig;
 use App\Permission\Offer;
 

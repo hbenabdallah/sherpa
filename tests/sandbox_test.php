@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Agent\Tool\ToolResult;
 
 // Verification that filesystem tools cannot escape the project root.

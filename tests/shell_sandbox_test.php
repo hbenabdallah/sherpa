@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // Commands run on this machine write only to the project, the temporary
 // directories and the package caches, and cannot read Sherpa's API keys.
 // Checked with real commands in the real sandbox: bubblewrap on Linux,

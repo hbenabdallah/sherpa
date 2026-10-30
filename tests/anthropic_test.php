@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Platform\ModelInfo;
 
 // Anthropic's Messages API, spoken natively: the request shape, the event

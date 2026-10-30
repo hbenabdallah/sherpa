@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Boutique\Billing;
 
 use Boutique\Catalog\Product;

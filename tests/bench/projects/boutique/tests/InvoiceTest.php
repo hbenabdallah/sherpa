@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Boutique\Billing\Invoice;
 use Boutique\Billing\InvoiceLine;
 use Boutique\Catalog\Product;

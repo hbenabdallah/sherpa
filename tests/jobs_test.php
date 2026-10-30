@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // Background jobs: left running, read as they go, stopped with what they started.
 
 require __DIR__ . '/../vendor/autoload.php';

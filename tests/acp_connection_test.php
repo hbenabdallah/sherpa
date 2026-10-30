@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // JSON-RPC over stdio, as ACP frames it: one message per line, requests both
 // ways, and a cancel that has to be heard while Sherpa waits on something else.
 

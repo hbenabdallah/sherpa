@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // doc_search as the model sees it: passages with their source, one per section,
 // within a budget — and the index kept where the project's files are, created
 // only once the project is, and gone when it is forgotten.

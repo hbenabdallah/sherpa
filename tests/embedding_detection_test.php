@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // The embedding model is found, never asked for: the user gives an address, a
 // key and a chat model, and a chat model cannot make vectors. The provider's
 // catalogue is read first; without one, known names are tried on one word. A

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // Questions about how a real project is put together: who handles a request,
 // what reacts to an event, what a change would break. On a project of a few
 // files grep answers them; here the answer crosses a command bus, an event

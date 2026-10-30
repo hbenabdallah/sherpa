@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // What a tool sends back goes into the model's window, and it has to fit.
 //
 // Seen in a real session: one project_grep matched a JSON test fixture written

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Symfony\Component\Yaml\Yaml;
 
 // Verification of model selection: the precedence chain, what gets written down,

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Boutique\Controller;
 
 use Boutique\Routing\Route;

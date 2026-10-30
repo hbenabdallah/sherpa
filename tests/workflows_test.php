@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // The GitHub workflows, read as GitHub reads them. A line with ": " inside an
 // unquoted value made tests.yml invalid YAML, and GitHub then ran none of its
 // jobs — reported as one failure with nothing in it, after the push.

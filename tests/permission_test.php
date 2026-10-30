@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Permission\Offer;
 
 // Per-project permissions: they have to survive the process that granted them,

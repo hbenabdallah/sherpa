@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Boutique\Billing\TaxCalculator;
 
 function test_vat_depends_on_country(): void

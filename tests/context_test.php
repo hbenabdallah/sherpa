@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Runtime\Interrupt;
 
 // Verification of ContextBudget accounting/calibration and HistoryCompactor.

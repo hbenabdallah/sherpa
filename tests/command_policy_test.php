@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // Grants for shell_exec name commands, not the tool. What a command line runs
 // is read the way the shell reads it, so a grant for `make test` is no grant
 // for `make test; rm -rf ~`, and some commands are asked about every time.

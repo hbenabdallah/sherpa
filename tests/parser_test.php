@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // Verification of TextToolCallParser: recovering tool calls a model emitted as
 // prose, without firing on models that merely talk about JSON.
 

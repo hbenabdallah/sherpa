@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Agent\Tool\ToolDefinition;
 
 // Declaring MCP servers without opening mcp.json: /mcp add and its siblings in

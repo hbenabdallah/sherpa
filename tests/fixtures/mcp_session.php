@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // Runs one /mcp command in a session, answering its questions from stdin, and
 // prints what happened as JSON — so declaring a server from a session can be
 // tested without a terminal.

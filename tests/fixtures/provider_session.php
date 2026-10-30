@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // Runs one /provider command against scripted providers, answering its
 // questions from stdin, and prints what happened as JSON — so adding and
 // switching providers can be tested without a terminal.

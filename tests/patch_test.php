@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Agent\Tool\ToolResult;
 
 // file_patch and file_write: placing an edit the way the model meant it, and

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // What is read goes to the model's provider. A file that usually holds secrets
 // is asked about every time before it is read, by file_read, grep or a
 // command, and a credential in any tool's output goes as a marker, not as

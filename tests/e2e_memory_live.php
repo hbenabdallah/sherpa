@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * End-to-end check of project memory against a LIVE Ollama model.
  *

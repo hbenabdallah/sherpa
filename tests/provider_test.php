@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Platform\OllamaPlatform;
 use App\Platform\OpenAiCompatiblePlatform;
 use App\Platform\SwitchablePlatform;

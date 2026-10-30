@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Boutique\User\UserRepo;
 
 function test_user_repo_finds_known_users(): void

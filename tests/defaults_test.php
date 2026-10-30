@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // Defaults live in two places, and they must say the same thing.
 //
 // docker-compose.yml passes every variable as ${VAR:-default}: a variable it

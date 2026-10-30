@@ -6,14 +6,11 @@ use Rector\CodeQuality\Rector\ClassMethod\LocallyCalledStaticMethodToNonStaticRe
 use Rector\Config\RectorConfig;
 use Rector\Php80\Rector\Class_\ClassPropertyAssignToConstructorPromotionRector;
 use Rector\DeadCode\Rector\ClassMethod\RemoveUnusedPublicMethodParameterRector;
-use Rector\TypeDeclaration\Rector\StmtsAwareInterface\SafeDeclareStrictTypesRector;
 
 return RectorConfig::configure()
     ->withPaths([__DIR__ . '/src', __DIR__ . '/tests'])
     ->withSkip([
         __DIR__ . '/tests/fixtures',
-        // strict_types changes how scalars are passed: it comes in its own change, with the suites run on it.
-        SafeDeclareStrictTypesRector::class,
         // A public signature is a contract with callers: changed on purpose, not as a side effect.
         RemoveUnusedPublicMethodParameterRector::class,
         // The suites reach some private static methods through reflection, statically.
