@@ -8,6 +8,7 @@ require __DIR__ . '/../vendor/autoload.php';
 
 use App\TUI\Clipboard;
 use App\TUI\X11Selection;
+use RuntimeException;
 use Symfony\Component\Process\Process;
 
 $pass = 0;
@@ -41,7 +42,7 @@ function paste(string $number, string $target): ?array
         while (strlen($bytes) < $length) {
             $chunk = fread($socket, $length - strlen($bytes));
             if ($chunk === false || $chunk === '') {
-                throw new \RuntimeException('no answer');
+                throw new RuntimeException('no answer');
             }
             $bytes .= $chunk;
         }
@@ -53,7 +54,7 @@ function paste(string $number, string $target): ?array
         while (true) {
             $packet = $read(32);
             if (ord($packet[0]) === 0) {
-                throw new \RuntimeException('X error ' . ord($packet[1]));
+                throw new RuntimeException('X error ' . ord($packet[1]));
             }
             if (ord($packet[0]) === 1) {
                 $extra = unpack('V', $packet, 4)[1] * 4;
@@ -108,7 +109,7 @@ function paste(string $number, string $target): ?array
         $length = unpack('V', $packet, 16)[1] * intdiv($format, 8);
 
         return ['type' => $name($type), 'value' => substr($packet, 32, $length)];
-    } catch (\RuntimeException) {
+    } catch (RuntimeException) {
         return null;
     } finally {
         fclose($socket);
