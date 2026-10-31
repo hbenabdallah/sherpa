@@ -104,7 +104,7 @@ final readonly class X11Selection
             return $holder === false;
         }
 
-        $this->serve($x['socket'], $window, $atoms, $time, $text);
+        $this->serve($x['socket'], $atoms, $time, $text);
     }
 
     private function socketPath(): ?string
@@ -282,11 +282,11 @@ final readonly class X11Selection
      * @param resource           $socket
      * @param array<string, int> $atoms
      */
-    private function serve($socket, int $window, array $atoms, int $time, string $text): never
+    private function serve($socket, array $atoms, int $time, string $text): never
     {
         try {
             stream_set_timeout($socket, 3600);
-            $latin1 = function_exists('mb_convert_encoding') ? (string) mb_convert_encoding($text, 'ISO-8859-1', 'UTF-8') : $text;
+            $latin1 = function_exists('mb_convert_encoding') ? mb_convert_encoding($text, 'ISO-8859-1', 'UTF-8') : $text;
             $utf8Targets = [$atoms['UTF8_STRING'], $atoms['TEXT'], $atoms['text/plain;charset=utf-8'], $atoms['text/plain']];
 
             while (true) {
