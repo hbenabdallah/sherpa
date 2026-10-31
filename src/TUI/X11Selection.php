@@ -395,7 +395,7 @@ final readonly class X11Selection
     {
         $bytes = '';
         while (strlen($bytes) < $length) {
-            $chunk = @fread($socket, $length - strlen($bytes));
+            $chunk = @fread($socket, max(1, $length - strlen($bytes)));
             if ($chunk === false || $chunk === '') {
                 throw new X11Failure('the display did not answer');
             }
