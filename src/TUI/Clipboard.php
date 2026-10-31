@@ -8,19 +8,24 @@ use Symfony\Component\Process\Process;
 
 /**
  * Text onto the system clipboard, by whatever this machine has: the desktop's
- * own tool first, and else OSC 52 — an escape sequence asking the terminal to
- * do it, which also crosses SSH and a Docker container, where no clipboard
- * tool can reach the desktop.
+ * own tool first, then the X11 selection held by Sherpa itself, which needs
+ * nothing installed and reaches Wayland through Xwayland, and else OSC 52 — an
+ * escape sequence asking the terminal to do it, which also crosses SSH and a
+ * Docker container, where no clipboard tool can reach the desktop.
  */
 final readonly class Clipboard
 {
-    /** OSC 52 payloads past this are cut off by common terminals. */
+    /** OSC 52 payloads past this, in base64, are cut off by common terminals. */
     private const int OSC52_LIMIT = 100_000;
 
     /**
      * @param (callable(string): ?string)|null $which finds a command on PATH; injectable for tests
+     * @param X11Selection|null                $x11   the display's selection; DISPLAY's when not given
      */
-    public function __construct(private mixed $which = null) {}
+    public function __construct(
+        private mixed $which = null,
+        private ?X11Selection $x11 = null,
+    ) {}
 
     /**
      * @return string how it was copied, to say so; null when it could not be
@@ -44,11 +49,16 @@ final readonly class Clipboard
             }
         }
 
-        if (strlen($text) > self::OSC52_LIMIT || !function_exists('posix_isatty') || !posix_isatty(STDOUT)) {
+        if (($this->x11 ?? new X11Selection())->copy($text)) {
+            return 'the X11 clipboard';
+        }
+
+        $payload = base64_encode($text);
+        if (strlen($payload) > self::OSC52_LIMIT || !function_exists('posix_isatty') || !posix_isatty(STDOUT)) {
             return null;
         }
 
-        echo "\e]52;c;" . base64_encode($text) . "\x07";
+        echo "\e]52;c;" . $payload . "\x07";
 
         return 'the terminal (OSC 52)';
     }

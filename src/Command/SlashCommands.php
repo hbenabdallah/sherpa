@@ -791,7 +791,7 @@ HELP . Terminal::RESET;
 
         $how = $this->clipboard->copy($reply);
         if ($how === null) {
-            $this->chat->showError('No way to reach the clipboard here: no pbcopy, wl-copy, xclip or xsel, and no terminal to ask.');
+            $this->chat->showError('No way to reach the clipboard here: no pbcopy, wl-copy, xclip or xsel, no X display, and no terminal to ask.');
 
             return;
         }
@@ -799,7 +799,7 @@ HELP . Terminal::RESET;
         echo Terminal::GREEN . '✓ Last reply copied' . Terminal::RESET
             . Terminal::GRAY . ' (' . number_format(mb_strlen($reply)) . " characters, via {$how})\n" . Terminal::RESET;
         if (str_starts_with($how, 'the terminal')) {
-            echo Terminal::GRAY . "  If nothing pastes, this terminal does not accept clipboard requests (OSC 52).\n" . Terminal::RESET;
+            echo Terminal::GRAY . "  If nothing pastes, this terminal does not accept clipboard requests (OSC 52): run Sherpa from a desktop session, where DISPLAY is set.\n" . Terminal::RESET;
         }
     }
 
