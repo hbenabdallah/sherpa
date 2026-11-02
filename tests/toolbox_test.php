@@ -123,5 +123,32 @@ check(
     json_encode($withArgs),
 );
 
+// ---- an argument the tool does not declare --------------------------------
+// Seen live: the model sent `timeout` to shell_exec, whose __invoke declares
+// only command/cwd/background. Spread as a named parameter, that is an
+// "Unknown named parameter $timeout" Error and the call never runs.
+[$result, $out] = call($box, ['count' => 3, 'timeout' => 30]);
+check('an undeclared argument is dropped, not fatal', !$result->isError && $out['count'] === 3, $result->content);
+
+// A variadic handler — an MCP server's tool, registered the way McpRegistry
+// does — takes whatever the server's schema declares, extra keys included.
+#[AsTool(name: 'variadic', description: 'Collects what it is given', permission: Permission::AUTO)]
+final class VariadicTool
+{
+    public function __invoke(mixed ...$arguments): string
+    {
+        return json_encode($arguments);
+    }
+}
+
+$variadicBox = new Toolbox([new VariadicTool()]);
+$def = $variadicBox->getDefinitions()[0];
+check('reflection marks a variadic __invoke as variadic', $def->variadic === true);
+check('and a fixed one as not', $box->getDefinitions()[0]->variadic === false);
+
+$result = $variadicBox->execute(new ToolCall(id: 'c3', name: 'variadic', arguments: ['a' => 1, 'timeout' => 30]));
+$out = json_decode($result->content, true);
+check('a variadic handler keeps the extra argument by name', !$result->isError && ($out['timeout'] ?? null) === 30, $result->content);
+
 printf("\n%d passed, %d failed\n", $pass, $fail);
 exit($fail === 0 ? 0 : 1);

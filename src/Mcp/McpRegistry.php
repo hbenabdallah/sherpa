@@ -179,6 +179,9 @@ class McpRegistry
                     permission: Permission::CONFIRM,
                     handler: new McpTool($client, $tool['name']),
                     untrusted: true,
+                    // McpTool::__invoke is variadic: the server's schema, not
+                    // ours, says what the tool takes, so nothing is dropped.
+                    variadic: true,
                 ));
                 $this->toolNames[$server->name][] = $name;
                 $added++;
