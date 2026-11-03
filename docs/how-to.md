@@ -44,7 +44,7 @@ tools, same project memory and saved conversations — with the editor's own vie
   for the terminal;
 - what a conversation taught is remembered, as when leaving the terminal: an
   editor never says a conversation is over, so its facts are taken when you
-  open another one.
+  open another one, in the background unless the model is local.
 
 **Set it up once.** The editor asks nothing, so Sherpa has to know its model
 before: run `sherpa acp --setup` in a terminal (the provider, its key, the

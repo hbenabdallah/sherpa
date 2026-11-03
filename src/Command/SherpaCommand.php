@@ -511,8 +511,12 @@ final class SherpaCommand extends Command
             $this->readLastFacts($bag, $factCursor);
         }
 
+        // Counts every pass that has ended; one still reading cannot report in
+        // time, and the summary says so rather than look complete.
+        $passStillRunning = $this->backgroundFacts->isRunning();
         if ($this->usage->requests() > 0) {
-            echo Terminal::GRAY . "\n" . $this->usage->summary() . "\n" . Terminal::RESET;
+            $notCounted = $passStillRunning ? ', not counting the memory pass still running' : '';
+            echo Terminal::GRAY . "\n" . $this->usage->summary() . $notCounted . "\n" . Terminal::RESET;
         }
 
         echo Terminal::GRAY . "\nSession over. Good luck!\n" . Terminal::RESET;

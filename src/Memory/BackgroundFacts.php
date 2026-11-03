@@ -7,6 +7,7 @@ namespace App\Memory;
 use App\Agent\MessageBag;
 use App\Platform\SwitchablePlatform;
 use App\Runtime\Interrupt;
+use App\Usage\UsageMeter;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -22,6 +23,9 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * resetting the session's client (curl keeps it, in a share that outlives
  * the reset on PHP 8.5), and one the child reused was cut under it by the
  * session's next request: "SSL_read: unexpected eof".
+ *
+ * What a pass spent comes back over a socket pair, and counts in the
+ * session's usage (its summary, its cap) once the pass is reaped.
  */
 final class BackgroundFacts
 {
@@ -34,8 +38,12 @@ final class BackgroundFacts
      */
     private array $stdio = [];
 
-    /** The pass still running, so the next one waits its turn rather than doubling the requests. */
-    private ?int $child = null;
+    /**
+     * The passes under way, each with the end of the socket it reports on.
+     *
+     * @var array<int, resource>
+     */
+    private array $children = [];
 
     public function __construct(
         private readonly FactExtractor $extractor,
@@ -47,6 +55,7 @@ final class BackgroundFacts
          */
         private readonly HttpClientInterface $http,
         private readonly Interrupt $interrupt,
+        private readonly UsageMeter $usage,
     ) {}
 
     /**
@@ -58,7 +67,7 @@ final class BackgroundFacts
         return !file_exists('/.dockerenv') && !file_exists('/run/.containerenv');
     }
 
-    /** Until the pass under way ends, or Ctrl+C. */
+    /** Until the passes under way end, or Ctrl+C. */
     public function wait(): void
     {
         while ($this->isRunning() && !$this->interrupt->requested()) {
@@ -66,19 +75,19 @@ final class BackgroundFacts
         }
     }
 
+    /** Whether a pass is under way. The ones that ended have their usage counted here. */
     public function isRunning(): bool
     {
-        if ($this->child === null) {
-            return false;
+        foreach ($this->children as $pid => $report) {
+            if (pcntl_waitpid($pid, $status, WNOHANG) === 0) {
+                continue;
+            }
+
+            $this->countUsage($report);
+            unset($this->children[$pid]);
         }
 
-        if (pcntl_waitpid($this->child, $status, WNOHANG) === 0) {
-            return true;
-        }
-
-        $this->child = null;
-
-        return false;
+        return $this->children !== [];
     }
 
     /**
@@ -94,13 +103,24 @@ final class BackgroundFacts
             return false;
         }
 
+        $sockets = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
+        if ($sockets === false) {
+            return false;
+        }
+        [$ours, $theirs] = $sockets;
+
         $pid = pcntl_fork();
         if ($pid === -1) {
+            fclose($ours);
+            fclose($theirs);
+
             return false;
         }
 
         if ($pid > 0) {
-            $this->child = $pid;
+            // Ours alone holds it now, so reading it ends when the child does.
+            fclose($theirs);
+            $this->children[$pid] = $ours;
 
             return true;
         }
@@ -114,13 +134,53 @@ final class BackgroundFacts
         // terminal this process no longer has.
         try {
             if ($this->detach()) {
-                $store = new MemoryStore();
-                $store->open($database);
-                $this->extractor->into($store, $this->platform->withHttpClient($this->http))->extract($bag, $from);
+                $this->extract($bag, $from, $database, $theirs);
             }
         } finally {
             self::vanish();
         }
+    }
+
+    /**
+     * The pass, then what it spent, on $report. A pass that asked nothing
+     * leaves the meter as it was, and reports nothing: the platform's last
+     * usage is then the session's own request, already counted.
+     *
+     * @param resource $report
+     */
+    private function extract(MessageBag $bag, int $from, string $database, $report): void
+    {
+        $store = new MemoryStore();
+        $store->open($database);
+        $platform = $this->platform->withHttpClient($this->http);
+        $asked = $this->usage->requests();
+
+        $this->extractor->into($store, $platform)->extract($bag, $from);
+
+        $usage = $platform->lastUsage();
+        if ($usage !== null && $this->usage->requests() > $asked) {
+            fwrite($report, json_encode($usage, JSON_THROW_ON_ERROR));
+        }
+    }
+
+    /**
+     * What an ended pass spent, read from its socket, into the session's
+     * meter. Read whole: its writer is gone, so the read ends at once.
+     *
+     * @param resource $report
+     */
+    private function countUsage($report): void
+    {
+        $sent = stream_get_contents($report);
+        fclose($report);
+
+        $usage = is_string($sent) && $sent !== '' ? json_decode($sent, true) : null;
+        if (!is_array($usage) || !is_int($usage['prompt'] ?? null) || !is_int($usage['completion'] ?? null)) {
+            return;
+        }
+
+        $cached = $usage['cached'] ?? 0;
+        $this->usage->record(['prompt' => $usage['prompt'], 'completion' => $usage['completion'], 'cached' => is_int($cached) ? $cached : 0]);
     }
 
     /** Gone without a shutdown function, a destructor or a flush: none of them is this process's to run. */
