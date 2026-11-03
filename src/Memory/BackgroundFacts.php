@@ -105,19 +105,19 @@ final class BackgroundFacts
             return true;
         }
 
-        if (!$this->detach()) {
-            self::vanish();
-        }
-
         // Whatever happens, this process ends here and only here: an
-        // exception left to unwind would run the session's shutdown function,
-        // which hands the tty back and stops the MCP servers and jobs, under
-        // the session still using them. Nothing is left to tell either: the
-        // pass reports to a terminal this process no longer has.
+        // exception left to unwind would run the session's own code in it,
+        // then the session's shutdown function, which hands the tty back and
+        // stops the MCP servers and jobs under the session still using them.
+        // detach() too: under the runtime's error handler, a failed fopen()
+        // throws. Nothing is left to tell either: the pass reports to a
+        // terminal this process no longer has.
         try {
-            $store = new MemoryStore();
-            $store->open($database);
-            $this->extractor->into($store, $this->platform->withHttpClient($this->http))->extract($bag, $from);
+            if ($this->detach()) {
+                $store = new MemoryStore();
+                $store->open($database);
+                $this->extractor->into($store, $this->platform->withHttpClient($this->http))->extract($bag, $from);
+            }
         } finally {
             self::vanish();
         }

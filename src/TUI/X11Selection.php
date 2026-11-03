@@ -271,11 +271,31 @@ final readonly class X11Selection
         foreach ([SIGINT, SIGTERM, SIGHUP, SIGQUIT, SIGTSTP, SIGWINCH, SIGCHLD] as $signal) {
             pcntl_signal($signal, SIG_DFL);
         }
+
+        return true;
+    }
+
+    /**
+     * /dev/null for 0, 1 and 2, out of the terminal: null when one could not
+     * be opened, and the holder must not go on. Closed and left closed, a
+     * write to them fails, and PHP ends the holder through the session's
+     * shutdown function, which hands back the tty and stops the MCP servers
+     * under the session still using them.
+     *
+     * @return list<resource>|null to be held as long as the holder runs
+     */
+    private static function toDevNull(): ?array
+    {
         foreach ([STDIN, STDOUT, STDERR] as $stream) {
             @fclose($stream);
         }
 
-        return true;
+        $streams = [fopen('/dev/null', 'r'), fopen('/dev/null', 'w'), fopen('/dev/null', 'w')];
+        if (in_array(false, $streams, true)) {
+            return null;
+        }
+
+        return $streams;
     }
 
     /**
@@ -285,6 +305,15 @@ final readonly class X11Selection
     private function serve($socket, array $atoms, int $time, string $text): never
     {
         try {
+            // Inside the try: under the runtime's error handler a failed
+            // fopen() throws, and anything thrown here must end the holder,
+            // not unwind into the session's code. Held as long as the holder
+            // runs: this method never returns.
+            $devNull = self::toDevNull();
+            if ($devNull === null) {
+                self::vanish();
+            }
+
             stream_set_timeout($socket, 3600);
             $latin1 = function_exists('mb_convert_encoding') ? mb_convert_encoding($text, 'ISO-8859-1', 'UTF-8') : $text;
             $utf8Targets = [$atoms['UTF8_STRING'], $atoms['TEXT'], $atoms['text/plain;charset=utf-8'], $atoms['text/plain']];

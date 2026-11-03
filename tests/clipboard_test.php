@@ -129,6 +129,26 @@ check('no tool, no display, and 80,000 characters: past OSC 52 once in base64, n
 
 // ---- with a display: another client pastes what was copied -----------------
 
+/**
+ * Where the holder's 0, 1 and 2 lead: the process left holding the clipboard
+ * runs this script, under another pid. Empty where /proc is not.
+ *
+ * @return list<string>
+ */
+function holderStdio(): array
+{
+    $ours = (string) @file_get_contents('/proc/self/cmdline');
+    foreach (glob('/proc/[0-9]*') ?: [] as $dir) {
+        if ((int) basename($dir) === getmypid() || @file_get_contents("{$dir}/cmdline") !== $ours) {
+            continue;
+        }
+
+        return [(string) @readlink("{$dir}/fd/0"), (string) @readlink("{$dir}/fd/1"), (string) @readlink("{$dir}/fd/2")];
+    }
+
+    return [];
+}
+
 $xvfb = trim((string) shell_exec('command -v Xvfb 2>/dev/null'));
 if ($xvfb === '') {
     echo " SKIP the X11 cases: no Xvfb here\n";
@@ -146,6 +166,21 @@ if ($xvfb === '') {
 
         $text = "Réponse en **Markdown**\n- é, ü, 日本語\n";
         check('the clipboard is taken', $x11->copy($text));
+
+        // Closed and left closed, 0, 1 and 2 make the holder's first warning a
+        // failed write, and PHP ends it through the session's shutdown function:
+        // the tty reset and the MCP servers stopped under the session.
+        if (is_dir('/proc/self/fd')) {
+            // copy() returns once the holder is forked, not once it has set
+            // itself up: on a busy host that takes a while.
+            $deadline = microtime(true) + 5;
+            $stdio = holderStdio();
+            while ($stdio !== ['/dev/null', '/dev/null', '/dev/null'] && microtime(true) < $deadline) {
+                usleep(50_000);
+                $stdio = holderStdio();
+            }
+            check('the holder\'s 0, 1 and 2 lead to /dev/null', $stdio === ['/dev/null', '/dev/null', '/dev/null'], json_encode($stdio));
+        }
         $utf8 = paste($number, 'UTF8_STRING');
         check('pasted as UTF8_STRING, byte for byte', $utf8 === ['type' => 'UTF8_STRING', 'value' => $text], var_export($utf8, true));
         $plain = paste($number, 'text/plain;charset=utf-8');
