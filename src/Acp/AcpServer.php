@@ -212,6 +212,8 @@ final class AcpServer
         $method = (string) $message['method'];
         $isRequest = array_key_exists('id', $message) && (is_int($message['id']) || is_string($message['id']));
         $params = is_array($message['params'] ?? null) ? $message['params'] : [];
+        // Before anything asks the model: what a pass spent counts toward the cap.
+        $this->backgroundFacts->reap();
 
         try {
             $result = match ($method) {
@@ -699,6 +701,8 @@ final class AcpServer
             $this->modeChanged($session);
         }
 
+        // A pass that ended during the turn is in the update too.
+        $this->backgroundFacts->reap();
         $this->reportUsage($session);
 
         return ['stopReason' => $stop];

@@ -148,7 +148,7 @@ function ollamaReplying(string $reply, int $prompt = 1000, int $completion = 20)
 {
     $body = ['message' => ['content' => $reply], 'done' => true, 'prompt_eval_count' => $prompt, 'eval_count' => $completion];
 
-    return new MockHttpClient(static fn(): MockResponse => new MockResponse(json_encode($body)));
+    return new MockHttpClient(static fn(): MockResponse => new MockResponse(json_encode($body, JSON_THROW_ON_ERROR)));
 }
 
 /**

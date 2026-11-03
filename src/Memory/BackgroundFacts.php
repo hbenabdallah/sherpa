@@ -75,8 +75,20 @@ final class BackgroundFacts
         }
     }
 
-    /** Whether a pass is under way. The ones that ended have their usage counted here. */
+    /** Whether a pass is under way, once the ones that ended are reaped. */
     public function isRunning(): bool
+    {
+        $this->reap();
+
+        return $this->children !== [];
+    }
+
+    /**
+     * The passes that ended: their usage counted, their socket closed, their
+     * process gone rather than left a zombie. Called often enough by whoever
+     * runs for long: each turn in the terminal, each request in an editor.
+     */
+    public function reap(): void
     {
         foreach ($this->children as $pid => $report) {
             if (pcntl_waitpid($pid, $status, WNOHANG) === 0) {
@@ -86,8 +98,6 @@ final class BackgroundFacts
             $this->countUsage($report);
             unset($this->children[$pid]);
         }
-
-        return $this->children !== [];
     }
 
     /**
