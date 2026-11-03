@@ -171,8 +171,14 @@ if ($xvfb === '') {
         // failed write, and PHP ends it through the session's shutdown function:
         // the tty reset and the MCP servers stopped under the session.
         if (is_dir('/proc/self/fd')) {
-            usleep(100_000);
+            // copy() returns once the holder is forked, not once it has set
+            // itself up: on a busy host that takes a while.
+            $deadline = microtime(true) + 5;
             $stdio = holderStdio();
+            while ($stdio !== ['/dev/null', '/dev/null', '/dev/null'] && microtime(true) < $deadline) {
+                usleep(50_000);
+                $stdio = holderStdio();
+            }
             check('the holder\'s 0, 1 and 2 lead to /dev/null', $stdio === ['/dev/null', '/dev/null', '/dev/null'], json_encode($stdio));
         }
         $utf8 = paste($number, 'UTF8_STRING');

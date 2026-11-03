@@ -104,12 +104,6 @@ final readonly class X11Selection
             return $holder === false;
         }
 
-        // Held open as long as the holder runs: serve() never returns.
-        $devNull = self::toDevNull();
-        if ($devNull === null) {
-            self::vanish();
-        }
-
         $this->serve($x['socket'], $atoms, $time, $text);
     }
 
@@ -311,6 +305,15 @@ final readonly class X11Selection
     private function serve($socket, array $atoms, int $time, string $text): never
     {
         try {
+            // Inside the try: under the runtime's error handler a failed
+            // fopen() throws, and anything thrown here must end the holder,
+            // not unwind into the session's code. Held as long as the holder
+            // runs: this method never returns.
+            $devNull = self::toDevNull();
+            if ($devNull === null) {
+                self::vanish();
+            }
+
             stream_set_timeout($socket, 3600);
             $latin1 = function_exists('mb_convert_encoding') ? mb_convert_encoding($text, 'ISO-8859-1', 'UTF-8') : $text;
             $utf8Targets = [$atoms['UTF8_STRING'], $atoms['TEXT'], $atoms['text/plain;charset=utf-8'], $atoms['text/plain']];
