@@ -80,6 +80,12 @@ final class MemoryStore
         $this->migrate();
     }
 
+    /** The file this store writes to: ':memory:' for a project not saved yet, null before open(). */
+    public function database(): ?string
+    {
+        return $this->currentDb;
+    }
+
     /**
      * Record a fact. An identical one is left alone; a new one is added beside
      * whatever else shares its key.

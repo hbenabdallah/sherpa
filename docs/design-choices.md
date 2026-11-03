@@ -144,9 +144,12 @@ choices:
   there. Situation counts for half, and how often a fact is looked up and how
   recent it is count for a quarter each. The digest has a fixed budget of
   characters, and facts that do not fit are named rather than dropped silently.
-- **An end-of-session pass is only a backup.** The model is expected to record
-  facts as it works. The pass after `/exit` catches what it forgot, and it has to
-  be cheap, because someone is waiting to get their shell back.
+- **The memory pass is only a backup.** The model is expected to record facts
+  as it works. The pass catches what it forgot, reading the conversation a
+  stretch at a time in a background process, the rest after `/exit`. Nobody
+  waits for it: not the next turn, and not someone getting their shell back.
+  With a model on the same machine, it waits for `/exit`, so it never competes
+  with a turn for the GPU.
 
 ## Documentation search
 

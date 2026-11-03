@@ -262,7 +262,8 @@ API provider, for this run), `-m <model>`, `-c <tokens>` (context window),
 
 **The project's memory.** Lasting facts — a convention, where the configuration
 lives, which command runs the tests — are kept per project in SQLite, by the
-model as it works and by a short pass at the end of a session. A digest goes into
+model as it works and by a pass in the background, which reads the conversation a
+stretch at a time and the rest after `/exit`. A digest goes into
 every prompt, ranked by what you are working on now: the files git has touched,
 the directory you launched from.
 
@@ -349,7 +350,7 @@ was rejected, is in the [design choices](https://github.com/hbenabdallah/sherpa/
 | `OLLAMA_URL` | where Ollama answers (default `http://localhost:11434`) |
 | `OLLAMA_MODEL`, `OLLAMA_CTX`, `OLLAMA_KEEP_ALIVE` | Ollama's model, context window, and how long it stays loaded (default `30m`) |
 | `SHERPA_MAX_SESSION_TOKENS` | stop a session past this many tokens |
-| `SHERPA_FACT_EXTRACTION=off` | no memory pass at the end of a session |
+| `SHERPA_FACT_EXTRACTION=off` | no memory pass in the background |
 | `SHERPA_UPDATE_CHECK=off` | no daily check for a newer release |
 | `SHERPA_SANDBOX=strict` · `off` | commands without network too · without a sandbox |
 | `SHERPA_AUTO_APPROVE=1` | answer every question "once", even those auto mode still asks, for a run nobody watches (benchmark, CI) |

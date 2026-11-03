@@ -216,13 +216,14 @@ you pay for and what you wait for. Sherpa keeps track of it:
 Each project has a small SQLite database of lasting facts. These are things
 like a convention, where the configuration lives, or which command runs the
 tests. Facts arrive two ways: the model records them with `memory_remember` as
-it works, and a short pass at the end of a session picks up those it did not
-record.
+it works, and a pass in the background picks up those it did not record. It
+reads the conversation a stretch at a time during the session, and the rest
+after `/exit`.
 
 A fact is never overwritten. A correction replaces it, and the old value stays
 on record.
 
-Each fact keeps who wrote it: the model, the end-of-session pass, or you with
+Each fact keeps who wrote it: the model, the memory pass, or you with
 `/remember`. A web page or an MCP server's answer can carry instructions meant
 for the model, so what `web_fetch` and MCP tools return reaches it marked as
 data from that source, not as instructions. Once the session has read some,

@@ -17,7 +17,9 @@ use App\Config\ProviderName;
 use App\Mcp\McpException;
 use App\Mcp\McpRegistry;
 use App\Mcp\PromptArguments;
+use App\Memory\BackgroundFacts;
 use App\Memory\ContextStore;
+use App\Memory\FactCursor;
 use App\Memory\FactExtractor;
 use App\Permission\ProjectPermissions;
 use App\Platform\ModelResidency;
@@ -53,6 +55,14 @@ use Throwable;
 #[AsCommand(name: 'sherpa', description: 'Sherpa — a development agent in your terminal')]
 final class SherpaCommand extends Command
 {
+    /**
+     * How much unread conversation sets off a fact pass during the session:
+     * enough to be worth a request, and half of the least a pass may read
+     * (FactExtractor's floor), so a stretch fits whole even when the last pass
+     * was still running and the next one has twice as much to read.
+     */
+    private const int FACTS_EVERY_CHARS = 12000;
+
     private bool $warnedAboutSessions = false;
 
     public function __construct(
@@ -62,6 +72,7 @@ final class SherpaCommand extends Command
         private readonly WorkingProject $working,
         private readonly ProjectStore $projectStore,
         private readonly FactExtractor $factExtractor,
+        private readonly BackgroundFacts $backgroundFacts,
         private readonly SkillRegistry $skillRegistry,
         private readonly AgentLoop $agentLoop,
         private readonly SystemPromptBuilder $promptBuilder,
@@ -90,9 +101,9 @@ final class SherpaCommand extends Command
         private readonly SessionStore $sessions,
         private readonly Scrollback $scrollback,
         /**
-         * Whether a session ends by asking the model what was worth
-         * remembering: how project memory fills up, at one more request per
-         * session. SHERPA_FACT_EXTRACTION.
+         * Whether the model is asked, in the background, what was worth
+         * remembering from the conversation: how project memory fills up, at
+         * a request per stretch of it. SHERPA_FACT_EXTRACTION.
          */
         private readonly bool $extractFacts = true,
         // A newer release, said under the logo. Optional so the tests that
@@ -343,6 +354,9 @@ final class SherpaCommand extends Command
         // Ollama loads lazily, so there is nothing to ask about until a reply
         // has come back. Checked once, after the first one.
         $checkedResidency = false;
+        // How far the fact passes have read: a stretch at a time as the
+        // session goes, the rest on the way out.
+        $factCursor = new FactCursor();
 
         while (true) {
             // The path, the container and the stack were read at startup and
@@ -464,6 +478,7 @@ final class SherpaCommand extends Command
             }
 
             $this->recordSession($bag);
+            $this->readFactsMeanwhile($bag, $factCursor);
 
             if ($this->usage->shouldWarn()) {
                 $this->chat->showInfo(sprintf(
@@ -485,24 +500,16 @@ final class SherpaCommand extends Command
         }
         $this->writeTranscript($bag);
 
-        // End-of-session: extract and persist facts. Wrapped in a turn so the
-        // wait is escapable — this is inference, it takes as long as any other,
-        // and it happens to someone who has already asked to leave.
         $this->lineEditor->saveHistory();
-
-        if ($this->extractFacts && !$forgotten) {
-            $this->chat->showInfo('Extracting the lasting facts... (Ctrl+C to skip)');
-            $this->interrupt->beginTurn();
-
-            try {
-                $this->chat->showInfo($this->factExtractor->extract($bag)->summary());
-            } finally {
-                $this->interrupt->endTurn();
-            }
-        }
 
         $this->mcp->shutdown();
         $this->jobs->stopAll();
+
+        // After the MCP servers and the jobs are gone, so a background pass
+        // forked here holds no pipe or process of theirs.
+        if ($this->extractFacts && !$forgotten) {
+            $this->readLastFacts($bag, $factCursor);
+        }
 
         if ($this->usage->requests() > 0) {
             echo Terminal::GRAY . "\n" . $this->usage->summary() . "\n" . Terminal::RESET;
@@ -511,6 +518,76 @@ final class SherpaCommand extends Command
         echo Terminal::GRAY . "\nSession over. Good luck!\n" . Terminal::RESET;
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Once enough of the conversation has gone by unread, a fact pass over it
+     * in the background while the session goes on. Not while the last one
+     * still runs, and not on a backend that takes one request at a time: a
+     * model on this machine, or a provider near its rate limit, would make the
+     * next turn wait for it. What is not read now is read on the way out.
+     */
+    private function readFactsMeanwhile(MessageBag $bag, FactCursor $cursor): void
+    {
+        if (!$this->extractFacts || $this->working->isForgotten()) {
+            return;
+        }
+
+        if ($this->platform->concurrency() < 2 || $this->backgroundFacts->isRunning()) {
+            return;
+        }
+
+        $from = $cursor->from($bag);
+        if (!$this->factExtractor->hasPending($bag, $from, atLeast: self::FACTS_EVERY_CHARS)) {
+            return;
+        }
+
+        if ($this->backgroundFacts->start($bag, $from)) {
+            $cursor->advance($bag);
+        }
+    }
+
+    /**
+     * What no pass has read yet, read on the way out: in the background when
+     * it can be, so leaving takes no longer than leaving.
+     */
+    private function readLastFacts(MessageBag $bag, FactCursor $cursor): void
+    {
+        $from = $cursor->from($bag);
+        $pending = $this->factExtractor->hasPending($bag, $from);
+
+        if ($pending && $this->backgroundFacts->survivesExit() && $this->backgroundFacts->start($bag, $from)) {
+            $this->chat->showInfo('Keeping the lasting facts in the background.');
+
+            return;
+        }
+
+        $passDiesWithSession = $this->backgroundFacts->isRunning() && !$this->backgroundFacts->survivesExit();
+        if ($pending || $passDiesWithSession) {
+            $this->readLastFactsHere($bag, $from);
+        }
+    }
+
+    /**
+     * Here, then: in a container, which ends with this process and every
+     * other one in it, or where no pass could be started. One under way is
+     * waited for rather than killed with its stretch half read. As a turn, so
+     * Ctrl+C skips it all: this is inference, as long as any other, for
+     * someone who has already asked to leave.
+     */
+    private function readLastFactsHere(MessageBag $bag, int $from): void
+    {
+        $this->chat->showInfo('Extracting the lasting facts... (Ctrl+C to skip)');
+        $this->interrupt->beginTurn();
+
+        try {
+            $this->backgroundFacts->wait();
+            if ($this->factExtractor->hasPending($bag, $from) && !$this->interrupt->requested()) {
+                $this->chat->showInfo($this->factExtractor->extract($bag, $from)->summary());
+            }
+        } finally {
+            $this->interrupt->endTurn();
+        }
     }
 
     /**

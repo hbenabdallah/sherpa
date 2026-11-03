@@ -6,6 +6,7 @@ namespace App\Platform;
 
 use App\Config\Backend;
 use App\Usage\UsageMeter;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * The platform everything else is handed: whichever backend is in force.
@@ -164,6 +165,18 @@ final class SwitchablePlatform implements PlatformInterface, EmbeddingBackend
     public function useModel(string $model, int $contextWindow): void
     {
         $this->active()->useModel($model, $contextWindow);
+    }
+
+    /**
+     * The same platform, talking through $client: a forked process must not
+     * share the connections it inherited (BackgroundFacts).
+     */
+    public function withHttpClient(HttpClientInterface $client): self
+    {
+        return clone($this, [
+            'ollama' => $this->ollama->withHttpClient($client),
+            'api'    => $this->api->withHttpClient($client),
+        ]);
     }
 
     public function name(): string

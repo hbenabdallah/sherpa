@@ -65,5 +65,5 @@ These are known, and either yours to decide or still to do:
 - **MCP servers** run as you, outside the sandbox. Only add servers you trust.
 - **The provider** sees everything the model is sent. Pick one you trust, or
   run a local model with Ollama.
-- **The end-of-session memory pass** writes facts without asking. After
+- **The memory pass** writes facts without asking. After
   untrusted text, they are recorded as such and shown in red in `/memory`.
