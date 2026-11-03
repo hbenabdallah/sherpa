@@ -20,6 +20,14 @@ final readonly class ToolDefinition
         public object $handler,
         /** Brings text from outside the project and the user; see Provenance. */
         public bool $untrusted = false,
+        /**
+         * The handler's __invoke is variadic, so it accepts named arguments
+         * beyond the declared ones (an MCP server's tool takes whatever the
+         * server declares). False for a native tool: Toolbox drops what the
+         * schema does not declare, because spreading it would be an
+         * "Unknown named parameter" Error.
+         */
+        public bool $variadic = false,
     ) {}
 
     /**

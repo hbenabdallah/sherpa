@@ -50,6 +50,7 @@ class Toolbox
             permission: $asTool->permission,
             handler: $tool,
             untrusted: $asTool->untrusted,
+            variadic: $method->isVariadic(),
         );
     }
 
@@ -143,12 +144,21 @@ class Toolbox
      * is declared is a TypeError the model cannot act on. Note that the string
      * "false" is truthy in PHP: a plain cast turns a refusal into consent.
      *
+     * An argument the tool does not declare is dropped rather than spread:
+     * named spread of an unknown key is an "Unknown named parameter" Error,
+     * seen when a model sent `timeout` to shell_exec. A variadic handler
+     * (an MCP server's tool) keeps everything, by name.
+     *
      * @param array<string, mixed> $arguments
      *
      * @return array<string, mixed>
      */
     private function coerce(ToolDefinition $def, array $arguments): array
     {
+        if (!$def->variadic) {
+            $arguments = array_intersect_key($arguments, $def->parameters);
+        }
+
         foreach ($arguments as $name => $value) {
             $type = $def->parameters[$name]['type'] ?? null;
 
