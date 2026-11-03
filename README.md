@@ -262,7 +262,8 @@ API provider, for this run), `-m <model>`, `-c <tokens>` (context window),
 
 **The project's memory.** Lasting facts — a convention, where the configuration
 lives, which command runs the tests — are kept per project in SQLite, by the
-model as it works and by a short pass at the end of a session. A digest goes into
+model as it works and by a pass in the background, which reads the conversation a
+stretch at a time and the rest after `/exit`. A digest goes into
 every prompt, ranked by what you are working on now: the files git has touched,
 the directory you launched from.
 
