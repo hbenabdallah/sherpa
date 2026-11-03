@@ -214,7 +214,7 @@ final readonly class SessionSearch
     /** @param array<string, int> $words */
     private function frequency(array $words, string $term, string $stem): int
     {
-        if ($term === $stem) {
+        if (mb_strlen($term) < self::PREFIX_FROM) {
             return $words[$term] ?? 0;
         }
 

@@ -15,12 +15,15 @@ use App\Session\SessionHit;
 require __DIR__ . '/../vendor/autoload.php';
 
 use App\Acp\ToolDescriptions;
+use App\Agent\Tool\AsTool;
+use App\Agent\Tool\Provenance;
 use App\Project\DockerConfig;
 use App\Project\ProjectStore;
 use App\Project\StackDetector;
 use App\Session\SessionSearch;
 use App\Session\SessionStore;
 use App\Tool\SessionSearchTool;
+use ReflectionClass;
 
 $pass = 0;
 $fail = 0;
@@ -61,6 +64,8 @@ $store->save([
     ['role' => 'assistant', 'content' => "We dropped Redis: the sessions go to PostgreSQL now, one service less to run.\nThe handler is PdoSessionHandler."],
     ['role' => 'user', 'content' => 'And the DBAL version?'],
     ['role' => 'assistant', 'content' => 'Doctrine DBAL 4.'],
+    ['role' => 'user', 'content' => 'Where do the invoices live?'],
+    ['role' => 'assistant', 'content' => 'In the billing schema.'],
 ], [], 'api', 'm');
 
 $store->startNew();
@@ -86,6 +91,7 @@ check('tool output is not searched: the files are read fresher by the tools', $s
 check('accents do not matter: "decide" finds "décidé"', count($search->search('decide') ?? []) === 1);
 $migration = $search->search('migrations') ?? [];
 check('a long word matches its other endings: "migrations" finds "migrer", and "migration" in the answer', count($migration) === 1 && str_contains($migration[0]->excerpt, 'migrer') && str_contains($migration[0]->reply ?? '', 'migration'), var_export($migration, true));
+check('a singular finds the plural, with no ending to cut: "invoice" finds "invoices"', count($search->search('invoice') ?? []) === 1);
 check('a short word matches whole: "db" does not find "DBAL"', $search->search('db') === []);
 check('a query of stop words alone finds nothing', $search->search('the of what') === []);
 
@@ -112,6 +118,11 @@ $store->save([
 $store->startNew();
 $long = $tool('queue worker retries');
 check('a long match is cut to its matching lines, within the budget', mb_strlen($long) <= 3000 && str_contains($long, 'queue worker'), (string) mb_strlen($long));
+
+// ---- read back as what it may be: a page repeated --------------------------
+$attribute = new ReflectionClass(SessionSearchTool::class)->getAttributes(AsTool::class)[0]->newInstance();
+check('its results are untrusted, as a page\'s are: an earlier answer may repeat one', $attribute->untrusted);
+check('and a fact written after them says where it came from', str_contains(new Provenance()->wrap('session_search', ['search' => 'x'], 'text'), 'earlier conversations'));
 
 // ---- in an editor ------------------------------------------------------------
 check('an editor draws it as a search', ToolDescriptions::kind('session_search') === 'search');

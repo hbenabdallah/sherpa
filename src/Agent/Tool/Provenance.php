@@ -75,6 +75,7 @@ final class Provenance
 
         return match (true) {
             $tool === 'web_fetch' => 'the web page ' . (is_string($url) ? $url : '(no address)'),
+            $tool === 'session_search' => 'earlier conversations',
             str_starts_with($tool, 'mcp__') => "the MCP tool {$tool}" . (is_string($url) ? " ({$url})" : ''),
             default => "the tool {$tool}",
         };

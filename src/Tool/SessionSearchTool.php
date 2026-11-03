@@ -15,6 +15,9 @@ use App\Session\SessionSearch;
     name: 'session_search',
     description: "Search this project's earlier conversations (not this one) for what was asked and answered: a decision, an approach tried or dropped, why something was done. Keywords, in any order. For lasting facts use memory_recall; for code, project_grep.",
     permission: Permission::AUTO,
+    // An earlier answer may repeat a web page or an MCP server's text: read
+    // back, it is that text again, and taints the session as it did then.
+    untrusted: true,
 )]
 final readonly class SessionSearchTool
 {
