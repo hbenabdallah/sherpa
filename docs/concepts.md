@@ -40,7 +40,7 @@ rejected otherwise.
 ## Tools and permissions
 
 The tools that read (`list_dir`, `file_find`, `project_grep`, `file_read`, `doc_search`,
-memory, `context_recall`, `skill_load`, `todo_write`, `delegate`) run without asking. The tools that
+memory, `context_recall`, `session_search`, `skill_load`, `todo_write`, `delegate`) run without asking. The tools that
 change something (`file_write`, `file_patch`, `shell_exec`), the one that reaches
 the web (`web_fetch`), and every MCP tool
 ask for confirmation first:
@@ -277,6 +277,14 @@ The conversation is saved after every turn, in the project's directory under
 `~/.config/sherpa/projects/`. If the terminal closes, you lose one turn at most.
 `/sessions` lists the saved conversations, and `/resume` or `sherpa -r` reopens
 one.
+
+The model can search the earlier conversations with `session_search`: what was
+decided, tried or given up, which the lasting facts leave out. It searches what
+you asked and what the model answered, not the tools' output, by keywords
+ranked with BM25, accents and word endings aside. The conversation in progress
+is left out, since it is already in the context. Each result names its
+conversation and the `/resume` that reopens it, and comes marked as what was
+said then, to check against the code before relying on it.
 
 ## Skills and MCP
 

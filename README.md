@@ -214,6 +214,7 @@ still gets all of it.
 | `web_fetch` | read a web page as text: a library's docs, an error explained online | **yes** |
 | `memory_remember`, `memory_recall` | keep and find lasting facts about the project | no |
 | `context_recall` | bring back tool output compacted out of the context | no |
+| `session_search` | search the project's earlier conversations: what was decided, tried or dropped | no |
 | `skill_load` | load a skill (see below) | no |
 | `todo_write` | keep a plan for a task of several steps, shown as it changes | no |
 

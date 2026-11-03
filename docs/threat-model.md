@@ -42,6 +42,7 @@ asks often enough to be treated as one. That text can come from:
 | Read or write outside the project through file tools | Every path is resolved and confined, symbolic links included. | `ProjectPathResolver` |
 | Make the model take a page for instructions | Web and MCP text is marked as data from its source. | `Provenance` |
 | Plant a fact that later sessions obey | After untrusted text, `memory_remember` is asked about every time; each fact keeps who wrote it and what had been read; the system prompt says to check such facts. | `Provenance`, `MemoryStore` |
+| Plant instructions in a conversation that later sessions search | `session_search` reads only what was asked and answered, not tool output, and returns it marked as what was said then, to check against the code. | `SessionSearch`, `SessionSearchTool` |
 | Reach your machine from a page | `web_fetch` does not follow a redirect from the web to `localhost`, a private network or a cloud metadata address. | `WebFetchTool` |
 
 ## What is not covered

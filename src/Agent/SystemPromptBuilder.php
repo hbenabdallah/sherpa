@@ -191,6 +191,8 @@ Load one with skill_load(name) when its subject is what the request is about.
   that prints nothing has checked nothing.
 - When you learn something lasting about the project (a convention, a pattern, an
   architectural decision), record it with memory_remember.
+- When the user refers to an earlier conversation ("as we decided", "last time",
+  "why did we drop…"), search it with session_search rather than guess.
 - Reply in the language the user writes in.
 - Be concise in explanations, precise in code.
 PROMPT;
