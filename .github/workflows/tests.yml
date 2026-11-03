@@ -58,7 +58,18 @@ jobs:
       - name: make php
         run: make php
 
+      # Composer's downloads, kept between runs: without them each run fetches
+      # some sixty archives from codeload.github.com, and one timeout among
+      # them fails the job before a test runs (the Intel Mac, on v1.7.0).
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/composer
+          key: composer-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-${{ runner.arch }}-
+
       - name: composer install
+        env:
+          COMPOSER_CACHE_DIR: ${{ runner.temp }}/composer
         run: ~/.local/share/sherpa/php "$(command -v composer)" install --no-interaction --no-progress
 
       # Commands run in bubblewrap where it is installed: the sandbox suite
@@ -101,10 +112,19 @@ jobs:
         run: |
           ~/.local/share/sherpa/php -r 'exit(PHP_VERSION_ID >= 80400 && extension_loaded("pdo_sqlite") && extension_loaded("pcntl") && extension_loaded("phar") ? 0 : 1);'
 
+      # Composer's downloads, kept between runs, as on the host job.
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/composer
+          key: composer-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-${{ runner.arch }}-
+
       # sandbox-exec exists only here: the sandbox suite runs it for real.
       # Composer with the runner's PHP: the static one aborts in its curl's
       # HTTP/3 (ngtcp2) on this runner before installing anything.
       - name: composer install
+        env:
+          COMPOSER_CACHE_DIR: ${{ runner.temp }}/composer
         run: |
           command -v composer > /dev/null || brew install -q composer
           composer install --no-interaction --no-progress
