@@ -25,6 +25,7 @@ use App\Platform\OllamaPlatform;
 use App\Platform\OpenAiCompatiblePlatform;
 use App\Platform\SwitchablePlatform;
 use App\Runtime\Interrupt;
+use App\Usage\UsageMeter;
 use Doctrine\DBAL\Exception as DatabaseError;
 use PDO;
 use Symfony\Component\HttpClient\MockHttpClient;
@@ -142,23 +143,25 @@ check('and not when what is left is shorter than asked', !$facts->hasPending($fi
 
 // ---- the pass in a process of its own -----------------------------------------
 
-/** A model answering $reply over $client, as the Ollama backend. */
-function ollamaReplying(string $reply): MockHttpClient
+/** A model answering $reply, as the Ollama backend does, with what it counted. */
+function ollamaReplying(string $reply, int $prompt = 1000, int $completion = 20): MockHttpClient
 {
-    return new MockHttpClient(static fn(): MockResponse => new MockResponse(json_encode(['message' => ['content' => $reply], 'done' => true])));
+    $body = ['message' => ['content' => $reply], 'done' => true, 'prompt_eval_count' => $prompt, 'eval_count' => $completion];
+
+    return new MockHttpClient(static fn(): MockResponse => new MockResponse(json_encode($body, JSON_THROW_ON_ERROR)));
 }
 
 /**
  * A background pass whose session talks through one client and whose child
  * through another, so a check can tell which the child asked through.
  */
-function background(MemoryStore $store, HttpClientInterface $sessionClient, HttpClientInterface $childClient): BackgroundFacts
+function background(MemoryStore $store, HttpClientInterface $sessionClient, HttpClientInterface $childClient, UsageMeter $usage = new UsageMeter()): BackgroundFacts
 {
     $ollama = new OllamaPlatform($sessionClient, 'http://x', 'm', 32768, -1.0, new Interrupt());
-    $platform = new SwitchablePlatform($ollama, new OpenAiCompatiblePlatform(new MockHttpClient(), 'http://y', 'm'));
+    $platform = new SwitchablePlatform($ollama, new OpenAiCompatiblePlatform(new MockHttpClient(), 'http://y', 'm'), $usage);
     $platform->switchTo(Backend::Ollama);
 
-    return new BackgroundFacts(new FactExtractor($platform, $store, new Interrupt()), $store, $platform, $childClient, new Interrupt());
+    return new BackgroundFacts(new FactExtractor($platform, $store, new Interrupt()), $store, $platform, $childClient, new Interrupt(), $usage);
 }
 
 function waitFor(BackgroundFacts $background): void
@@ -224,6 +227,29 @@ $background = background($store, ollamaReplying('[]'), $warning);
 $background->start(conversation(2), 0);
 waitFor($background);
 check('a warning in the child does not run the session\'s shutdown function either', !file_exists($marker));
+
+// ---- what a pass spent counts in the session's usage ---------------------------
+// Seen live: the summary at /exit said nothing of the passes, and the token cap
+// never saw them, since they ran in another process.
+
+$store = new MemoryStore();
+$store->open(database());
+$usage = new UsageMeter();
+$background = background($store, ollamaReplying('[]'), ollamaReplying('[]', prompt: 3000, completion: 40), $usage);
+$background->start(conversation(2), 0);
+$background->start(conversation(3), 0);
+waitFor($background);
+check(
+    'two passes under way at once are both reaped, and both counted',
+    $usage->requests() === 2 && $usage->prompt() === 6000 && $usage->completion() === 80,
+    "{$usage->requests()} requests, {$usage->prompt()} + {$usage->completion()} tokens",
+);
+
+$usage = new UsageMeter();
+$background = background($store, ollamaReplying('[]'), ollamaReplying('[]'), $usage);
+$background->start(conversation(1), 0);
+waitFor($background);
+check('a pass that asked the model nothing counts nothing', $usage->requests() === 0, "{$usage->requests()} requests");
 
 // ---- two writers at once ------------------------------------------------------
 // The child writes while the session does (memory_remember). SQLite fails a

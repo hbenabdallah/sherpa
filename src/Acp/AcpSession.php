@@ -7,6 +7,7 @@ namespace App\Acp;
 use App\Agent\MessageBag;
 use App\Agent\Mode;
 use App\Config\ModelProfile;
+use App\Memory\FactCursor;
 use DateTimeImmutable;
 
 /**
@@ -27,8 +28,8 @@ final class AcpSession
     /** The model its turns run on: each conversation keeps the one chosen for it. */
     public ?ModelProfile $profile = null;
 
-    /** Messages its facts were last taken from: grown past it, it has more to give. */
-    public int $remembered = 0;
+    /** How far the memory pass has read it: past it, it has more to give. */
+    public FactCursor $facts;
 
     /** The title the editor was given for it: said once the conversation has one. */
     public ?string $title = null;
@@ -41,5 +42,7 @@ final class AcpSession
         /** The project directory, canonical. */
         public readonly string $directory,
         public readonly MessageBag $bag,
-    ) {}
+    ) {
+        $this->facts = new FactCursor();
+    }
 }

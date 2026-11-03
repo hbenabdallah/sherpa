@@ -19,6 +19,7 @@ use App\Config\ModelProfile;
 use App\Mcp\McpException;
 use App\Mcp\McpRegistry;
 use App\Mcp\ServerConfig;
+use App\Memory\BackgroundFacts;
 use App\Memory\ContextStore;
 use App\Memory\FactExtractor;
 use App\Permission\AutoMode;
@@ -139,6 +140,7 @@ final class AcpServer
         private readonly EditorCommands $commands,
         private readonly ProjectQuestions $questions,
         private readonly FactExtractor $facts,
+        private readonly BackgroundFacts $backgroundFacts,
         /** As in the terminal: what a conversation taught is kept, at one request per conversation. SHERPA_FACT_EXTRACTION. */
         private readonly bool $extractFacts = true,
         // What auto mode lets run here, said when /auto turns it on.
@@ -169,6 +171,12 @@ final class AcpServer
 
         // The editor closed: what is left to remember, if it waits for it.
         $this->rememberFacts(null);
+
+        // In a container, which stops with this process, a pass under way
+        // would be killed with its stretch half read.
+        if (!$this->backgroundFacts->survivesExit()) {
+            $this->backgroundFacts->wait();
+        }
     }
 
     /**
@@ -204,6 +212,8 @@ final class AcpServer
         $method = (string) $message['method'];
         $isRequest = array_key_exists('id', $message) && (is_int($message['id']) || is_string($message['id']));
         $params = is_array($message['params'] ?? null) ? $message['params'] : [];
+        // Before anything asks the model: what a pass spent counts toward the cap.
+        $this->backgroundFacts->reap();
 
         try {
             $result = match ($method) {
@@ -367,7 +377,7 @@ final class AcpServer
         $this->makeCurrent($session);
 
         new Replay($this->connection, $id)->send($saved->messages);
-        $session->remembered = $bag->count();
+        $session->facts->advance($bag);
         $this->then[] = fn() => $this->advertise($session);
         $this->then[] = fn() => $this->rememberFacts($session);
 
@@ -424,9 +434,10 @@ final class AcpServer
 
     /**
      * The lasting facts of the conversations that moved on since theirs were
-     * last taken. An editor never says a conversation is over, as leaving the
-     * terminal does: opening another one is the sign. Stopped by a prompt,
-     * and taken up again next time.
+     * last taken, from where the last pass stopped. An editor never says a
+     * conversation is over, as leaving the terminal does: opening another one
+     * is the sign. In the background when it can be, as in the terminal;
+     * here otherwise, stopped by a prompt and taken up again next time.
      *
      * @param AcpSession|null $opened the session just opened, which stays current
      */
@@ -438,32 +449,65 @@ final class AcpServer
 
         try {
             foreach ($this->open as $session) {
-                if ($session === $opened || $session->bag->count() <= $session->remembered || $session->bag->conversationSize() === 0) {
+                $from = $session->facts->from($session->bag);
+                if ($session === $opened || !$this->facts->hasPending($session->bag, $from)) {
                     continue;
                 }
 
+                // Current first: the pass reads with its model, into its project's memory.
                 $this->makeCurrent($session);
-                $this->extracting = true;
-                $this->interrupt->beginTurn();
 
-                try {
-                    $summary = $this->facts->extract($session->bag)->summary();
-                    if ($this->interrupt->requested()) {
-                        return;
-                    }
-                } finally {
-                    $this->interrupt->endTurn();
-                    $this->extracting = false;
+                if ($this->canReadInBackground($opened) && $this->backgroundFacts->start($session->bag, $from)) {
+                    $session->facts->advance($session->bag);
+                    fwrite(STDERR, "sherpa acp: {$session->id}: reading its facts in the background\n");
+                    continue;
                 }
 
-                $session->remembered = $session->bag->count();
-                fwrite(STDERR, "sherpa acp: {$session->id}: {$summary}\n");
+                if (!$this->rememberFactsHere($session, $from)) {
+                    return;
+                }
             }
         } finally {
             if ($opened instanceof AcpSession) {
                 $this->makeCurrent($opened);
             }
         }
+    }
+
+    /**
+     * Not with a backend that takes one request at a time, where the pass
+     * would make the next prompt wait; nor, the editor gone, where the pass
+     * would not outlive this process.
+     */
+    private function canReadInBackground(?AcpSession $opened): bool
+    {
+        if ($this->platform->concurrency() < 2) {
+            return false;
+        }
+
+        return $opened instanceof AcpSession || $this->backgroundFacts->survivesExit();
+    }
+
+    /** The pass here, as a turn a prompt stops. False when one did. */
+    private function rememberFactsHere(AcpSession $session, int $from): bool
+    {
+        $this->extracting = true;
+        $this->interrupt->beginTurn();
+
+        try {
+            $summary = $this->facts->extract($session->bag, $from)->summary();
+            if ($this->interrupt->requested()) {
+                return false;
+            }
+        } finally {
+            $this->interrupt->endTurn();
+            $this->extracting = false;
+        }
+
+        $session->facts->advance($session->bag);
+        fwrite(STDERR, "sherpa acp: {$session->id}: {$summary}\n");
+
+        return true;
     }
 
     /** What "/" offers in the editor: the commands, the project's skills, the MCP servers' prompts. */
@@ -657,6 +701,8 @@ final class AcpServer
             $this->modeChanged($session);
         }
 
+        // A pass that ended during the turn is in the update too.
+        $this->backgroundFacts->reap();
         $this->reportUsage($session);
 
         return ['stopReason' => $stop];
