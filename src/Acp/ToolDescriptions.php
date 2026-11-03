@@ -18,7 +18,7 @@ final class ToolDescriptions
     {
         return match ($tool) {
             'file_read', 'list_dir', 'context_recall', 'job_output', 'skill_load' => 'read',
-            'project_grep', 'file_find', 'doc_search', 'memory_recall'           => 'search',
+            'project_grep', 'file_find', 'doc_search', 'memory_recall', 'session_search' => 'search',
             'file_write', 'file_patch'                                            => 'edit',
             'shell_exec'                                                          => 'execute',
             'web_fetch'                                                           => 'fetch',
@@ -45,6 +45,7 @@ final class ToolDescriptions
             'memory_recall'   => $arg('search') !== '' ? 'Recall ' . $arg('search') : 'Recall what is known about the project',
             'memory_remember' => 'Remember ' . $arg('key'),
             'context_recall'  => 'Recall an earlier result',
+            'session_search'  => 'Search earlier conversations for ' . $arg('search'),
             'skill_load'      => 'Load the skill ' . $arg('name'),
             'job_output'      => 'Read the output of job ' . $arg('id'),
             'job_stop'        => 'Stop job ' . $arg('id'),
