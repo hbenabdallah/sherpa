@@ -13,10 +13,11 @@ use App\Runtime\Interrupt;
 use Throwable;
 
 /**
- * Reads a finished conversation and keeps what is worth knowing next time: a
- * backstop for the facts nobody thought to write down, since the model is
- * expected to call memory_remember as it works. It runs after /exit, while
- * someone waits for their shell back, so it has to be cheap.
+ * Reads a conversation and keeps what is worth knowing next time: a backstop
+ * for the facts nobody thought to write down, since the model is expected to
+ * call memory_remember as it works. It reads from a given message on, so a
+ * session is read a stretch at a time (BackgroundFacts, FactCursor) rather
+ * than all at once while someone waits for their shell back.
  */
 final readonly class FactExtractor
 {
@@ -68,13 +69,35 @@ final readonly class FactExtractor
         ) ?? self::MIN_TRANSCRIPT_CHARS;
     }
 
-    public function extract(MessageBag $bag): Extraction
+    /**
+     * The same pass, asking through $platform and writing to $store: a
+     * process of its own needs connections of its own, to the model and to
+     * the database.
+     */
+    public function into(MemoryStore $store, PlatformInterface $platform): self
+    {
+        return new self($platform, $store, $this->interrupt, $this->budget, $this->provenance);
+    }
+
+    /**
+     * Whether a pass from message $from on is worth a request: the session
+     * long enough for extract() not to skip it, and at least $atLeast
+     * characters of conversation to read.
+     */
+    public function hasPending(MessageBag $bag, int $from, int $atLeast = 1): bool
+    {
+        return $bag->count() >= self::MIN_MESSAGES
+            && mb_strlen($this->evidence(array_slice($bag->all(), $from))) >= $atLeast;
+    }
+
+    /** @param int $from the first message not read yet; the ones before it were */
+    public function extract(MessageBag $bag, int $from = 0): Extraction
     {
         if ($bag->count() < self::MIN_MESSAGES) {
             return Extraction::skipped('Session too short to keep anything from.');
         }
 
-        $transcript = $this->transcribe($bag->all());
+        $transcript = $this->transcribe(array_slice($bag->all(), $from));
         if (trim($transcript) === '') {
             return Extraction::skipped('Nothing worth keeping from this session.');
         }
@@ -110,7 +133,7 @@ final readonly class FactExtractor
      *
      * @param array<int, array<string, mixed>> $messages
      */
-    private function transcribe(array $messages): string
+    private function evidence(array $messages): string
     {
         $lines = [];
 
@@ -125,7 +148,17 @@ final readonly class FactExtractor
             $lines[] = ($role === 'user' ? '[USER] ' : '[AGENT] ') . $content;
         }
 
-        $transcript = implode("\n\n", $lines);
+        return implode("\n\n", $lines);
+    }
+
+    /**
+     * The evidence, cut to what this window can afford.
+     *
+     * @param array<int, array<string, mixed>> $messages
+     */
+    private function transcribe(array $messages): string
+    {
+        $transcript = $this->evidence($messages);
 
         // Keep the tail: what was decided late supersedes what was guessed early.
         $budget = $this->transcriptBudget();
@@ -242,7 +275,7 @@ final readonly class FactExtractor
 
             // remember(), never supersede(): a model reading a transcript is in
             // no position to decide that something it did not see is now wrong.
-            match ($this->store->remember($key, $value, Provenance::sourceOf('the end-of-session pass', $this->provenance))) {
+            match ($this->store->remember($key, $value, Provenance::sourceOf('the memory pass', $this->provenance))) {
                 Recorded::Created => $created++,
                 default           => $known++,
             };

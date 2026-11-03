@@ -349,7 +349,7 @@ was rejected, is in the [design choices](https://github.com/hbenabdallah/sherpa/
 | `OLLAMA_URL` | where Ollama answers (default `http://localhost:11434`) |
 | `OLLAMA_MODEL`, `OLLAMA_CTX`, `OLLAMA_KEEP_ALIVE` | Ollama's model, context window, and how long it stays loaded (default `30m`) |
 | `SHERPA_MAX_SESSION_TOKENS` | stop a session past this many tokens |
-| `SHERPA_FACT_EXTRACTION=off` | no memory pass at the end of a session |
+| `SHERPA_FACT_EXTRACTION=off` | no memory pass in the background |
 | `SHERPA_UPDATE_CHECK=off` | no daily check for a newer release |
 | `SHERPA_SANDBOX=strict` · `off` | commands without network too · without a sandbox |
 | `SHERPA_AUTO_APPROVE=1` | answer every question "once", even those auto mode still asks, for a run nobody watches (benchmark, CI) |

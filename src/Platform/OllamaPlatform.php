@@ -486,6 +486,15 @@ final class OllamaPlatform implements PlatformInterface, EmbeddingBackend
         return $vectors;
     }
 
+    /**
+     * The same platform, talking through $client: a forked process must not
+     * share the connections it inherited (BackgroundFacts).
+     */
+    public function withHttpClient(HttpClientInterface $client): self
+    {
+        return clone($this, ['client' => $client]);
+    }
+
     public function name(): string
     {
         return 'Ollama';

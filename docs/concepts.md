@@ -222,7 +222,7 @@ record.
 A fact is never overwritten. A correction replaces it, and the old value stays
 on record.
 
-Each fact keeps who wrote it: the model, the end-of-session pass, or you with
+Each fact keeps who wrote it: the model, the memory pass, or you with
 `/remember`. A web page or an MCP server's answer can carry instructions meant
 for the model, so what `web_fetch` and MCP tools return reaches it marked as
 data from that source, not as instructions. Once the session has read some,

@@ -95,10 +95,20 @@ services:
             $temperature:   '%sampling_temperature%'
             $maxTokens:     '%reply_max_tokens%'
 
+    # A fact pass forks, and a child must not reuse the session's pooled
+    # connections: this client is the children's, never used by the session.
+    background_facts.http_client:
+        class: Symfony\Contracts\HttpClient\HttpClientInterface
+        factory: ['Symfony\Component\HttpClient\HttpClient', 'create']
+
+    App\Memory\BackgroundFacts:
+        arguments:
+            $http: '@background_facts.http_client'
+
     App\Command\SherpaCommand:
         arguments:
-            # on / off. Off skips the end-of-session request that asks the
-            # model what was worth remembering.
+            # on / off. Off skips the background requests that ask the model
+            # what was worth remembering.
             $extractFacts: '%env(bool:SHERPA_FACT_EXTRACTION)%'
 
     App\Acp\AcpServer:

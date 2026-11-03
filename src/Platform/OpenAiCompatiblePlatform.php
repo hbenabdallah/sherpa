@@ -1078,6 +1078,15 @@ final class OpenAiCompatiblePlatform implements PlatformInterface, EmbeddingBack
         return $this->contextWindow;
     }
 
+    /**
+     * The same platform, talking through $client: a forked process must not
+     * share the connections it inherited (BackgroundFacts).
+     */
+    public function withHttpClient(HttpClientInterface $client): self
+    {
+        return clone($this, ['client' => $client]);
+    }
+
     public function name(): string
     {
         if ($this->label !== null) {
