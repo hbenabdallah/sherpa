@@ -104,6 +104,12 @@ final readonly class X11Selection
             return $holder === false;
         }
 
+        // Held open as long as the holder runs: serve() never returns.
+        $devNull = self::toDevNull();
+        if ($devNull === null) {
+            self::vanish();
+        }
+
         $this->serve($x['socket'], $atoms, $time, $text);
     }
 
@@ -271,11 +277,31 @@ final readonly class X11Selection
         foreach ([SIGINT, SIGTERM, SIGHUP, SIGQUIT, SIGTSTP, SIGWINCH, SIGCHLD] as $signal) {
             pcntl_signal($signal, SIG_DFL);
         }
+
+        return true;
+    }
+
+    /**
+     * /dev/null for 0, 1 and 2, out of the terminal: null when one could not
+     * be opened, and the holder must not go on. Closed and left closed, a
+     * write to them fails, and PHP ends the holder through the session's
+     * shutdown function, which hands back the tty and stops the MCP servers
+     * under the session still using them.
+     *
+     * @return list<resource>|null to be held as long as the holder runs
+     */
+    private static function toDevNull(): ?array
+    {
         foreach ([STDIN, STDOUT, STDERR] as $stream) {
             @fclose($stream);
         }
 
-        return true;
+        $streams = [fopen('/dev/null', 'r'), fopen('/dev/null', 'w'), fopen('/dev/null', 'w')];
+        if (in_array(false, $streams, true)) {
+            return null;
+        }
+
+        return $streams;
     }
 
     /**
