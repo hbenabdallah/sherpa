@@ -6,12 +6,17 @@ namespace App\Mcp;
 
 use App\Runtime\Interrupt;
 use App\Runtime\InterruptibleHttpClient;
+use App\TUI\ElicitationForm;
+use App\TUI\Terminal;
 use App\Version;
 use Closure;
 use LogicException;
 use Mcp\Client as Sdk;
+use Mcp\Client\Handler\Request\ElicitationCallbackInterface;
+use Mcp\Client\Handler\Request\ElicitationRequestHandler;
 use Mcp\Client\Transport\TransportInterface;
 use Mcp\Exception\ExceptionInterface as SdkException;
+use Mcp\Schema\ClientCapabilities;
 use Mcp\Schema\Content\AudioContent;
 use Mcp\Schema\Content\BlobResourceContents;
 use Mcp\Schema\Content\EmbeddedResource;
@@ -19,9 +24,12 @@ use Mcp\Schema\Content\ImageContent;
 use Mcp\Schema\Content\ResourceLink;
 use Mcp\Schema\Content\TextContent;
 use Mcp\Schema\Content\TextResourceContents;
+use Mcp\Schema\Enum\ElicitAction;
 use Mcp\Schema\Enum\ProtocolVersion;
 use Mcp\Schema\PromptArgument;
+use Mcp\Schema\Request\ElicitRequest;
 use Mcp\Schema\Result\CallToolResult;
+use Mcp\Schema\Result\ElicitResult;
 use Mcp\Schema\Result\GetPromptResult;
 use Mcp\Schema\Result\ListPromptsResult;
 use Mcp\Schema\Result\ListResourcesResult;
@@ -102,6 +110,8 @@ final class McpClient
             // fails the same way three times. Retrying only delays the message.
             ->setMaxRetries(0)
             ->setLogger($this->log)
+            ->setCapabilities(new ClientCapabilities(elicitation: true, elicitationForm: true))
+            ->addRequestHandler(new ElicitationRequestHandler($this->elicitationCallback()))
             ->build();
 
         try {
@@ -338,6 +348,43 @@ final class McpClient
         }
 
         return $messages;
+    }
+
+    /**
+     * Callback for handling elicitation requests from the server.
+     * The server may ask for additional information during tool execution.
+     */
+    private function elicitationCallback(): ElicitationCallbackInterface
+    {
+        $form = new ElicitationForm(new Terminal());
+
+        return new readonly class ($this->log, $form) implements ElicitationCallbackInterface {
+            private ServerLog $log;
+
+            private ElicitationForm $form;
+
+            public function __construct(ServerLog $log, ElicitationForm $form)
+            {
+                $this->log = $log;
+                $this->form = $form;
+            }
+
+            public function __invoke(ElicitRequest $request): ElicitResult
+            {
+                $this->log->info('Elicitation requested', [
+                    'message' => $request->message,
+                    'mode' => $request->mode->value,
+                ]);
+
+                try {
+                    return $this->form->present($request);
+                } catch (Throwable $e) {
+                    $this->log->info('Elicitation form failed: ' . $e->getMessage());
+
+                    return new ElicitResult(ElicitAction::Decline);
+                }
+            }
+        };
     }
 
     /**
