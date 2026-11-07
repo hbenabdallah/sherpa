@@ -1,8 +1,9 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/hbenabdallah/sherpa/main/public/sherpa.jpeg" alt="Sherpa, un agent de développement pour le terminal" width="720">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/hbenabdallah/sherpa/main/docs/brand/logo-dark.svg">
+    <img src="https://raw.githubusercontent.com/hbenabdallah/sherpa/main/docs/brand/logo.svg" alt="Sherpa" width="380">
+  </picture>
 </p>
-
-<h1 align="center">Sherpa</h1>
 
 <p align="center">
   <b>Un agent de développement pour le terminal, avec le modèle de votre choix.</b><br>
