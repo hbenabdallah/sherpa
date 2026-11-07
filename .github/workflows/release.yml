@@ -17,6 +17,11 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # A tag whose version the changelog has no section for stops here,
+      # before twenty minutes of building.
+      - name: release notes
+        run: bin/release-notes.sh "$GITHUB_REF_NAME" > /dev/null
+
       # The pinned PHP and micro archives, kept between runs: the host they
       # come from has had passing 500s. Keyed on the Makefile, where the pins are.
       - uses: actions/cache@v4
@@ -98,11 +103,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      # The whole history and its tags: the notes are the commits since the
-      # release before this one.
       - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
 
       - uses: actions/download-artifact@v4
         with:

@@ -231,21 +231,28 @@ check('from the source, it points at git instead', $run->getStatusCode() === 1 &
 $run = update([], $target, '1.0.1', new MockHttpClient(new MockResponse('', ['error' => 'offline'])));
 check('with GitHub out of reach, it says so and suggests naming a version', $run->getStatusCode() === 1 && str_contains($run->getDisplay(), 'sherpa update 1.0.1'), $run->getDisplay());
 
-// ---- the notes, from the history -----------------------------------------------
-// Run on this repository's own tags: v1.0.1 is the commits after v1.0.0.
-$repo = dirname(__DIR__);
-if (is_dir($repo . '/.git') && trim((string) shell_exec('git -C ' . escapeshellarg($repo) . ' tag -l v1.0.1 2>/dev/null')) === 'v1.0.1') {
-    $notes = (string) shell_exec('cd ' . escapeshellarg($repo) . ' && sh bin/release-notes.sh v1.0.1 2>&1');
-    check(
-        'the notes of a release are its commits since the one before',
-        str_contains($notes, 'What changed in Sherpa 1.0.1') && str_contains($notes, '- Say at start-up when a newer release is out')
-        && str_contains($notes, 'Since 1.0.0.'),
-        $notes,
-    );
-    check('and none from the release before', !str_contains($notes, 'Confine symlinks'), $notes);
-} else {
-    check('the notes script (skipped: no git history with tags here)', true);
-}
+// ---- the notes, from the changelog ---------------------------------------------
+$changelog = $root . '/CHANGELOG.md';
+file_put_contents($changelog, "# Changelog\n\n## Unreleased\n\n- not yet\n\n## 1.0.10 (2026-10-14)\n\n- ten\n\n## 1.0.1 (2026-10-12)\n\n### Added\n\n- one\n\n## 1.0.0\n\n- zero\n");
+$notes = static function (string $tag) use ($changelog): array {
+    exec('sh ' . escapeshellarg(__DIR__ . '/../bin/release-notes.sh') . ' ' . escapeshellarg($tag) . ' ' . escapeshellarg($changelog) . ' 2>&1', $lines, $status);
+
+    return [implode("\n", $lines), $status];
+};
+[$text, $status] = $notes('v1.0.1');
+check(
+    'the notes of a release are its section of the changelog',
+    $status === 0 && str_contains($text, 'What changed in Sherpa 1.0.1') && str_contains($text, "### Added\n\n- one"),
+    $text,
+);
+check('and nothing from another release, not even one whose number starts the same', !str_contains($text, 'ten') && !str_contains($text, 'zero') && !str_contains($text, 'not yet'), $text);
+[$text, $status] = $notes('v1.0.0');
+check('the last section ends with the file', $status === 0 && str_contains($text, '- zero'), $text);
+[$text, $status] = $notes('v1.0.2');
+check('a version the changelog has no section for is an error, saying what to do', $status === 1 && str_contains($text, '"## 1.0.2 (date)"'), $text);
+exec('cd ' . escapeshellarg(dirname(__DIR__)) . ' && sh bin/release-notes.sh v1.8.0 2>&1', $ownLines, $ownStatus);
+$own = implode("\n", $ownLines);
+check("and this repository's changelog has the notes of 1.8.0", $ownStatus === 0 && str_contains($own, 'session_search'), $own);
 
 // ---- wired --------------------------------------------------------------------
 $kernel = new Kernel('dev', true);
