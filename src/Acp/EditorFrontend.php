@@ -277,6 +277,11 @@ final class EditorFrontend implements AgentOutput, Approver
         $content = $this->preview($call->name, $call->arguments, $edit) ?: [self::text($def->description)];
         if (!$offer->standing()) {
             $content[] = self::text("Asked every time: {$offer->onlyOnce}");
+        } elseif (!$offer->persistable()) {
+            $content[] = self::text(Terminal::plain(
+                'Not kept for the project: ' . ($offer->sessionOnly ?? ''),
+                singleLine: true,
+            ));
         }
 
         try {
@@ -321,14 +326,18 @@ final class EditorFrontend implements AgentOutput, Approver
         if (!$offer->standing()) {
             return [self::OPTIONS[0], self::OPTIONS[3]];
         }
+        $options = $offer->persistable()
+            ? self::OPTIONS
+            : [self::OPTIONS[0], self::OPTIONS[1], self::OPTIONS[3]];
         if ($offer->grants === []) {
-            return self::OPTIONS;
+            return $options;
         }
 
-        $commands = implode(', ', $offer->commands());
-        $options = self::OPTIONS;
+        $commands = Terminal::plain(implode(', ', $offer->commands()), singleLine: true);
         $options[1]['name'] = "Allow {$commands} for this session";
-        $options[2]['name'] = "Always allow {$commands} in this project";
+        if ($offer->persistable()) {
+            $options[2]['name'] = "Always allow {$commands} in this project";
+        }
 
         return $options;
     }

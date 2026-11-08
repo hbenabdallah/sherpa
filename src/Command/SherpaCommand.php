@@ -40,6 +40,7 @@ use App\Tool\Sandbox;
 use App\TUI\ChatPane;
 use App\TUI\LineEditor;
 use App\TUI\Scrollback;
+use App\TUI\StandingGrants;
 use App\TUI\StatusBar;
 use App\TUI\Terminal;
 use App\Update\UpdateNotice;
@@ -308,8 +309,9 @@ final class SherpaCommand extends Command
         // on. Say so on the way in rather than let it be discovered by surprise.
         $standing = $this->projectPermissions->all();
         if ($standing !== []) {
-            echo Terminal::YELLOW . '  ⚠ Allowed without asking: ' . implode(', ', $standing)
-                . Terminal::GRAY . "  (/permissions to withdraw)\n" . Terminal::RESET;
+            echo Terminal::YELLOW . '  ⚠ Allowed without asking: '
+                . Terminal::plain(StandingGrants::summary($standing), singleLine: true)
+                . Terminal::GRAY . "  (/permissions to see or withdraw)\n" . Terminal::RESET;
         }
 
         // Set up before Sherpa knew better, or answered yes by hand: commands

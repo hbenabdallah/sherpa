@@ -544,16 +544,29 @@ HELP . Terminal::RESET;
 
         if ($action === 'revoke') {
             // A command is named as it is listed, or without the tool's name.
-            if ($target !== '' && !in_array($target, [...$this->projectPermissions->all(), ...$this->sessionPermissions->all()], true)) {
+            $grants = [...$this->projectPermissions->all(), ...$this->sessionPermissions->all()];
+            if ($target !== '') {
+                $plainTarget = self::plainPermission($target);
+                foreach ($grants as $grant) {
+                    $command = str_starts_with($grant, CommandPolicy::PREFIX)
+                        ? substr($grant, strlen(CommandPolicy::PREFIX))
+                        : $grant;
+                    if ($plainTarget === self::plainPermission($grant) || $plainTarget === self::plainPermission($command)) {
+                        $target = $grant;
+                        break;
+                    }
+                }
+            }
+            if ($target !== '' && !in_array($target, $grants, true)) {
                 $target = CommandPolicy::PREFIX . $target;
             }
 
             if ($target === '') {
                 echo Terminal::RED . "Usage: /permissions revoke <tool|command>\n" . Terminal::RESET;
             } elseif ($this->projectPermissions->revoke($target) | $this->sessionPermissions->revoke($target)) {
-                echo Terminal::GREEN . "✓ Withdrawn: {$target}. It will be asked about again.\n" . Terminal::RESET;
+                echo Terminal::GREEN . '✓ Withdrawn: ' . self::plainPermission($target) . ". It will be asked about again.\n" . Terminal::RESET;
             } else {
-                echo Terminal::RED . "Not a grant: {$target}\n" . Terminal::RESET;
+                echo Terminal::RED . 'Not a grant: ' . self::plainPermission($target) . "\n" . Terminal::RESET;
             }
 
             return;
@@ -569,7 +582,7 @@ HELP . Terminal::RESET;
             ? Terminal::GRAY . "— none\n" . Terminal::RESET
             : "\n" . Terminal::RESET;
         foreach ($standing as $tool) {
-            echo Terminal::YELLOW . "    • {$tool}\n" . Terminal::RESET;
+            echo Terminal::YELLOW . '    • ' . self::plainPermission($tool) . "\n" . Terminal::RESET;
         }
 
         echo Terminal::CYAN . "  This session only " . Terminal::RESET;
@@ -577,12 +590,17 @@ HELP . Terminal::RESET;
             ? Terminal::GRAY . "— none\n" . Terminal::RESET
             : "\n" . Terminal::RESET;
         foreach ($session as $tool) {
-            echo Terminal::CYAN . "    • {$tool}\n" . Terminal::RESET;
+            echo Terminal::CYAN . '    • ' . self::plainPermission($tool) . "\n" . Terminal::RESET;
         }
 
         if ($standing !== [] || $session !== []) {
             echo Terminal::GRAY . "\n  /permissions revoke <tool|command> · /permissions clear\n" . Terminal::RESET;
         }
+    }
+
+    private static function plainPermission(string $grant): string
+    {
+        return Terminal::plain($grant, singleLine: true);
     }
 
     /** What this session used and cost — the compactor's requests included. */

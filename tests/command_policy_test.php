@@ -167,5 +167,44 @@ check('a variable set first is not covered by a grant without it', !allows('LD_P
 check('a grant of the whole tool covers nothing', !CommandPolicy::allows(ShellCommand::parse('ls'), ['shell_exec']));
 check('a grant read back with a literal * stays literal', !allows('ls /etc', ["ls '*'"]));
 
+// ---- grants that should not be kept for a project -------------------------
+$isOneShot = is_callable(CommandPolicy::isOneShot(...));
+check('one-shot grant classifier exists', $isOneShot);
+foreach ([
+    "php -r 'echo 1;'" => true,
+    "python3 -c 'print(1)'" => true,
+    "perl -e 'print 1'" => true,
+    "node --eval 'console.log(1)'" => true,
+    "sh -c 'echo 1'" => true,
+    "perl -ne 'print'" => true,
+    "php -r 'echo 1;\necho 2;'" => true,
+    "docker run --rm php:8 php -r 'echo 1;'" => true,
+    "docker exec worker php -r 'echo 1;'" => true,
+    'sed -n 1p /tmp/output' => true,
+    'php /var/tmp/run.php' => true,
+    'php -I/tmp/php.ini bin/console' => true,
+    'docker run --mount=type=bind,source=/tmp/logs,target=/logs image php bin/console' => true,
+    'php bin/console --cache-dir=/tmpfoo' => false,
+    'head -20' => false,
+    'php -c php.ini bin/console' => false,
+    'git status *' => false,
+    'make test *' => false,
+    'php bin/console cache:clear' => false,
+    // Prefix grants with temporary paths are still one-shot.
+    'php /var/tmp/run.php *' => true,
+    'cat /tmp/out *' => true,
+    // New inline-code patterns.
+    "bash -lc 'echo 1'" => true,
+    "sh -ec 'echo 1'" => true,
+    "perl -E 'print 1'" => true,
+    "node -p '1'" => true,
+    "node --print '1'" => true,
+    "docker compose exec app php -r 'echo 1;'" => true,
+    "xargs -I {} sh -c 'echo {}'" => true,
+] as $rule => $expected) {
+    $actual = $isOneShot && CommandPolicy::isOneShot($rule);
+    check("one-shot classification: {$rule}", $actual === $expected, 'got ' . ($actual ? 'true' : 'false'));
+}
+
 printf("\n%d passed, %d failed\n", $pass, $fail);
 exit($fail === 0 ? 0 : 1);

@@ -16,11 +16,18 @@ final readonly class Offer
         public array $grants = [],
         /** Why only "once" is offered, or null when a grant may be made. */
         public ?string $onlyOnce = null,
+        /** Why a command may be allowed for the session but not the project. */
+        public ?string $sessionOnly = null,
     ) {}
 
     public function standing(): bool
     {
         return $this->onlyOnce === null;
+    }
+
+    public function persistable(): bool
+    {
+        return $this->sessionOnly === null;
     }
 
     /** @return list<string> the commands granted, as written in /permissions without the tool's name */

@@ -7,6 +7,18 @@ Security, with its number. A release is a pull request of its own that renames t
 date; once it is merged, the version is tagged on `main`, and the release's notes are this section
 (`bin/release-notes.sh`), on its GitHub page and in `sherpa update`.
 
+## Unreleased
+
+### Changed
+
+- The startup warning summarizes standing grants, showing whole-tool exposure first, grouping MCP tools and counting
+  shell command grants instead of printing each command (#31).
+
+### Security
+
+- One-shot shell command grants can be kept for the session but not the project, and a Project answer cannot persist
+  them (#31).
+
 ## 1.8.0 (2026-11-07)
 
 ### Added

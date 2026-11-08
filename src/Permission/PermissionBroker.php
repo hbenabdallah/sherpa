@@ -96,11 +96,23 @@ class PermissionBroker
         }
 
         $onlyOnce = CommandPolicy::onlyOnce($command);
-        $offer = new Offer($onlyOnce === null ? CommandPolicy::grantsFor($command) : [], $onlyOnce);
+        $grants = $onlyOnce === null ? CommandPolicy::grantsFor($command) : [];
+        $sessionOnly = array_any(
+            array_map(static fn(string $grant): string => substr($grant, strlen(CommandPolicy::PREFIX)), $grants),
+            static fn(string $rule): bool => CommandPolicy::isOneShot($rule),
+        );
+        $offer = new Offer(
+            $grants,
+            $onlyOnce,
+            $sessionOnly ? 'one-shot command' : null,
+        );
 
         $choice = $this->approver->confirm($call, $def, $offer);
         if ($choice === ConfirmChoice::Deny) {
             return false;
+        }
+        if ($choice === ConfirmChoice::Project && !$offer->persistable()) {
+            $choice = ConfirmChoice::Session;
         }
         // Whatever an approver answers for a call that can only be allowed
         // once, nothing outlives it.

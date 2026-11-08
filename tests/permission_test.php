@@ -140,8 +140,9 @@ function call(string $name): ToolCall
 function broker(ConfirmChoice $answer, ProjectPermissions $perms): array
 {
     $overlay = new ScriptedOverlay($answer);
+    $session = new SessionPermissions();
 
-    return [new PermissionBroker(new SessionPermissions(), $overlay, $perms), $overlay];
+    return [new PermissionBroker($session, $overlay, $perms), $overlay, $session];
 }
 
 $store->revokeAllTools($project);
@@ -216,6 +217,15 @@ check('a dangerous command is asked about, granted or not', !$b->check($run('mak
 $b->check($run('git push'), $shell);
 $b->check($run('git push'), $shell);
 check('"this session" for what is only allowed once grants nothing', $overlay->asked === 2);
+
+$reloadedPerms->revokeAll();
+[$b, $overlay, $session] = broker(ConfirmChoice::Project, $reloadedPerms);
+$oneShot = "php -r 'echo 1;\necho 2;'";
+check('a one-shot command still runs when Project is answered', $b->check($run($oneShot), $shell));
+$oneShotOffer = $overlay->offer;
+check('the one-shot offer is marked as session-only', $oneShotOffer instanceof Offer && !$oneShotOffer->persistable());
+check('Project is downgraded to a session grant', in_array("shell_exec: php -r 'echo 1;\necho 2;'", $session->all(), true), json_encode($session->all()));
+check('a one-shot command never reaches the project grants', !array_any($reloadedPerms->all(), static fn(string $grant): bool => str_contains($grant, 'php -r')));
 
 // A grant of the tool itself, kept by an older Sherpa, is not read back.
 $reloadedStore->allowTool($reloadedStore->get($project->slug), 'shell_exec');

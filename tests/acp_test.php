@@ -432,6 +432,34 @@ check('/auto off turns it off', ($editor->of('current_mode_update', $from)[0]['p
 $command('Patch the invoice again');
 check('and the same edit is asked about again', count($editor->asked) === $asked + 1, json_encode(array_slice($editor->asked, $asked)));
 file_put_contents("{$project}/Invoice.php", $invoice);
+
+$editor->answer = static fn(array $question): string => in_array(
+    'allow-session',
+    array_column($question['options'] ?? [], 'optionId'),
+    true,
+) ? 'allow-session' : 'allow-once';
+$asked = count($editor->asked);
+$from = count($editor->updates);
+$reply = $editor->call('session/prompt', [
+    'sessionId' => $session,
+    'prompt' => [['type' => 'text', 'text' => 'Run the one-shot shell command']],
+]);
+$oneShotQuestion = $editor->asked[$asked] ?? [];
+$oneShotCompletion = $editor->of('tool_call_update', $from)[0]['params']['update'] ?? [];
+check(
+    'a one-shot shell command through ACP offers session but not project',
+    array_column($oneShotQuestion['options'] ?? [], 'optionId') === ['allow-once', 'allow-session', 'reject'],
+    json_encode($oneShotQuestion['options'] ?? []),
+);
+check(
+    'ACP says why the one-shot command is not kept for the project',
+    str_contains(json_encode($oneShotQuestion['toolCall']['content'] ?? []), 'Not kept for the project: one-shot command'),
+    json_encode($oneShotQuestion['toolCall']['content'] ?? []),
+);
+check('ACP allows the command for this session and it runs', ($oneShotQuestion['answered'] ?? '') === 'allow-session'
+    && ($oneShotCompletion['status'] ?? '') === 'completed'
+    && ($reply['result']['stopReason'] ?? '') === 'end_turn', json_encode([$oneShotQuestion, $oneShotCompletion, $reply]));
+
 [, $said] = $command('/greet the new colleague');
 check('a skill run as a command goes to the model with its text', $said === 'Skill applied: greet', $said);
 [$stop, $said] = $command('/etc/hosts is wrong here');
