@@ -20,6 +20,7 @@ use App\Tool\FileWriteTool;
 use App\Tool\ShellExecTool;
 use App\TUI\ConfirmOverlay;
 use App\TUI\Terminal;
+use Override;
 
 $pass = 0;
 $fail = 0;
@@ -30,6 +31,34 @@ function check(string $label, bool $ok, string $got = ''): void
     printf("%s %s\n", $ok ? ' PASS' : ' FAIL', $label);
     if (!$ok && $got !== '') {
         echo "        got: ", str_replace("\n", "\n             ", substr($got, 0, 300)), "\n";
+    }
+}
+
+final class AnsweringTerminal extends Terminal
+{
+    /** @param list<string> $keys */
+    public function __construct(private array $keys) {}
+
+    #[Override]
+    public function rawMode(): void {}
+
+    #[Override]
+    public function discardPendingInput(): void {}
+
+    #[Override]
+    public function restoreMode(): void {}
+
+    /** @return array{0: int, 1: int} */
+    #[Override]
+    public function size(): array
+    {
+        return [80, 24];
+    }
+
+    #[Override]
+    public function readKey(): string
+    {
+        return array_shift($this->keys) ?? '';
     }
 }
 
@@ -127,6 +156,25 @@ check('and says why a command is asked every time', str_contains($once, 'Asked e
 check(
     'the grant made is named once chosen',
     str_contains(Terminal::plain(ConfirmOverlay::verdict(ConfirmChoice::Session, 'shell_exec', new Offer(['shell_exec: make test *']))), 'Allowed for this session: make test *'),
+);
+
+$sessionOnlyTerminal = new AnsweringTerminal(['p', 's']);
+$sessionOnlyOverlay = new ConfirmOverlay($sessionOnlyTerminal, $write, $patch, $shell);
+$sessionOnlyOffer = new Offer(['shell_exec: php -r'], sessionOnly: 'one-shot command');
+ob_start();
+$sessionOnlyChoice = $sessionOnlyOverlay->show(
+    $call('shell_exec', ['command' => "php -r 'echo 1;\necho 2;'" ]),
+    $shellDef,
+    $sessionOnlyOffer,
+);
+$sessionOnlyPrompt = Terminal::plain((string) ob_get_clean());
+$flattenedSessionOnlyPrompt = preg_replace('/\s+/', ' ', str_replace('│', '', $sessionOnlyPrompt));
+check('Project is not a valid key for a session-only grant', $sessionOnlyChoice === ConfirmChoice::Session);
+check('the prompt offers session but not project', str_contains($sessionOnlyPrompt, '[s] This session') && !str_contains($sessionOnlyPrompt, '[p]'));
+check(
+    'the session-only reason is visible when the note wraps',
+    str_contains((string) $flattenedSessionOnlyPrompt, '(not kept for the project: one-shot command)'),
+    (string) $flattenedSessionOnlyPrompt,
 );
 
 // ---- What was chosen stays on screen ------------------------------------------

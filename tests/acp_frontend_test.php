@@ -249,6 +249,34 @@ check('the grant offered names the command', str_contains(json_encode($asked[0][
 check('only once or refuse for what is asked every time', array_column($asked[1]['options'] ?? [], 'optionId') === ['allow-once', 'reject'], json_encode($asked[1]['options'] ?? []));
 check('with the reason', str_contains(json_encode($asked[1]['toolCall']['content'] ?? []), 'Asked every time: it pushes to a remote'));
 
+$sessionOnlyCommand = new ToolCall('x3', 'shell_exec', ['command' => "php -r 'echo 1;\necho 2;'"]);
+$sessionOnlyOffer = new Offer(
+    ["shell_exec: php -r 'echo 1;\necho 2;'"],
+    sessionOnly: 'one-shot command',
+);
+[$front, $editor] = frontend($paths, $todos, [
+    ['outcome' => ['outcome' => 'selected', 'optionId' => 'allow-project']],
+]);
+check('an unoffered ACP Project answer is refused', $front->confirm($sessionOnlyCommand, $shellDef, $sessionOnlyOffer) === ConfirmChoice::Deny);
+$sessionOnlyQuestion = array_first(array_filter(
+    out($editor),
+    fn(array $message): bool => ($message['method'] ?? '') === 'session/request_permission',
+))['params'] ?? [];
+check(
+    'ACP offers once and session but not project for a one-shot grant',
+    array_column($sessionOnlyQuestion['options'] ?? [], 'optionId') === ['allow-once', 'allow-session', 'reject'],
+    json_encode($sessionOnlyQuestion['options'] ?? []),
+);
+check(
+    'ACP explains why the grant is not kept for the project',
+    str_contains(json_encode($sessionOnlyQuestion['toolCall']['content'] ?? []), 'Not kept for the project: one-shot command'),
+);
+check(
+    'ACP grant option text is flattened',
+    !str_contains(json_encode($sessionOnlyQuestion['options'] ?? []), "\n"),
+    json_encode($sessionOnlyQuestion['options'] ?? []),
+);
+
 // An editor that went away answers nothing, which allows nothing.
 [$sherpa, $gone] = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
 fclose($gone);

@@ -343,6 +343,23 @@ check('a command grant is listed with what it covers', str_contains($out, 'shell
 check('and withdrawn by the command alone', str_contains($out, 'Withdrawn') && !$permissions->isAllowed('shell_exec: make test *'), $out);
 [, $out] = $slash('/permissions revoke shell_exec: ls -la');
 check('or as it is listed', str_contains($out, 'Withdrawn') && $session->all() === [], $out);
+
+$multiLineGrant = "shell_exec: php -r 'echo 1;\necho 2;'";
+$flattenedGrant = "shell_exec: php -r 'echo 1; echo 2;'";
+$permissions->allow($multiLineGrant);
+[, $out] = $slash('/permissions');
+check(
+    '/permissions lists a multi-line grant in full on one line',
+    array_any(explode("\n", $out), static fn(string $line): bool => str_contains($line, $flattenedGrant)),
+    $out,
+);
+[, $out] = $slash('/permissions revoke ' . $flattenedGrant);
+check(
+    'a flattened multi-line grant can be withdrawn as listed',
+    str_contains($out, 'Withdrawn') && !$permissions->isAllowed($multiLineGrant),
+    $out,
+);
+
 $permissions->allow('file_patch');
 $session->allowForSession('project_grep');
 [, $out] = $slash('/permissions clear');

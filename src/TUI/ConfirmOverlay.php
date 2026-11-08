@@ -99,17 +99,22 @@ class ConfirmOverlay implements Approver
         // question it had not seen yet — least of all "a" for allow.
         $this->terminal->discardPendingInput();
         $choice = ConfirmChoice::Deny;
+        $question = match (true) {
+            !$offer->standing() => self::QUESTION_ONCE,
+            !$offer->persistable() => self::QUESTION_SESSION,
+            default => self::QUESTION,
+        };
 
         try {
             while (true) {
-                echo "\r\e[2K" . ($offer->standing() ? self::QUESTION : self::QUESTION_ONCE);
+                echo "\r\e[2K" . $question;
 
                 $key = strtolower($this->terminal->readKey());
                 $picked = match ($key) {
                     'a' => ConfirmChoice::Once,
                     // Not offered for what is only ever allowed once.
                     's' => $offer->standing() ? ConfirmChoice::Session : null,
-                    'p' => $offer->standing() ? ConfirmChoice::Project : null,
+                    'p' => $offer->standing() && $offer->persistable() ? ConfirmChoice::Project : null,
                     // End of input refuses too: a closed terminal must not
                     // spin here, and must not allow anything either.
                     'r', "\x03", '' => ConfirmChoice::Deny,
@@ -135,6 +140,12 @@ class ConfirmOverlay implements Approver
         . Terminal::GREEN . '[a]' . Terminal::RESET . ' Allow once  '
         . Terminal::CYAN . '[s]' . Terminal::RESET . ' This session  '
         . Terminal::BLUE . '[p]' . Terminal::RESET . ' Always (project)  '
+        . Terminal::RED . '[r]' . Terminal::RESET . ' Refuse  '
+        . Terminal::BOLD . '› ' . Terminal::RESET;
+
+    private const string QUESTION_SESSION = '  '
+        . Terminal::GREEN . '[a]' . Terminal::RESET . ' Allow once  '
+        . Terminal::CYAN . '[s]' . Terminal::RESET . ' This session  '
         . Terminal::RED . '[r]' . Terminal::RESET . ' Refuse  '
         . Terminal::BOLD . '› ' . Terminal::RESET;
 
@@ -194,6 +205,11 @@ class ConfirmOverlay implements Approver
         // Wrapped, not cut: this is what a grant would cover from now on.
         $note = match (true) {
             !$offer->standing() => ["⚠ Asked every time: {$offer->onlyOnce}", Terminal::RED],
+            !$offer->persistable() => [
+                '[s] would allow: ' . implode(', ', $offer->commands())
+                    . ' (not kept for the project: ' . $offer->sessionOnly . ')',
+                Terminal::CYAN,
+            ],
             $offer->grants !== [] => ['[s]/[p] would allow: ' . implode(', ', $offer->commands()), Terminal::CYAN],
             default => null,
         };

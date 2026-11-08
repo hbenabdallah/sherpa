@@ -114,6 +114,12 @@ if (str_contains($asked, 'propose')) {
     return;
 }
 
+if (str_contains($asked, 'one-shot shell')) {
+    $call('shell_exec', ['command' => "php -r 'echo 1;'"]);
+
+    return;
+}
+
 if (str_contains($asked, 'patch')) {
     $call('file_patch', str_contains($asked, 'again')
         ? ['path' => 'Invoice.php', 'search' => 'return 42;', 'replace' => 'return 43;']

@@ -38,6 +38,31 @@ final class CommandPolicy
     /** Programs that run what they read, when they are given no script. */
     private const array INTERPRETERS = ['sh', 'bash', 'zsh', 'dash', 'ksh', 'fish', 'python', 'python3', 'perl', 'ruby', 'php', 'node'];
 
+    /** Inline-code options by interpreter. */
+    private const array INLINE_CODE_OPTIONS = [
+        'sh' => ['-c'], 'bash' => ['-c'], 'zsh' => ['-c'], 'dash' => ['-c'], 'ksh' => ['-c'], 'fish' => ['-c'],
+        'python' => ['-c'], 'python3' => ['-c'], 'perl' => ['-e'], 'ruby' => ['-e'], 'php' => ['-r'],
+        'node' => ['-e', '--eval'],
+    ];
+
+    private const array DOCKER_GLOBAL_OPTIONS_WITH_VALUE = ['-H', '--host', '--context', '--config', '--log-level'];
+
+    private const array DOCKER_RUN_OPTIONS_WITH_VALUE = [
+        '-a', '--attach', '--add-host', '--annotation', '--blkio-weight', '--cap-add', '--cap-drop', '--cgroup-parent',
+        '--cpu-period', '--cpu-quota', '--cpu-rt-period', '--cpu-rt-runtime', '--cpu-shares', '--cpus', '--cpuset-cpus',
+        '--cpuset-mems', '--device', '--device-cgroup-rule', '--dns', '--dns-option', '--dns-search', '--domainname',
+        '-e', '--env', '--env-file', '--expose', '--gpus', '--group-add', '--health-cmd', '--health-interval',
+        '--health-retries', '--health-start-period', '--health-timeout', '-h', '--hostname', '--ip', '--ip6', '--ipc',
+        '-l', '--label', '--log-driver', '--log-opt', '--mac-address', '-m', '--memory', '--memory-reservation',
+        '--memory-swap', '--mount', '--name', '--network', '--network-alias', '-p', '--publish', '--pull', '--restart',
+        '--runtime', '--security-opt', '--shm-size', '--stop-signal', '--stop-timeout', '--storage-opt', '--sysctl',
+        '--tmpfs', '-u', '--user', '--ulimit', '-v', '--volume', '--volume-driver', '-w', '--workdir',
+    ];
+
+    private const array DOCKER_EXEC_OPTIONS_WITH_VALUE = [
+        '--detach-keys', '-e', '--env', '--user', '-u', '--workdir', '-w',
+    ];
+
     /** Why this command is asked about every time and allowed once at most, or null. */
     public static function onlyOnce(ShellCommand $command): ?string
     {
@@ -135,6 +160,24 @@ final class CommandPolicy
     }
 
     /**
+     * Whether an exact command grant is too specific or temporary to be useful
+     * in another session.
+     */
+    public static function isOneShot(string $rule): bool
+    {
+        if (str_ends_with($rule, ' *')) {
+            return false;
+        }
+
+        $command = ShellCommand::parse($rule);
+        if (str_contains($rule, "\n")) {
+            return true;
+        }
+
+        return array_any($command->segments, fn($words): bool => self::namesTemporaryPath($words) || self::runsInlineCode(self::core($words)));
+    }
+
+    /**
      * Whether a rule covers these words: the same words, or, for a rule ending
      * in a bare `*`, the same words first.
      *
@@ -179,6 +222,122 @@ final class CommandPolicy
         }
 
         return $words;
+    }
+
+    /**
+     * @param list<string> $words
+     */
+    private static function namesTemporaryPath(array $words): bool
+    {
+        foreach ($words as $word) {
+            foreach (['/tmp', '/var/tmp'] as $directory) {
+                $position = 0;
+                while (($position = strpos($word, $directory, $position)) !== false) {
+                    $before = $position === 0 || in_array($word[$position - 1], ['=', ':'], true)
+                        || str_starts_with($word, '-') && $position <= 2;
+                    $afterIndex = $position + strlen($directory);
+                    $after = !isset($word[$afterIndex]) || in_array($word[$afterIndex], ['/', ':', ','], true);
+                    if ($before && $after) {
+                        return true;
+                    }
+                    $position++;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param list<string> $words
+     */
+    private static function runsInlineCode(array $words): bool
+    {
+        if ($words === []) {
+            return false;
+        }
+
+        $program = basename($words[0]);
+        if (in_array($program, ['docker', 'podman'], true)) {
+            return self::runsInlineCode(self::core(self::dockerCommand($words)));
+        }
+        if (!in_array($program, self::INTERPRETERS, true)) {
+            return false;
+        }
+
+        $options = self::INLINE_CODE_OPTIONS[$program];
+        $arguments = array_slice($words, 1);
+        foreach ($arguments as $index => $argument) {
+            if (in_array($argument, $options, true) && isset($arguments[$index + 1])) {
+                return true;
+            }
+            if (str_starts_with($argument, '--eval=')) {
+                return true;
+            }
+            if (preg_match('/^-[A-Za-z]+$/', $argument) === 1 && isset($arguments[$index + 1])) {
+                $short = substr($argument, 1);
+                $last = substr($short, -1);
+                $prefix = substr($short, 0, -1);
+                if (in_array('-' . $last, $options, true) && preg_match('/^[npw]*$/', $prefix) === 1) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param list<string> $words
+     *
+     * @return list<string>
+     */
+    private static function dockerCommand(array $words): array
+    {
+        $operation = null;
+        $index = 1;
+        while (isset($words[$index])) {
+            if (in_array($words[$index], ['run', 'exec'], true)) {
+                $operation = $words[$index];
+                break;
+            }
+            if (!str_starts_with($words[$index], '-')) {
+                return [];
+            }
+            $index += in_array($words[$index], self::DOCKER_GLOBAL_OPTIONS_WITH_VALUE, true) ? 2 : 1;
+        }
+        if ($operation === null) {
+            return [];
+        }
+
+        $arguments = array_slice($words, $index + 1);
+        $optionsWithValue = $operation === 'run'
+            ? self::DOCKER_RUN_OPTIONS_WITH_VALUE
+            : self::DOCKER_EXEC_OPTIONS_WITH_VALUE;
+        $target = self::dockerTargetIndex($arguments, $optionsWithValue);
+
+        return $target === null ? [] : array_slice($arguments, $target + 1);
+    }
+
+    /**
+     * @param list<string> $arguments
+     * @param list<string> $optionsWithValue
+     */
+    private static function dockerTargetIndex(array $arguments, array $optionsWithValue): ?int
+    {
+        $index = 0;
+        while (isset($arguments[$index])) {
+            if ($arguments[$index] === '--') {
+                return isset($arguments[$index + 1]) ? $index + 1 : null;
+            }
+            if (!str_starts_with($arguments[$index], '-')) {
+                return $index;
+            }
+
+            $index += in_array($arguments[$index], $optionsWithValue, true) ? 2 : 1;
+        }
+
+        return null;
     }
 
     /**
