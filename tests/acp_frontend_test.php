@@ -273,8 +273,10 @@ check(
 );
 check(
     'ACP grant option text is flattened',
-    !str_contains(json_encode($sessionOnlyQuestion['options'] ?? []), "\n"),
-    json_encode($sessionOnlyQuestion['options'] ?? []),
+    array_all(
+        array_column($sessionOnlyQuestion['options'] ?? [], 'name'),
+        static fn(string $name): bool => !str_contains($name, "\n"),
+    ),
 );
 
 // An editor that went away answers nothing, which allows nothing.

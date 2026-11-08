@@ -190,6 +190,17 @@ foreach ([
     'git status *' => false,
     'make test *' => false,
     'php bin/console cache:clear' => false,
+    // Prefix grants with temporary paths are still one-shot.
+    'php /var/tmp/run.php *' => true,
+    'cat /tmp/out *' => true,
+    // New inline-code patterns.
+    "bash -lc 'echo 1'" => true,
+    "sh -ec 'echo 1'" => true,
+    "perl -E 'print 1'" => true,
+    "node -p '1'" => true,
+    "node --print '1'" => true,
+    "docker compose exec app php -r 'echo 1;'" => true,
+    "xargs -I {} sh -c 'echo {}'" => true,
 ] as $rule => $expected) {
     $actual = $isOneShot && CommandPolicy::isOneShot($rule);
     check("one-shot classification: {$rule}", $actual === $expected, 'got ' . ($actual ? 'true' : 'false'));

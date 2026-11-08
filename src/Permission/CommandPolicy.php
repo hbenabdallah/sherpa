@@ -41,8 +41,8 @@ final class CommandPolicy
     /** Inline-code options by interpreter. */
     private const array INLINE_CODE_OPTIONS = [
         'sh' => ['-c'], 'bash' => ['-c'], 'zsh' => ['-c'], 'dash' => ['-c'], 'ksh' => ['-c'], 'fish' => ['-c'],
-        'python' => ['-c'], 'python3' => ['-c'], 'perl' => ['-e'], 'ruby' => ['-e'], 'php' => ['-r'],
-        'node' => ['-e', '--eval'],
+        'python' => ['-c'], 'python3' => ['-c'], 'perl' => ['-e', '-E'], 'ruby' => ['-e'], 'php' => ['-r'],
+        'node' => ['-e', '--eval', '-p', '--print'],
     ];
 
     private const array DOCKER_GLOBAL_OPTIONS_WITH_VALUE = ['-H', '--host', '--context', '--config', '--log-level'];
@@ -165,16 +165,17 @@ final class CommandPolicy
      */
     public static function isOneShot(string $rule): bool
     {
-        if (str_ends_with($rule, ' *')) {
-            return false;
-        }
-
-        $command = ShellCommand::parse($rule);
         if (str_contains($rule, "\n")) {
             return true;
         }
 
-        return array_any($command->segments, fn($words): bool => self::namesTemporaryPath($words) || self::runsInlineCode(self::core($words)));
+        // For prefix grants (ending with ' *'), strip the suffix before parsing.
+        $prefix = str_ends_with($rule, ' *');
+        $ruleToParse = $prefix ? substr($rule, 0, -2) : $rule;
+
+        $command = ShellCommand::parse($ruleToParse);
+
+        return array_any($command->segments, fn($words): bool => self::namesTemporaryPath($words) || (!$prefix && self::runsInlineCode(self::core($words))));
     }
 
     /**
@@ -213,11 +214,20 @@ final class CommandPolicy
         }
 
         while ($words !== [] && in_array(basename($words[0]), self::WRAPPERS, true)) {
-            array_shift($words);
+            $wrapper = basename(array_shift($words));
             while ($words !== [] && (str_starts_with($words[0], '-')
                 || preg_match('/^\d+(\.\d+)?[smhd]?$/', $words[0]) === 1
                 || self::isAssignment($words[0]))) {
+                $flag = $words[0];
                 array_shift($words);
+                // xargs -I {} carries a value that is not the subcommand.
+                if ($wrapper === 'xargs' && preg_match('/^-I(\s(.*))?$/', $flag) === 1) {
+                    if ($words !== [] && !str_starts_with($words[0], '-')
+                        && !preg_match('/^\d+(\.\d+)?[smhd]?$/', $words[0])
+                        && !self::isAssignment($words[0])) {
+                        array_shift($words);
+                    }
+                }
             }
         }
 
@@ -278,7 +288,7 @@ final class CommandPolicy
                 $short = substr($argument, 1);
                 $last = substr($short, -1);
                 $prefix = substr($short, 0, -1);
-                if (in_array('-' . $last, $options, true) && preg_match('/^[npw]*$/', $prefix) === 1) {
+                if (in_array('-' . $last, $options, true) && preg_match('/^[npxwleiu]*$/', $prefix) === 1) {
                     return true;
                 }
             }
@@ -300,6 +310,11 @@ final class CommandPolicy
             if (in_array($words[$index], ['run', 'exec'], true)) {
                 $operation = $words[$index];
                 break;
+            }
+            // Handle `docker compose exec` — skip `compose` as a subcommand prefix.
+            if ($words[$index] === 'compose' || $words[$index] === 'docker') {
+                $index++;
+                continue;
             }
             if (!str_starts_with($words[$index], '-')) {
                 return [];
