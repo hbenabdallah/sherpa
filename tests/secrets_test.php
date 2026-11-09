@@ -135,6 +135,7 @@ final class Answer implements Approver
             ConfirmChoice::Once => ConfirmResult::once(),
             ConfirmChoice::Session => ConfirmResult::session(),
             ConfirmChoice::Project => ConfirmResult::project(),
+            ConfirmChoice::Discuss => ConfirmResult::discuss('let us talk'),
             ConfirmChoice::Deny => ConfirmResult::deny(),
         };
     }
