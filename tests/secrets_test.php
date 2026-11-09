@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\SecretsTest;
 
+use App\Agent\Tool\ToolResult;
+
 // What is read goes to the model's provider. A file that usually holds secrets
 // is asked about every time before it is read, by file_read, grep or a
 // command, and a credential in any tool's output goes as a marker, not as
@@ -19,6 +21,7 @@ use App\Agent\Tool\ToolDefinition;
 use App\Permission\Approver;
 use App\Permission\CommandPolicy;
 use App\Permission\ConfirmChoice;
+use App\Permission\ConfirmResult;
 use App\Permission\Offer;
 use App\Permission\PermissionBroker;
 use App\Permission\ProjectPermissions;
@@ -123,12 +126,18 @@ final class Answer implements Approver
 
     public function __construct(private readonly ConfirmChoice $choice) {}
 
-    public function confirm(ToolCall $call, ToolDefinition $def, Offer $offer): ConfirmChoice
+    public function confirm(ToolCall $call, ToolDefinition $def, Offer $offer): ConfirmResult
     {
         $this->asked++;
         $this->offer = $offer;
 
-        return $this->choice;
+        return match ($this->choice) {
+            ConfirmChoice::Once => ConfirmResult::once(),
+            ConfirmChoice::Session => ConfirmResult::session(),
+            ConfirmChoice::Project => ConfirmResult::project(),
+            ConfirmChoice::Discuss => ConfirmResult::discuss('let us talk'),
+            ConfirmChoice::Deny => ConfirmResult::deny(),
+        };
     }
 
     public function approvePlan(string $plan): ?bool
@@ -144,14 +153,14 @@ $readDef = new ToolDefinition('file_read', 'Read a file', [], Permission::AUTO, 
 
 $yes = new Answer(ConfirmChoice::Project);
 $broker = new PermissionBroker($session = new SessionPermissions(), $yes, new ProjectPermissions(new ProjectStore(new StackDetector())));
-check('an ordinary file is read unasked', $broker->check(new ToolCall('5', 'file_read', ['path' => 'src/Client.php']), $readDef) && $yes->asked === 0);
-check('.env is asked about', $broker->check(new ToolCall('6', 'file_read', ['path' => '.env']), $readDef) && $yes->asked === 1);
+check('an ordinary file is read unasked', !$broker->check(new ToolCall('5', 'file_read', ['path' => 'src/Client.php']), $readDef) instanceof ToolResult && $yes->asked === 0);
+check('.env is asked about', !$broker->check(new ToolCall('6', 'file_read', ['path' => '.env']), $readDef) instanceof ToolResult && $yes->asked === 1);
 check('with the reason, and only once offered', $yes->offer?->standing() === false && str_contains((string) $yes->offer->onlyOnce, '.env'));
 $broker->check(new ToolCall('7', 'file_read', ['path' => '.env']), $readDef);
 check('"always" grants nothing: asked again', $yes->asked === 2 && $session->all() === [], json_encode($session->all()));
 $no = new Answer(ConfirmChoice::Deny);
 $refusing = new PermissionBroker(new SessionPermissions(), $no, new ProjectPermissions(new ProjectStore(new StackDetector())));
-check('refused, it is not read', !$refusing->check(new ToolCall('8', 'file_read', ['path' => './config/../.env']), $readDef));
+check('refused, it is not read', $refusing->check(new ToolCall('8', 'file_read', ['path' => './config/../.env']), $readDef) instanceof ToolResult);
 
 check('a command naming .env is asked about every time', str_contains((string) CommandPolicy::onlyOnce(ShellCommand::parse('cat .env')), '.env usually holds secrets'));
 check('even when granted', !CommandPolicy::allows(ShellCommand::parse('grep DB .env'), ['shell_exec: grep DB *']));

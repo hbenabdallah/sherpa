@@ -10,10 +10,11 @@ use App\Agent\Tool\Permission;
 use App\Agent\Tool\Provenance;
 use App\Agent\Tool\ToolCall;
 use App\Agent\Tool\ToolDefinition;
+use App\Agent\Tool\ToolResult;
 use App\Permission\Approver;
 use App\Permission\AutoMode;
 use App\Permission\CommandConfinement;
-use App\Permission\ConfirmChoice;
+use App\Permission\ConfirmResult;
 use App\Permission\Offer;
 use App\Permission\PermissionBroker;
 use App\Permission\ProjectPermissions;
@@ -50,11 +51,11 @@ final class Refusing implements Approver
     public int $asked = 0;
 
     #[Override]
-    public function confirm(ToolCall $call, ToolDefinition $def, Offer $offer): ConfirmChoice
+    public function confirm(ToolCall $call, ToolDefinition $def, Offer $offer): ConfirmResult
     {
         $this->asked++;
 
-        return ConfirmChoice::Deny;
+        return ConfirmResult::deny();
     }
 
     #[Override]
@@ -94,7 +95,7 @@ function ranUnasked(ToolCall $call, ToolDefinition $def, Mode $mode, ?string $co
         auto: new AutoMode($modes, new Confined($confinedBy)),
     );
 
-    return $broker->check($call, $def) && $user->asked === 0;
+    return !$broker->check($call, $def) instanceof ToolResult && $user->asked === 0;
 }
 
 $write = new ToolCall('1', 'file_write', ['path' => 'src/A.php', 'content' => '<?php']);
@@ -157,7 +158,7 @@ $user = new Refusing();
 $broker = new PermissionBroker($session, $user, new ProjectPermissions(new ProjectStore(new StackDetector())), auto: new AutoMode($modes, new Confined('the sandbox (bubblewrap)')));
 $broker->check($tests, tool('shell_exec'));
 $modes->switchTo(Mode::Default);
-check('what ran in auto mode is not granted for after it', !$broker->check($tests, tool('shell_exec')) && $user->asked === 1 && $session->all() === [], json_encode($session->all()));
+check('what ran in auto mode is not granted for after it', $broker->check($tests, tool('shell_exec')) instanceof ToolResult && $user->asked === 1 && $session->all() === [], json_encode($session->all()));
 
 // ---- what it says it does --------------------------------------------------------
 $said = new AutoMode(new PlanMode(), new Confined('the sandbox (bubblewrap)'))->describe();

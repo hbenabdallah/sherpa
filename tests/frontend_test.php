@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\FrontendTest;
 
 use App\Agent\Tool\Permission;
+use App\Permission\ConfirmChoice;
 use App\Permission\Offer;
 use App\Tool\Edit\ProposedEdit;
 use App\Tool\FileReadTool;
@@ -24,7 +25,7 @@ use App\Agent\Tool\ToolCall;
 use App\Agent\Tool\ToolDefinition;
 use App\Kernel;
 use App\Permission\Approver;
-use App\Permission\ConfirmChoice;
+use App\Permission\ConfirmResult;
 use App\Project\ProjectPathResolver;
 use App\Runtime\Frontend;
 use App\Runtime\Interrupt;
@@ -103,11 +104,11 @@ final class Recorder implements AgentOutput, Approver
         return $this;
     }
 
-    public function confirm(ToolCall $call, ToolDefinition $def, Offer $offer): ConfirmChoice
+    public function confirm(ToolCall $call, ToolDefinition $def, Offer $offer): ConfirmResult
     {
         $this->seen[] = "confirm:{$call->id}";
 
-        return ConfirmChoice::Session;
+        return ConfirmResult::session();
     }
 
     public function approvePlan(string $plan): bool
@@ -171,7 +172,7 @@ check(
     $recorder->seen === ['begin', 'token:Hi', 'flush', 'call:file_read:c1', 'result:file_read:c1', 'info:note', 'confirm:c2', 'plan:the plan'],
     json_encode($recorder->seen),
 );
-check('and its answers come back', $choice === ConfirmChoice::Session && $approved === false);
+check('and its answers come back', $choice->choice === ConfirmChoice::Session && $approved === false);
 check('a sub-agent follows the switch', $frontend->forSubagent() === $recorder);
 
 // ---- the edit, whole ------------------------------------------------------------

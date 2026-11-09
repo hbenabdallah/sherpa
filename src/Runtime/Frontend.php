@@ -8,7 +8,7 @@ use App\Agent\AgentOutput;
 use App\Agent\Tool\ToolCall;
 use App\Agent\Tool\ToolDefinition;
 use App\Permission\Approver;
-use App\Permission\ConfirmChoice;
+use App\Permission\ConfirmResult;
 use App\Permission\Offer;
 use App\TUI\ChatPane;
 use App\TUI\ConfirmOverlay;
@@ -87,7 +87,7 @@ final class Frontend implements AgentOutput, Approver
         return $this->output->forSubagent();
     }
 
-    public function confirm(ToolCall $call, ToolDefinition $def, Offer $offer): ConfirmChoice
+    public function confirm(ToolCall $call, ToolDefinition $def, Offer $offer): ConfirmResult
     {
         return $this->approver->confirm($call, $def, $offer);
     }

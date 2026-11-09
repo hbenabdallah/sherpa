@@ -10,7 +10,7 @@ use App\Agent\TodoList;
 use App\Agent\Tool\ToolCall;
 use App\Agent\Tool\ToolDefinition;
 use App\Permission\Approver;
-use App\Permission\ConfirmChoice;
+use App\Permission\ConfirmResult;
 use App\Permission\Offer;
 use App\Project\ProjectPathResolver;
 use App\Tool\Edit\EditPreview;
@@ -37,6 +37,7 @@ final class EditorFrontend implements AgentOutput, Approver
         ['optionId' => 'allow-once', 'name' => 'Allow once', 'kind' => 'allow_once'],
         ['optionId' => 'allow-session', 'name' => 'Allow for this session', 'kind' => 'allow_always'],
         ['optionId' => 'allow-project', 'name' => 'Always allow in this project', 'kind' => 'allow_always'],
+        ['optionId' => 'discuss', 'name' => 'Discuss', 'kind' => 'reject_once'],
         ['optionId' => 'reject', 'name' => 'Refuse', 'kind' => 'reject_once'],
     ];
 
@@ -49,6 +50,9 @@ final class EditorFrontend implements AgentOutput, Approver
 
     /** Whether the editor shows notices; otherwise Sherpa's remarks go as thoughts. */
     private bool $notices = false;
+
+    /** Whether the editor supports form-mode elicitation. */
+    private bool $elicitation = false;
 
     private string $messageId = '';
 
@@ -76,10 +80,11 @@ final class EditorFrontend implements AgentOutput, Approver
         private readonly TodoList $todos,
     ) {}
 
-    public function forSession(string $sessionId, bool $notices): void
+    public function forSession(string $sessionId, bool $notices, bool $elicitation = false): void
     {
         $this->sessionId = $sessionId;
         $this->notices = $notices;
+        $this->elicitation = $elicitation;
         $this->calls = [];
         $this->planCall = null;
     }
@@ -271,7 +276,15 @@ final class EditorFrontend implements AgentOutput, Approver
 
     // ---- questions --------------------------------------------------------------
 
-    public function confirm(ToolCall $call, ToolDefinition $def, Offer $offer): ConfirmChoice
+    /**
+     * Ask the editor to approve or discuss a tool call.
+     *
+     * Sends a request_permission notification with the call preview and the
+     * available options. An invalid or missing answer is treated as a denial.
+     * When the editor chooses Discuss, a follow-up elicitation/create request
+     * collects the user's message to send back to the agent.
+     */
+    public function confirm(ToolCall $call, ToolDefinition $def, Offer $offer): ConfirmResult
     {
         $edit = $this->calls[$call->id]['edit'] ?? $this->edits->of($call);
         $content = $this->preview($call->name, $call->arguments, $edit) ?: [self::text($def->description)];
@@ -298,21 +311,74 @@ final class EditorFrontend implements AgentOutput, Approver
             ]);
         } catch (AcpError) {
             // No answer is not a yes.
-            return ConfirmChoice::Deny;
+            return ConfirmResult::deny();
         }
 
         $chosen = self::chosen($answer);
         // Only what was offered: an answer naming another option is no answer.
         if (!in_array($chosen, array_column(self::options($offer), 'optionId'), true)) {
-            return ConfirmChoice::Deny;
+            return ConfirmResult::deny();
+        }
+
+        // Discuss uses a follow-up elicitation to collect the user's message.
+        if ($chosen === 'discuss') {
+            return $this->askForDiscussion($call);
         }
 
         return match ($chosen) {
-            'allow-once'    => ConfirmChoice::Once,
-            'allow-session' => ConfirmChoice::Session,
-            'allow-project' => ConfirmChoice::Project,
-            default         => ConfirmChoice::Deny,
+            'allow-once'    => ConfirmResult::once(),
+            'allow-session' => ConfirmResult::session(),
+            'allow-project' => ConfirmResult::project(),
+            default         => ConfirmResult::deny(),
         };
+    }
+
+    /**
+     * Ask the editor for a discussion message via elicitation/create.
+     *
+     * Sends a form-mode elicitation with a single text field. If the editor
+     * does not support elicitation or the user cancels, the result is a denial.
+     * Too-short messages are also denied to avoid wasting the agent's context
+     * window.
+     */
+    private function askForDiscussion(ToolCall $call): ConfirmResult
+    {
+        if (!$this->elicitation) {
+            return ConfirmResult::deny();
+        }
+
+        try {
+            $result = $this->connection->request('elicitation/create', [
+                'sessionId' => $this->sessionId,
+                'toolCallId' => $call->id,
+                'message' => 'You chose to discuss this action. What would you like to tell Sherpa?',
+                'mode' => 'form',
+                'requestedSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'message' => [
+                            'type' => 'string',
+                            'title' => 'Your message',
+                            'description' => 'Type your message to Sherpa',
+                        ],
+                    ],
+                    'required' => ['message'],
+                ],
+            ]);
+        } catch (AcpError) {
+            // Editor doesn't support elicitation or refused.
+            return ConfirmResult::deny();
+        }
+
+        // ACP elicitation response: {action: accept|decline|cancel, content?: {...}}.
+        if (!is_array($result) || ($result['action'] ?? null) !== 'accept') {
+            return ConfirmResult::deny();
+        }
+
+        $content = $result['content'] ?? null;
+        $message = is_array($content) && is_string($content['message'] ?? null) ? trim($content['message']) : '';
+
+        return mb_strlen($message) >= 3 ? ConfirmResult::discuss($message) : ConfirmResult::deny();
     }
 
     /**
@@ -324,11 +390,11 @@ final class EditorFrontend implements AgentOutput, Approver
     private static function options(Offer $offer): array
     {
         if (!$offer->standing()) {
-            return [self::OPTIONS[0], self::OPTIONS[3]];
+            return [self::OPTIONS[0], self::OPTIONS[3], self::OPTIONS[4]];
         }
         $options = $offer->persistable()
             ? self::OPTIONS
-            : [self::OPTIONS[0], self::OPTIONS[1], self::OPTIONS[3]];
+            : [self::OPTIONS[0], self::OPTIONS[1], self::OPTIONS[3], self::OPTIONS[4]];
         if ($offer->grants === []) {
             return $options;
         }

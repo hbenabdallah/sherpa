@@ -22,6 +22,7 @@ use App\Agent\Tool\AsTool;
 use App\Agent\Tool\Param;
 use App\Agent\Tool\Permission;
 use App\Agent\Tool\Toolbox;
+use App\Agent\Tool\ToolResult;
 use App\Permission\PermissionBroker;
 use App\Platform\ModelInfo;
 use App\Platform\ModelResidency;
@@ -63,9 +64,9 @@ final class AllowAll extends PermissionBroker
 {
     public function __construct() {}
 
-    public function check(ToolCall $call, ?ToolDefinition $def): bool
+    public function check(ToolCall $call, ?ToolDefinition $def): ?ToolResult
     {
-        return true;
+        return null;
     }
 }
 

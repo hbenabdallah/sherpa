@@ -10,4 +10,5 @@ enum ConfirmChoice
     case Session;
     case Project;
     case Deny;
+    case Discuss;
 }

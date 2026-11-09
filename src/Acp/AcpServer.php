@@ -633,7 +633,8 @@ final class AcpServer
         }
 
         $this->makeCurrent($session);
-        $this->editor->forSession($id, is_array($this->client['session']['notices'] ?? null));
+        $elicitation = is_array($this->client['elicitation']['form'] ?? null);
+        $this->editor->forSession($id, is_array($this->client['session']['notices'] ?? null), $elicitation);
 
         $note = $this->notes[$session->directory] ?? null;
         if ($note !== null) {

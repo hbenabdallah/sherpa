@@ -42,8 +42,6 @@ final class AgentLoop
 
     private const string INTERRUPTED = 'Interrupted by the user.';
 
-    private const string REFUSED = 'Refused by the user.';
-
     private const string STUCK = 'Stopped: the model repeated the same tool call without getting anywhere.';
 
     private const string WALLED = 'Stopped: every call came back with the same error, %d times running: %s';
@@ -551,8 +549,10 @@ final class AgentLoop
         $content = trim($result->content);
         $failed = preg_match('/^\((?:exit code [1-9]\d*|command failed[^)]*)\)\s*/', $content, $status) === 1;
 
-        // The user's answer, or plan mode's: neither is a wall to report.
-        if (!$result->isError && !$failed || in_array($content, [self::REFUSED, PlanMode::BLOCKED], true)) {
+        // The user's answer, the policy's or plan mode's: none is a wall to report.
+        $answered = in_array($content, [PermissionBroker::REFUSED, PermissionBroker::DENIED, PlanMode::BLOCKED], true)
+            || str_starts_with($content, PermissionBroker::DISCUSSED);
+        if (!$result->isError && !$failed || $answered) {
             return null;
         }
 
@@ -579,16 +579,27 @@ final class AgentLoop
         return $this->record($bag, $call, $this->decide($call));
     }
 
-    /** Run, unless plan mode or the user says not to. */
+    /**
+     * Decide whether to execute a tool call or block it.
+     *
+     * Checks plan mode first, then asks the permission broker. If the broker
+     * returns a blocked ToolResult (denial or discussion message), it is
+     * returned without executing the tool. Otherwise the call is executed.
+     */
     private function decide(ToolCall $call): ToolResult
     {
         $def = $this->toolbox->find($call->name);
 
-        return match (true) {
-            $this->planMode?->blocks($def) === true => new ToolResult($call->id, PlanMode::BLOCKED, isError: true),
-            $this->permissions->check($call, $def)  => $this->execute($call),
-            default                                 => new ToolResult($call->id, self::REFUSED, isError: true),
-        };
+        if ($this->planMode?->blocks($def) === true) {
+            return new ToolResult($call->id, PlanMode::BLOCKED, isError: true);
+        }
+
+        $blocked = $this->permissions->check($call, $def);
+        if ($blocked instanceof ToolResult) {
+            return $blocked;
+        }
+
+        return $this->execute($call);
     }
 
     /** A result: shown, observed, into history. */
