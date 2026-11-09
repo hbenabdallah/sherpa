@@ -362,24 +362,13 @@ final class EditorFrontend implements AgentOutput, Approver
             return ConfirmResult::deny();
         }
 
-        // The result may be an array or a stdClass from JSON decoding.
-        if ($result === null || $result instanceof stdClass && (!property_exists($result, 'formResult') && !property_exists($result, 'form_result'))) {
+        // ACP elicitation response: {action: accept|decline|cancel, content?: {...}}.
+        if (!is_array($result) || ($result['action'] ?? null) !== 'accept') {
             return ConfirmResult::deny();
         }
 
-        $formResult = [];
-        if (is_array($result)) {
-            $formResult = $result['formResult'] ?? $result['form_result'] ?? [];
-        } elseif ($result instanceof stdClass) {
-            $fr = $result->formResult ?? $result->form_result ?? null;
-            if (is_object($fr)) {
-                $formResult = (array) $fr;
-            } elseif (is_array($fr)) {
-                $formResult = $fr;
-            }
-        }
-
-        $message = is_string($formResult['message'] ?? null) ? trim($formResult['message']) : '';
+        $content = $result['content'] ?? null;
+        $message = is_array($content) && is_string($content['message'] ?? null) ? trim($content['message']) : '';
 
         return mb_strlen($message) >= 3 ? ConfirmResult::discuss($message) : ConfirmResult::deny();
     }

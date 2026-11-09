@@ -226,7 +226,7 @@ check('so is an answer naming no option offered', $front->confirm($call, $def, n
 // Discuss triggers a follow-up elicitation/create to collect the message.
 [$discussFront, $discussEditor] = frontend($paths, $todos, [
     ['outcome' => ['outcome' => 'selected', 'optionId' => 'discuss']],
-    ['formResult' => ['message' => 'Please reconsider this action']],
+    ['action' => 'accept', 'content' => ['message' => 'Please reconsider this action']],
 ]);
 $discussFront->showToolCall('file_patch', $call->arguments, 'p1');
 check('Discuss collects a message via elicitation', $discussFront->confirm($call, $def, new Offer())->choice === ConfirmChoice::Discuss);
@@ -238,7 +238,7 @@ fclose($discussEditor);
 // Discuss with a too-short message is treated as a denial.
 [$shortFront, $shortEditor] = frontend($paths, $todos, [
     ['outcome' => ['outcome' => 'selected', 'optionId' => 'discuss']],
-    ['formResult' => ['message' => 'ok']],
+    ['action' => 'accept', 'content' => ['message' => 'ok']],
 ]);
 $shortFront->showToolCall('file_patch', $call->arguments, 'p1');
 check('a too-short Discuss message is a denial', $shortFront->confirm($call, $def, new Offer())->choice === ConfirmChoice::Deny);
