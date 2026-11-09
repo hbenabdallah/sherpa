@@ -25,8 +25,9 @@ use App\Agent\Tool\AsTool;
 use App\Agent\Tool\Param;
 use App\Agent\Tool\Permission;
 use App\Agent\Tool\Toolbox;
+use App\Agent\Tool\ToolResult;
 use App\Permission\Approver;
-use App\Permission\ConfirmChoice;
+use App\Permission\ConfirmResult;
 use App\Permission\PermissionBroker;
 use App\Platform\ModelInfo;
 use App\Platform\ModelResidency;
@@ -86,9 +87,9 @@ final class PlanAnswer implements Approver
 
     public function __construct(private readonly bool $yes) {}
 
-    public function confirm(ToolCall $call, ToolDefinition $def, Offer $offer): ConfirmChoice
+    public function confirm(ToolCall $call, ToolDefinition $def, Offer $offer): ConfirmResult
     {
-        return ConfirmChoice::Once;
+        return ConfirmResult::once();
     }
 
     public function approvePlan(string $plan): bool
@@ -106,13 +107,13 @@ final class YesBroker extends PermissionBroker
 
     public function __construct() {}
 
-    public function check(ToolCall $call, ?ToolDefinition $def): bool
+    public function check(ToolCall $call, ?ToolDefinition $def): ?ToolResult
     {
         if ($def?->permission === Permission::CONFIRM) {
             $this->asked++;
         }
 
-        return true;
+        return null;
     }
 }
 

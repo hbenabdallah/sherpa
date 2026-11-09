@@ -10,7 +10,7 @@ use App\Agent\TodoList;
 use App\Agent\Tool\ToolCall;
 use App\Agent\Tool\ToolDefinition;
 use App\Permission\Approver;
-use App\Permission\ConfirmChoice;
+use App\Permission\ConfirmResult;
 use App\Permission\Offer;
 use App\Project\ProjectPathResolver;
 use App\Tool\Edit\EditPreview;
@@ -37,6 +37,7 @@ final class EditorFrontend implements AgentOutput, Approver
         ['optionId' => 'allow-once', 'name' => 'Allow once', 'kind' => 'allow_once'],
         ['optionId' => 'allow-session', 'name' => 'Allow for this session', 'kind' => 'allow_always'],
         ['optionId' => 'allow-project', 'name' => 'Always allow in this project', 'kind' => 'allow_always'],
+        ['optionId' => 'discuss', 'name' => 'Discuss', 'kind' => 'reject_once'],
         ['optionId' => 'reject', 'name' => 'Refuse', 'kind' => 'reject_once'],
     ];
 
@@ -271,7 +272,7 @@ final class EditorFrontend implements AgentOutput, Approver
 
     // ---- questions --------------------------------------------------------------
 
-    public function confirm(ToolCall $call, ToolDefinition $def, Offer $offer): ConfirmChoice
+    public function confirm(ToolCall $call, ToolDefinition $def, Offer $offer): ConfirmResult
     {
         $edit = $this->calls[$call->id]['edit'] ?? $this->edits->of($call);
         $content = $this->preview($call->name, $call->arguments, $edit) ?: [self::text($def->description)];
@@ -298,20 +299,27 @@ final class EditorFrontend implements AgentOutput, Approver
             ]);
         } catch (AcpError) {
             // No answer is not a yes.
-            return ConfirmChoice::Deny;
+            return ConfirmResult::deny();
         }
 
         $chosen = self::chosen($answer);
         // Only what was offered: an answer naming another option is no answer.
         if (!in_array($chosen, array_column(self::options($offer), 'optionId'), true)) {
-            return ConfirmChoice::Deny;
+            return ConfirmResult::deny();
+        }
+
+        // Discuss carries a message from the editor.
+        if ($chosen === 'discuss') {
+            $message = is_string($answer['message'] ?? null) ? $answer['message'] : '';
+
+            return $message !== '' ? ConfirmResult::discuss($message) : ConfirmResult::deny();
         }
 
         return match ($chosen) {
-            'allow-once'    => ConfirmChoice::Once,
-            'allow-session' => ConfirmChoice::Session,
-            'allow-project' => ConfirmChoice::Project,
-            default         => ConfirmChoice::Deny,
+            'allow-once'    => ConfirmResult::once(),
+            'allow-session' => ConfirmResult::session(),
+            'allow-project' => ConfirmResult::project(),
+            default         => ConfirmResult::deny(),
         };
     }
 
@@ -324,11 +332,11 @@ final class EditorFrontend implements AgentOutput, Approver
     private static function options(Offer $offer): array
     {
         if (!$offer->standing()) {
-            return [self::OPTIONS[0], self::OPTIONS[3]];
+            return [self::OPTIONS[0], self::OPTIONS[3], self::OPTIONS[4]];
         }
         $options = $offer->persistable()
             ? self::OPTIONS
-            : [self::OPTIONS[0], self::OPTIONS[1], self::OPTIONS[3]];
+            : [self::OPTIONS[0], self::OPTIONS[1], self::OPTIONS[3], self::OPTIONS[4]];
         if ($offer->grants === []) {
             return $options;
         }

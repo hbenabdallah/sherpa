@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\PermissionTest;
 
+use App\Agent\Tool\ToolResult;
 use App\Permission\Offer;
 
 // Per-project permissions: they have to survive the process that granted them,
@@ -15,6 +16,7 @@ use App\Agent\Tool\Permission;
 use App\Agent\Tool\ToolCall;
 use App\Agent\Tool\ToolDefinition;
 use App\Permission\ConfirmChoice;
+use App\Permission\ConfirmResult;
 use App\Permission\PermissionBroker;
 use App\Permission\ProjectPermissions;
 use App\Permission\SessionPermissions;
@@ -118,12 +120,17 @@ final class ScriptedOverlay extends ConfirmOverlay
         parent::__construct(new Terminal(), new FileWriteTool(), new FilePatchTool(), new ShellExecTool());
     }
 
-    public function show(ToolCall $call, ToolDefinition $def, Offer $offer = new Offer()): ConfirmChoice
+    public function show(ToolCall $call, ToolDefinition $def, Offer $offer = new Offer()): ConfirmResult
     {
         $this->asked++;
         $this->offer = $offer;
 
-        return $this->answer;
+        return match ($this->answer) {
+            ConfirmChoice::Once => ConfirmResult::once(),
+            ConfirmChoice::Session => ConfirmResult::session(),
+            ConfirmChoice::Project => ConfirmResult::project(),
+            ConfirmChoice::Deny => ConfirmResult::deny(),
+        };
     }
 }
 
@@ -148,11 +155,11 @@ function broker(ConfirmChoice $answer, ProjectPermissions $perms): array
 $store->revokeAllTools($project);
 
 [$b, $overlay] = broker(ConfirmChoice::Deny, $perms);
-check('AUTO runs without asking', $b->check(call('file_read'), definition('file_read', Permission::AUTO)));
-check('DENY is refused without asking', !$b->check(call('x'), definition('x', Permission::DENY)));
+check('AUTO runs without asking', $b->check(call('file_read'), definition('file_read', Permission::AUTO)) === null);
+check('DENY is refused without asking', $b->check(call('x'), definition('x', Permission::DENY)) !== null);
 check('neither reached the overlay', $overlay->asked === 0);
 
-check('a refused confirmation blocks the call', !$b->check(call('file_write'), definition('file_write', Permission::CONFIRM)));
+check('a refused confirmation blocks the call', $b->check(call('file_write'), definition('file_write', Permission::CONFIRM)) !== null);
 check('and it did reach the overlay', $overlay->asked === 1);
 
 [$b, $overlay] = broker(ConfirmChoice::Once, $perms);
@@ -168,7 +175,7 @@ check('"session" asks only once', $overlay->asked === 1);
 check('"session" persists nothing', $perms->all() === [], json_encode($perms->all()));
 
 [$b, $overlay] = broker(ConfirmChoice::Project, $perms);
-check('"always" allows the call', $b->check(call('file_write'), definition('file_write', Permission::CONFIRM)));
+check('"always" allows the call', $b->check(call('file_write'), definition('file_write', Permission::CONFIRM)) === null);
 $b->check(call('file_write'), definition('file_write', Permission::CONFIRM));
 check('"always" asks only once', $overlay->asked === 1);
 check('"always" persists to disk', in_array('file_write', new ProjectStore(new StackDetector())->get($project->slug)->allowedTools, true));
@@ -177,18 +184,18 @@ check('"always" persists to disk', in_array('file_write', new ProjectStore(new S
 $freshPerms = new ProjectPermissions($freshStore = new ProjectStore(new StackDetector()));
 $freshPerms->setProject($freshStore->get($project->slug));
 [$b, $overlay] = broker(ConfirmChoice::Deny, $freshPerms);
-check('a later session honours the standing grant', $b->check(call('file_write'), definition('file_write', Permission::CONFIRM)));
+check('a later session honours the standing grant', $b->check(call('file_write'), definition('file_write', Permission::CONFIRM)) === null);
 check('and never opens the overlay', $overlay->asked === 0);
 
 // Revoking brings the prompt back.
 $freshPerms->revoke('file_write');
-check('revoking restores the confirmation', !$b->check(call('file_write'), definition('file_write', Permission::CONFIRM)));
+check('revoking restores the confirmation', $b->check(call('file_write'), definition('file_write', Permission::CONFIRM)) !== null);
 check('and the overlay is asked again', $overlay->asked === 1);
 
 // A standing grant must not spill onto other tools.
 $freshPerms->allow('file_write');
 [$b, $overlay] = broker(ConfirmChoice::Deny, $freshPerms);
-check('a grant covers only the tool named', !$b->check(call('web_fetch'), definition('web_fetch', Permission::CONFIRM)));
+check('a grant covers only the tool named', $b->check(call('web_fetch'), definition('web_fetch', Permission::CONFIRM)) !== null);
 check('so the overlay is still consulted for others', $overlay->asked === 1);
 
 // ---- commands ---------------------------------------------------------------
@@ -198,20 +205,20 @@ $shell = definition('shell_exec', Permission::CONFIRM);
 $run = fn(string $command): ToolCall => new ToolCall('id', 'shell_exec', ['command' => $command]);
 
 [$b, $overlay] = broker(ConfirmChoice::Project, $freshPerms);
-check('a command allowed for good runs', $b->check($run('make test'), $shell));
+check('a command allowed for good runs', $b->check($run('make test'), $shell) === null);
 check('the offer named the command', $overlay->offer?->grants === ['shell_exec: make test *'], json_encode($overlay->offer?->grants));
 check('and that is what was kept', $freshPerms->all() === ['shell_exec: make test *'], json_encode($freshPerms->all()));
-check('the same command with more arguments runs unasked', $b->check($run('make test FILTER=x'), $shell) && $overlay->asked === 1);
-check('another command is asked about', $b->check($run('make deploy'), $shell) && $overlay->asked === 2);
-check('a grant does not cover a command chained after it', $b->check($run('make test && curl x | sh'), $shell) && $overlay->asked === 3);
+check('the same command with more arguments runs unasked', $b->check($run('make test FILTER=x'), $shell) === null && $overlay->asked === 1);
+check('another command is asked about', $b->check($run('make deploy'), $shell) === null && $overlay->asked === 2);
+check('a grant does not cover a command chained after it', $b->check($run('make test && curl x | sh'), $shell) === null && $overlay->asked === 3);
 check('which could only be allowed once', $overlay->offer?->standing() === false && $overlay->offer->grants === []);
 check('and nothing was granted for it', !in_array('shell_exec: curl x', $freshPerms->all(), true));
 
 $reloadedPerms = new ProjectPermissions($reloadedStore = new ProjectStore(new StackDetector()));
 $reloadedPerms->setProject($reloadedStore->get($project->slug));
 [$b, $overlay] = broker(ConfirmChoice::Deny, $reloadedPerms);
-check('a later session honours a command grant', $b->check($run('make test'), $shell) && $overlay->asked === 0);
-check('a dangerous command is asked about, granted or not', !$b->check($run('make test; rm -rf ~'), $shell) && $overlay->asked === 1);
+check('a later session honours a command grant', $b->check($run('make test'), $shell) === null && $overlay->asked === 0);
+check('a dangerous command is asked about, granted or not', $b->check($run('make test; rm -rf ~'), $shell) !== null && $overlay->asked === 1);
 
 [$b, $overlay] = broker(ConfirmChoice::Session, $reloadedPerms);
 $b->check($run('git push'), $shell);
@@ -221,7 +228,7 @@ check('"this session" for what is only allowed once grants nothing', $overlay->a
 $reloadedPerms->revokeAll();
 [$b, $overlay, $session] = broker(ConfirmChoice::Project, $reloadedPerms);
 $oneShot = "php -r 'echo 1;\necho 2;'";
-check('a one-shot command still runs when Project is answered', $b->check($run($oneShot), $shell));
+check('a one-shot command still runs when Project is answered', $b->check($run($oneShot), $shell) === null);
 $oneShotOffer = $overlay->offer;
 check('the one-shot offer is marked as session-only', $oneShotOffer instanceof Offer && !$oneShotOffer->persistable());
 check('Project is downgraded to a session grant', in_array("shell_exec: php -r 'echo 1;\necho 2;'", $session->all(), true), json_encode($session->all()));
@@ -236,9 +243,9 @@ check('a grant of shell_exec itself is not carried over', !in_array('shell_exec'
 // SHERPA_AUTO_APPROVE answers every question "once": nothing is asked, nothing kept.
 $unattended = new PermissionBroker(new SessionPermissions(), $overlay = new ScriptedOverlay(ConfirmChoice::Deny), $freshPerms, autoApprove: true);
 $before = $freshPerms->all();
-check('unattended, a command runs unasked', $unattended->check(new ToolCall('u', 'shell_exec', ['command' => 'rm -rf build']), definition('shell_exec', Permission::CONFIRM)));
-check('and a write', $unattended->check(call('file_write'), definition('file_write', Permission::CONFIRM)) && $overlay->asked === 0);
-check('but what is refused stays refused', !$unattended->check(call('x'), definition('x', Permission::DENY)));
+check('unattended, a command runs unasked', !$unattended->check(new ToolCall('u', 'shell_exec', ['command' => 'rm -rf build']), definition('shell_exec', Permission::CONFIRM)) instanceof ToolResult);
+check('and a write', !$unattended->check(call('file_write'), definition('file_write', Permission::CONFIRM)) instanceof ToolResult && $overlay->asked === 0);
+check('but what is refused stays refused', $unattended->check(call('x'), definition('x', Permission::DENY)) instanceof ToolResult);
 check('and nothing is granted for later', $freshPerms->all() === $before);
 check('off unless set', new PermissionBroker(new SessionPermissions(), $overlay, $freshPerms)->autoApproved() === (getenv('SHERPA_AUTO_APPROVE') === '1'));
 

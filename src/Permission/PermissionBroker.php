@@ -8,6 +8,7 @@ use App\Agent\Tool\Permission;
 use App\Agent\Tool\Provenance;
 use App\Agent\Tool\ToolCall;
 use App\Agent\Tool\ToolDefinition;
+use App\Agent\Tool\ToolResult;
 
 /** @open the suites extend it with brokers that answer for the user */
 class PermissionBroker
@@ -40,16 +41,17 @@ class PermissionBroker
     }
 
     /**
-     * Returns true if the tool call should proceed.
+     * Returns null if the tool call should proceed, or a ToolResult with the
+     * refusal/discuss message if it should not.
      */
-    public function check(ToolCall $call, ?ToolDefinition $def): bool
+    public function check(ToolCall $call, ?ToolDefinition $def): ?ToolResult
     {
         if (!$def instanceof ToolDefinition) {
-            return true; // tool not found, let Toolbox handle the error
+            return null; // tool not found, let Toolbox handle the error
         }
 
         if ($def->permission !== Permission::DENY && $this->autoApproved()) {
-            return true;
+            return null;
         }
 
         // Memory is read by every later session, in its system prompt. After a
@@ -58,27 +60,45 @@ class PermissionBroker
         if ($call->name === 'memory_remember' && $this->provenance?->tainted() && $def->permission !== Permission::DENY) {
             $reason = "this session has read {$this->provenance->label()}, and a fact is kept for every later session";
 
-            return $this->approver->confirm($call, $def, new Offer([], $reason)) !== ConfirmChoice::Deny;
+            $result = $this->approver->confirm($call, $def, new Offer([], $reason));
+
+            return $this->toToolResult($call, $result);
         }
 
         // Reading runs unasked, but not a file that usually holds secrets:
         // asked every time, and never granted for longer.
         $secret = $call->name === 'file_read' ? SecretFiles::reason((string) ($call->arguments['path'] ?? '')) : null;
         if ($secret !== null && $def->permission !== Permission::DENY) {
-            return $this->approver->confirm($call, $def, new Offer([], $secret)) !== ConfirmChoice::Deny;
+            $result = $this->approver->confirm($call, $def, new Offer([], $secret));
+
+            return $this->toToolResult($call, $result);
         }
 
         // After what is asked whatever the mode, before what auto mode stops asking.
         if ($def->permission === Permission::CONFIRM && $this->auto?->allows($call) === true) {
-            return true;
+            return null;
         }
 
         return match ($def->permission) {
-            Permission::AUTO   => true,
-            Permission::DENY   => false,
+            Permission::AUTO   => null,
+            Permission::DENY   => new ToolResult($call->id, 'Denied by policy.', isError: true),
             Permission::CONFIRM => $call->name === CommandPolicy::TOOL
                 ? $this->askAboutCommand($call, $def)
                 : $this->askConfirmation($call, $def),
+        };
+    }
+
+    /** Convert a ConfirmResult to a ToolResult (block) or null (proceed). */
+    private function toToolResult(ToolCall $call, ConfirmResult $result): ?ToolResult
+    {
+        return match ($result->choice) {
+            ConfirmChoice::Once, ConfirmChoice::Session, ConfirmChoice::Project => null,
+            ConfirmChoice::Discuss => new ToolResult(
+                $call->id,
+                'The user discussed this action: ' . ($result->message ?? ''),
+                isError: true,
+            ),
+            ConfirmChoice::Deny => new ToolResult($call->id, 'Refused by the user.', isError: true),
         };
     }
 
@@ -87,12 +107,12 @@ class PermissionBroker
      * nothing in it is asked about every time. A grant is made for the
      * commands it names, never for the tool.
      */
-    private function askAboutCommand(ToolCall $call, ToolDefinition $def): bool
+    private function askAboutCommand(ToolCall $call, ToolDefinition $def): ?ToolResult
     {
         $command = ShellCommand::parse((string) ($call->arguments['command'] ?? ''));
         $grants = [...$this->project->all(), ...$this->session->all()];
         if (CommandPolicy::allows($command, $grants)) {
-            return true;
+            return null;
         }
 
         $onlyOnce = CommandPolicy::onlyOnce($command);
@@ -107,9 +127,17 @@ class PermissionBroker
             $sessionOnly ? 'one-shot command' : null,
         );
 
-        $choice = $this->approver->confirm($call, $def, $offer);
+        $result = $this->approver->confirm($call, $def, $offer);
+        $choice = $result->choice;
+        if ($choice === ConfirmChoice::Discuss) {
+            return new ToolResult(
+                $call->id,
+                'The user discussed this action: ' . ($result->message ?? ''),
+                isError: true,
+            );
+        }
         if ($choice === ConfirmChoice::Deny) {
-            return false;
+            return new ToolResult($call->id, 'Refused by the user.', isError: true);
         }
         if ($choice === ConfirmChoice::Project && !$offer->persistable()) {
             $choice = ConfirmChoice::Session;
@@ -126,21 +154,31 @@ class PermissionBroker
             }
         }
 
-        return true;
+        return null;
     }
 
-    private function askConfirmation(ToolCall $call, ToolDefinition $def): bool
+    private function askConfirmation(ToolCall $call, ToolDefinition $def): ?ToolResult
     {
         // Standing grant from a previous session, or one made in this one?
         if ($this->project->isAllowed($call->name) || $this->session->isSessionAllowed($call->name)) {
-            return true;
+            return null;
         }
 
-        return match ($this->approver->confirm($call, $def, new Offer())) {
-            ConfirmChoice::Once    => true,
-            ConfirmChoice::Session => $this->grantForSession($call->name),
-            ConfirmChoice::Project => $this->grantForProject($call->name),
-            ConfirmChoice::Deny    => false,
+        $result = $this->approver->confirm($call, $def, new Offer());
+        $choice = $result->choice;
+        if ($choice === ConfirmChoice::Discuss) {
+            return new ToolResult(
+                $call->id,
+                'The user discussed this action: ' . ($result->message ?? ''),
+                isError: true,
+            );
+        }
+
+        return match ($choice) {
+            ConfirmChoice::Once    => null,
+            ConfirmChoice::Session => $this->grantForSession($call->name) ? null : null,
+            ConfirmChoice::Project => $this->grantForProject($call->name) ? null : null,
+            ConfirmChoice::Deny    => new ToolResult($call->id, 'Refused by the user.', isError: true),
         };
     }
 

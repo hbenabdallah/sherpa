@@ -584,11 +584,16 @@ final class AgentLoop
     {
         $def = $this->toolbox->find($call->name);
 
-        return match (true) {
-            $this->planMode?->blocks($def) === true => new ToolResult($call->id, PlanMode::BLOCKED, isError: true),
-            $this->permissions->check($call, $def)  => $this->execute($call),
-            default                                 => new ToolResult($call->id, self::REFUSED, isError: true),
-        };
+        if ($this->planMode?->blocks($def) === true) {
+            return new ToolResult($call->id, PlanMode::BLOCKED, isError: true);
+        }
+
+        $blocked = $this->permissions->check($call, $def);
+        if ($blocked instanceof ToolResult) {
+            return $blocked;
+        }
+
+        return $this->execute($call);
     }
 
     /** A result: shown, observed, into history. */

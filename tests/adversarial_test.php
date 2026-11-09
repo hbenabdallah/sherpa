@@ -27,7 +27,7 @@ use App\Agent\Tool\ToolCall;
 use App\Agent\Tool\ToolDefinition;
 use App\Memory\MemoryStore;
 use App\Permission\Approver;
-use App\Permission\ConfirmChoice;
+use App\Permission\ConfirmResult;
 use App\Permission\Offer;
 use App\Permission\PermissionBroker;
 use App\Permission\ProjectPermissions;
@@ -145,19 +145,19 @@ final class BusyUser implements Approver
 
     public function __construct(private readonly array $onceFor) {}
 
-    public function confirm(ToolCall $call, ToolDefinition $def, Offer $offer): ConfirmChoice
+    public function confirm(ToolCall $call, ToolDefinition $def, Offer $offer): ConfirmResult
     {
         $this->asked[] = ['tool' => $call->name, 'args' => $call->arguments, 'onlyOnce' => $offer->onlyOnce, 'grants' => $offer->grants];
         if ($offer->standing()) {
-            return ConfirmChoice::Project;
+            return ConfirmResult::project();
         }
         foreach ($this->onceFor as $needle) {
             if (str_contains(json_encode($call->arguments), $needle)) {
-                return ConfirmChoice::Once;
+                return ConfirmResult::once();
             }
         }
 
-        return ConfirmChoice::Deny;
+        return ConfirmResult::deny();
     }
 
     public function approvePlan(string $plan): ?bool

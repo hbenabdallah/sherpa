@@ -8,6 +8,7 @@ use App\Agent\Tool\ToolCall;
 use App\Agent\Tool\ToolDefinition;
 use App\Permission\Approver;
 use App\Permission\ConfirmChoice;
+use App\Permission\ConfirmResult;
 use App\Permission\Offer;
 use App\Tool\FilePatchTool;
 use App\Tool\FileWriteTool;
@@ -28,7 +29,7 @@ class ConfirmOverlay implements Approver
         private readonly MarkdownRenderer $markdown = new MarkdownRenderer(),
     ) {}
 
-    public function confirm(ToolCall $call, ToolDefinition $def, Offer $offer): ConfirmChoice
+    public function confirm(ToolCall $call, ToolDefinition $def, Offer $offer): ConfirmResult
     {
         return $this->show($call, $def, $offer);
     }
@@ -85,7 +86,7 @@ class ConfirmOverlay implements Approver
      * the scrollback, the keypress echoed inside it, and no trace of what was
      * chosen. The question line is then replaced by the answer.
      */
-    public function show(ToolCall $call, ToolDefinition $def, Offer $offer = new Offer()): ConfirmChoice
+    public function show(ToolCall $call, ToolDefinition $def, Offer $offer = new Offer()): ConfirmResult
     {
         [$cols] = $this->terminal->size();
         $width = max(20, min(76, $cols - 4));
@@ -98,7 +99,7 @@ class ConfirmOverlay implements Approver
         // A key typed while the model was working is not an answer to a
         // question it had not seen yet — least of all "a" for allow.
         $this->terminal->discardPendingInput();
-        $choice = ConfirmChoice::Deny;
+        $result = ConfirmResult::deny();
         $question = match (true) {
             !$offer->standing() => self::QUESTION_ONCE,
             !$offer->persistable() => self::QUESTION_SESSION,
@@ -115,6 +116,7 @@ class ConfirmOverlay implements Approver
                     // Not offered for what is only ever allowed once.
                     's' => $offer->standing() ? ConfirmChoice::Session : null,
                     'p' => $offer->standing() && $offer->persistable() ? ConfirmChoice::Project : null,
+                    'd' => ConfirmChoice::Discuss,
                     // End of input refuses too: a closed terminal must not
                     // spin here, and must not allow anything either.
                     'r', "\x03", '' => ConfirmChoice::Deny,
@@ -122,7 +124,16 @@ class ConfirmOverlay implements Approver
                 };
 
                 if ($picked !== null) {
-                    $choice = $picked;
+                    if ($picked === ConfirmChoice::Discuss) {
+                        $result = $this->askForDiscussion();
+                    } else {
+                        $result = match ($picked) {
+                            ConfirmChoice::Once => ConfirmResult::once(),
+                            ConfirmChoice::Session => ConfirmResult::session(),
+                            ConfirmChoice::Project => ConfirmResult::project(),
+                            ConfirmChoice::Deny => ConfirmResult::deny(),
+                        };
+                    }
                     break;
                 }
             }
@@ -130,28 +141,50 @@ class ConfirmOverlay implements Approver
             $this->terminal->restoreMode();
             // Wiped whatever the key echoed, if the terminal echoed it, along
             // with the question: the answer takes its place, and stays.
-            echo "\r\e[2K" . self::verdict($choice, $call->name, $offer) . "\n";
+            echo "\r\e[2K" . self::verdict($result->choice, $call->name, $offer) . "\n";
         }
 
-        return $choice;
+        return $result;
+    }
+
+    /** Prompt the user for a message to send to the agent. Restores mode for line input, then re-enters raw mode. */
+    private function askForDiscussion(): ConfirmResult
+    {
+        $this->terminal->restoreMode();
+        echo "\r\e[2K" . self::QUESTION_DISCUSS;
+        $line = trim(fgets(STDIN) ?: '');
+        $this->terminal->rawMode();
+
+        if ($line === '') {
+            return ConfirmResult::deny();
+        }
+
+        return ConfirmResult::discuss($line);
     }
 
     private const string QUESTION = '  '
         . Terminal::GREEN . '[a]' . Terminal::RESET . ' Allow once  '
         . Terminal::CYAN . '[s]' . Terminal::RESET . ' This session  '
         . Terminal::BLUE . '[p]' . Terminal::RESET . ' Always (project)  '
+        . Terminal::MAGENTA . '[d]' . Terminal::RESET . ' Discuss  '
         . Terminal::RED . '[r]' . Terminal::RESET . ' Refuse  '
         . Terminal::BOLD . '› ' . Terminal::RESET;
 
     private const string QUESTION_SESSION = '  '
         . Terminal::GREEN . '[a]' . Terminal::RESET . ' Allow once  '
         . Terminal::CYAN . '[s]' . Terminal::RESET . ' This session  '
+        . Terminal::MAGENTA . '[d]' . Terminal::RESET . ' Discuss  '
         . Terminal::RED . '[r]' . Terminal::RESET . ' Refuse  '
         . Terminal::BOLD . '› ' . Terminal::RESET;
 
     private const string QUESTION_ONCE = '  '
         . Terminal::GREEN . '[a]' . Terminal::RESET . ' Allow once  '
+        . Terminal::MAGENTA . '[d]' . Terminal::RESET . ' Discuss  '
         . Terminal::RED . '[r]' . Terminal::RESET . ' Refuse  '
+        . Terminal::BOLD . '› ' . Terminal::RESET;
+
+    private const string QUESTION_DISCUSS = '  '
+        . Terminal::MAGENTA . 'Type your message to Sherpa (empty to refuse): '
         . Terminal::BOLD . '› ' . Terminal::RESET;
 
     /** The line that replaces the question: what was chosen, and what happens now. */
@@ -165,6 +198,7 @@ class ConfirmOverlay implements Approver
             ConfirmChoice::Once    => Terminal::GREEN . "  ✓ Allowed once — running {$tool}…" . Terminal::RESET,
             ConfirmChoice::Session => Terminal::GREEN . "  ✓ Allowed for this session{$what} — running {$tool}…" . Terminal::RESET,
             ConfirmChoice::Project => Terminal::GREEN . "  ✓ Always allowed in this project{$what} — running {$tool}…" . Terminal::RESET,
+            ConfirmChoice::Discuss => Terminal::MAGENTA . "  ✎ Discussing — {$tool} does not run." . Terminal::RESET,
             ConfirmChoice::Deny    => Terminal::RED . "  ✗ Refused — {$tool} does not run." . Terminal::RESET,
         };
     }

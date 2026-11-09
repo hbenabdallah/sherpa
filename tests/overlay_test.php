@@ -169,7 +169,7 @@ $sessionOnlyChoice = $sessionOnlyOverlay->show(
 );
 $sessionOnlyPrompt = Terminal::plain((string) ob_get_clean());
 $flattenedSessionOnlyPrompt = preg_replace('/\s+/', ' ', str_replace('│', '', $sessionOnlyPrompt));
-check('Project is not a valid key for a session-only grant', $sessionOnlyChoice === ConfirmChoice::Session);
+check('Project is not a valid key for a session-only grant', $sessionOnlyChoice->choice === ConfirmChoice::Session);
 check('the prompt offers session but not project', str_contains($sessionOnlyPrompt, '[s] This session') && !str_contains($sessionOnlyPrompt, '[p]'));
 check(
     'the session-only reason is visible when the note wraps',

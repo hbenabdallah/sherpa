@@ -216,12 +216,12 @@ $answers = [
 ];
 [$front, $editor] = frontend($paths, $todos, $answers);
 $front->showToolCall('file_patch', $call->arguments, 'p1');
-check('"for this session" is the session grant', $front->confirm($call, $def, new Offer()) === ConfirmChoice::Session);
+check('"for this session" is the session grant', $front->confirm($call, $def, new Offer())->choice === ConfirmChoice::Session);
 $asked = array_first(array_filter(out($editor), fn(array $m): bool => ($m['method'] ?? '') === 'session/request_permission'))['params'] ?? [];
 check('the question names the session and the call, with the diff', $asked['sessionId'] === 's1' && $asked['toolCall']['toolCallId'] === 'p1'
     && $asked['toolCall']['content'][0]['type'] === 'diff' && str_contains($asked['toolCall']['content'][0]['newText'], 'return 1;'), json_encode($asked));
-check('a cancelled question is a refusal', $front->confirm($call, $def, new Offer()) === ConfirmChoice::Deny);
-check('so is an answer naming no option offered', $front->confirm($call, $def, new Offer()) === ConfirmChoice::Deny);
+check('a cancelled question is a refusal', $front->confirm($call, $def, new Offer())->choice === ConfirmChoice::Deny);
+check('so is an answer naming no option offered', $front->confirm($call, $def, new Offer())->choice === ConfirmChoice::Deny);
 
 $front->showToolCall('plan_ready', ['plan' => '1. Fix'], 'r1');
 check('a plan carried out on "go"', $front->approvePlan('1. Fix') === true);
@@ -238,15 +238,15 @@ $shellCall = new ToolCall('x1', 'shell_exec', ['command' => 'make test']);
     ['outcome' => ['outcome' => 'selected', 'optionId' => 'allow-session']],
 ]);
 $front->showToolCall('shell_exec', $shellCall->arguments, 'x1');
-check('a command granted for the project', $front->confirm($shellCall, $shellDef, new Offer(['shell_exec: make test *'])) === ConfirmChoice::Project);
+check('a command granted for the project', $front->confirm($shellCall, $shellDef, new Offer(['shell_exec: make test *']))->choice === ConfirmChoice::Project);
 $front->showToolCall('shell_exec', ['command' => 'git push'], 'x2');
 check(
     '"for this session" is no answer where only once is offered',
-    $front->confirm(new ToolCall('x2', 'shell_exec', ['command' => 'git push']), $shellDef, new Offer([], 'it pushes to a remote')) === ConfirmChoice::Deny,
+    $front->confirm(new ToolCall('x2', 'shell_exec', ['command' => 'git push']), $shellDef, new Offer([], 'it pushes to a remote'))->choice === ConfirmChoice::Deny,
 );
 $asked = array_values(array_map(fn(array $m) => $m['params'], array_filter(out($editor), fn(array $m): bool => ($m['method'] ?? '') === 'session/request_permission')));
 check('the grant offered names the command', str_contains(json_encode($asked[0]['options'] ?? []), 'Always allow make test * in this project'), json_encode($asked[0]['options'] ?? []));
-check('only once or refuse for what is asked every time', array_column($asked[1]['options'] ?? [], 'optionId') === ['allow-once', 'reject'], json_encode($asked[1]['options'] ?? []));
+check('once, discuss, or refuse for what is asked every time', array_column($asked[1]['options'] ?? [], 'optionId') === ['allow-once', 'discuss', 'reject'], json_encode($asked[1]['options'] ?? []));
 check('with the reason', str_contains(json_encode($asked[1]['toolCall']['content'] ?? []), 'Asked every time: it pushes to a remote'));
 
 $sessionOnlyCommand = new ToolCall('x3', 'shell_exec', ['command' => "php -r 'echo 1;\necho 2;'"]);
@@ -257,14 +257,14 @@ $sessionOnlyOffer = new Offer(
 [$front, $editor] = frontend($paths, $todos, [
     ['outcome' => ['outcome' => 'selected', 'optionId' => 'allow-project']],
 ]);
-check('an unoffered ACP Project answer is refused', $front->confirm($sessionOnlyCommand, $shellDef, $sessionOnlyOffer) === ConfirmChoice::Deny);
+check('an unoffered ACP Project answer is refused', $front->confirm($sessionOnlyCommand, $shellDef, $sessionOnlyOffer)->choice === ConfirmChoice::Deny);
 $sessionOnlyQuestion = array_first(array_filter(
     out($editor),
     fn(array $message): bool => ($message['method'] ?? '') === 'session/request_permission',
 ))['params'] ?? [];
 check(
     'ACP offers once and session but not project for a one-shot grant',
-    array_column($sessionOnlyQuestion['options'] ?? [], 'optionId') === ['allow-once', 'allow-session', 'reject'],
+    array_column($sessionOnlyQuestion['options'] ?? [], 'optionId') === ['allow-once', 'allow-session', 'discuss', 'reject'],
     json_encode($sessionOnlyQuestion['options'] ?? []),
 );
 check(
@@ -283,7 +283,7 @@ check(
 [$sherpa, $gone] = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
 fclose($gone);
 $orphan = new EditorFrontend(new Connection($sherpa, $sherpa), new EditPreview(new FileWriteTool($paths), new FilePatchTool($paths)), $paths, new ShellExecTool($paths), $todos);
-check('no editor to answer: refused', $orphan->confirm($call, $def, new Offer()) === ConfirmChoice::Deny);
+check('no editor to answer: refused', $orphan->confirm($call, $def, new Offer())->choice === ConfirmChoice::Deny);
 check('and no plan approved', $orphan->approvePlan('x') === null);
 
 // ---- the model menu ------------------------------------------------------------------
