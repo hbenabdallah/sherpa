@@ -223,6 +223,37 @@ check('the question names the session and the call, with the diff', $asked['sess
 check('a cancelled question is a refusal', $front->confirm($call, $def, new Offer())->choice === ConfirmChoice::Deny);
 check('so is an answer naming no option offered', $front->confirm($call, $def, new Offer())->choice === ConfirmChoice::Deny);
 
+// Discuss triggers a follow-up elicitation/create to collect the message.
+[$discussFront, $discussEditor] = frontend($paths, $todos, [
+    ['outcome' => ['outcome' => 'selected', 'optionId' => 'discuss']],
+    ['formResult' => ['message' => 'Please reconsider this action']],
+]);
+$discussFront->showToolCall('file_patch', $call->arguments, 'p1');
+check('Discuss collects a message via elicitation', $discussFront->confirm($call, $def, new Offer())->choice === ConfirmChoice::Discuss);
+$elicitation = array_first(array_filter(out($discussEditor), fn(array $m): bool => ($m['method'] ?? '') === 'elicitation/create'))['params'] ?? [];
+check('the elicitation asks for a message', ($elicitation['message'] ?? '') !== '');
+check('the elicitation is linked to the tool call', ($elicitation['toolCallId'] ?? '') === 'p1');
+fclose($discussEditor);
+
+// Discuss with a too-short message is treated as a denial.
+[$shortFront, $shortEditor] = frontend($paths, $todos, [
+    ['outcome' => ['outcome' => 'selected', 'optionId' => 'discuss']],
+    ['formResult' => ['message' => 'ok']],
+]);
+$shortFront->showToolCall('file_patch', $call->arguments, 'p1');
+check('a too-short Discuss message is a denial', $shortFront->confirm($call, $def, new Offer())->choice === ConfirmChoice::Deny);
+fclose($shortEditor);
+
+// Discuss when the editor doesn't support elicitation falls back to denial.
+[$sherpa2, $editor2] = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
+fwrite($editor2, json_encode(['jsonrpc' => '2.0', 'id' => 1, 'result' => ['outcome' => ['outcome' => 'selected', 'optionId' => 'discuss']]]) . "\n");
+fclose($editor2);
+$orphanFront = new EditorFrontend(new Connection($sherpa2, $sherpa2), new EditPreview(new FileWriteTool($paths), new FilePatchTool($paths)), $paths, new ShellExecTool($paths), $todos);
+$orphanFront->forSession('s1', false);
+$orphanFront->showToolCall('file_patch', $call->arguments, 'p1');
+check('Discuss without elicitation support is a denial', $orphanFront->confirm($call, $def, new Offer())->choice === ConfirmChoice::Deny);
+fclose($sherpa2);
+
 $front->showToolCall('plan_ready', ['plan' => '1. Fix'], 'r1');
 check('a plan carried out on "go"', $front->approvePlan('1. Fix') === true);
 check('and kept on "keep planning"', $front->approvePlan('1. Fix') === false);
@@ -248,18 +279,19 @@ $asked = array_values(array_map(fn(array $m) => $m['params'], array_filter(out($
 check('the grant offered names the command', str_contains(json_encode($asked[0]['options'] ?? []), 'Always allow make test * in this project'), json_encode($asked[0]['options'] ?? []));
 check('once, discuss, or refuse for what is asked every time', array_column($asked[1]['options'] ?? [], 'optionId') === ['allow-once', 'discuss', 'reject'], json_encode($asked[1]['options'] ?? []));
 check('with the reason', str_contains(json_encode($asked[1]['toolCall']['content'] ?? []), 'Asked every time: it pushes to a remote'));
+fclose($editor);
 
 $sessionOnlyCommand = new ToolCall('x3', 'shell_exec', ['command' => "php -r 'echo 1;\necho 2;'"]);
 $sessionOnlyOffer = new Offer(
     ["shell_exec: php -r 'echo 1;\necho 2;'"],
     sessionOnly: 'one-shot command',
 );
-[$front, $editor] = frontend($paths, $todos, [
+[$sessionOnlyFront, $sessionOnlyEditor] = frontend($paths, $todos, [
     ['outcome' => ['outcome' => 'selected', 'optionId' => 'allow-project']],
 ]);
-check('an unoffered ACP Project answer is refused', $front->confirm($sessionOnlyCommand, $shellDef, $sessionOnlyOffer)->choice === ConfirmChoice::Deny);
+check('an unoffered ACP Project answer is refused', $sessionOnlyFront->confirm($sessionOnlyCommand, $shellDef, $sessionOnlyOffer)->choice === ConfirmChoice::Deny);
 $sessionOnlyQuestion = array_first(array_filter(
-    out($editor),
+    out($sessionOnlyEditor),
     fn(array $message): bool => ($message['method'] ?? '') === 'session/request_permission',
 ))['params'] ?? [];
 check(
@@ -278,6 +310,7 @@ check(
         static fn(string $name): bool => !str_contains($name, "\n"),
     ),
 );
+fclose($sessionOnlyEditor);
 
 // An editor that went away answers nothing, which allows nothing.
 [$sherpa, $gone] = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
@@ -285,6 +318,7 @@ fclose($gone);
 $orphan = new EditorFrontend(new Connection($sherpa, $sherpa), new EditPreview(new FileWriteTool($paths), new FilePatchTool($paths)), $paths, new ShellExecTool($paths), $todos);
 check('no editor to answer: refused', $orphan->confirm($call, $def, new Offer())->choice === ConfirmChoice::Deny);
 check('and no plan approved', $orphan->approvePlan('x') === null);
+fclose($sherpa);
 
 // ---- the model menu ------------------------------------------------------------------
 $menu = SessionConfig::grouped([

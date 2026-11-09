@@ -277,8 +277,8 @@ final class EditorFrontend implements AgentOutput, Approver
      *
      * Sends a request_permission notification with the call preview and the
      * available options. An invalid or missing answer is treated as a denial.
-     * When the editor chooses Discuss, the reply may carry a message back to
-     * the agent.
+     * When the editor chooses Discuss, a follow-up elicitation/create request
+     * collects the user's message to send back to the agent.
      */
     public function confirm(ToolCall $call, ToolDefinition $def, Offer $offer): ConfirmResult
     {
@@ -316,12 +316,9 @@ final class EditorFrontend implements AgentOutput, Approver
             return ConfirmResult::deny();
         }
 
-        // Discuss carries a message from the editor; too-short messages are
-        // denied to avoid wasting the agent's context window.
+        // Discuss uses a follow-up elicitation to collect the user's message.
         if ($chosen === 'discuss') {
-            $message = is_string($answer['message'] ?? null) ? trim($answer['message']) : '';
-
-            return mb_strlen($message) >= 3 ? ConfirmResult::discuss($message) : ConfirmResult::deny();
+            return $this->askForDiscussion($call);
         }
 
         return match ($chosen) {
@@ -330,6 +327,61 @@ final class EditorFrontend implements AgentOutput, Approver
             'allow-project' => ConfirmResult::project(),
             default         => ConfirmResult::deny(),
         };
+    }
+
+    /**
+     * Ask the editor for a discussion message via elicitation/create.
+     *
+     * Sends a form-mode elicitation with a single text field. If the editor
+     * does not support elicitation or the user cancels, the result is a denial.
+     * Too-short messages are also denied to avoid wasting the agent's context
+     * window.
+     */
+    private function askForDiscussion(ToolCall $call): ConfirmResult
+    {
+        try {
+            $result = $this->connection->request('elicitation/create', [
+                'sessionId' => $this->sessionId,
+                'toolCallId' => $call->id,
+                'message' => 'You chose to discuss this action. What would you like to tell Sherpa?',
+                'mode' => 'form',
+                'requestedSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'message' => [
+                            'type' => 'string',
+                            'title' => 'Your message',
+                            'description' => 'Type your message to Sherpa',
+                        ],
+                    ],
+                    'required' => ['message'],
+                ],
+            ]);
+        } catch (AcpError) {
+            // Editor doesn't support elicitation or refused.
+            return ConfirmResult::deny();
+        }
+
+        // The result may be an array or a stdClass from JSON decoding.
+        if ($result === null || $result instanceof stdClass && (!property_exists($result, 'formResult') && !property_exists($result, 'form_result'))) {
+            return ConfirmResult::deny();
+        }
+
+        $formResult = [];
+        if (is_array($result)) {
+            $formResult = $result['formResult'] ?? $result['form_result'] ?? [];
+        } elseif ($result instanceof stdClass) {
+            $fr = $result->formResult ?? $result->form_result ?? null;
+            if (is_object($fr)) {
+                $formResult = (array) $fr;
+            } elseif (is_array($fr)) {
+                $formResult = $fr;
+            }
+        }
+
+        $message = is_string($formResult['message'] ?? null) ? trim($formResult['message']) : '';
+
+        return mb_strlen($message) >= 3 ? ConfirmResult::discuss($message) : ConfirmResult::deny();
     }
 
     /**
