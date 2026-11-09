@@ -347,12 +347,18 @@ class Terminal
         return "\e" . $seq;
     }
 
+    /**
+     * One typed line, then the terminal exactly as it was. Line mode is set
+     * outright: restoring the mode saved by rawMode() would, during a turn,
+     * restore the quiet mode where fgets() returns at once with nothing.
+     */
     public function readLine(string $prompt = ''): string
     {
-        $this->restoreMode();
+        $before = trim((string) shell_exec('stty -g 2>/dev/null'));
+        exec('stty icanon echo 2>/dev/null');
         echo $prompt;
         $line = trim(fgets(STDIN) ?: '');
-        $this->rawMode();
+        exec(($before !== '' ? 'stty ' . escapeshellarg($before) : 'stty sane') . ' 2>/dev/null');
 
         return $line;
     }

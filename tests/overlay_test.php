@@ -37,8 +37,17 @@ function check(string $label, bool $ok, string $got = ''): void
 
 final class AnsweringTerminal extends Terminal
 {
-    /** @param list<string> $keys */
-    public function __construct(private array $keys) {}
+    /**
+     * @param list<string> $keys
+     * @param list<string> $lines
+     */
+    public function __construct(private array $keys, private array $lines = []) {}
+
+    #[Override]
+    public function readLine(string $prompt = ''): string
+    {
+        return array_shift($this->lines) ?? '';
+    }
 
     #[Override]
     public function rawMode(): void {}
@@ -188,6 +197,21 @@ check('discussing says it does not run', str_contains(Terminal::plain(ConfirmOve
 $discussResult = ConfirmResult::discuss('Please reconsider this action.');
 check('Discuss result has the Discuss choice', $discussResult->choice === ConfirmChoice::Discuss);
 check('and carries the message', $discussResult->message === 'Please reconsider this action.');
+
+// ---- [d] then a typed line is a Discuss carrying that line -----------------------
+$discussing = new ConfirmOverlay(new AnsweringTerminal(['d'], ['use src/Other.php instead']), $write, $patch, $shell);
+ob_start();
+$typed = $discussing->show($call('file_write', ['path' => 'src/Existing.php', 'content' => 'x']), $def);
+$discussPrompt = Terminal::plain((string) ob_get_clean());
+check('[d] with a message is a Discuss', $typed->choice === ConfirmChoice::Discuss);
+check('carrying the line typed', $typed->message === 'use src/Other.php instead', (string) $typed->message);
+check('and the verdict stays on screen', str_contains($discussPrompt, 'Discussing — file_write does not run'), $discussPrompt);
+
+$tooShort = new ConfirmOverlay(new AnsweringTerminal(['d'], ['ok']), $write, $patch, $shell);
+ob_start();
+$typed = $tooShort->show($call('file_write', ['path' => 'src/Existing.php', 'content' => 'x']), $def);
+ob_end_clean();
+check('[d] with a too-short line is a refusal', $typed->choice === ConfirmChoice::Deny);
 
 // ---- Discuss verdict mentions the tool name -----------------------------------
 $discussVerdict = Terminal::plain(ConfirmOverlay::verdict(ConfirmChoice::Discuss, 'file_write', new Offer(['shell_exec: make test *'])));

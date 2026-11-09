@@ -29,9 +29,13 @@ use App\Agent\Tool\Param;
 use App\Agent\Tool\Permission;
 use App\Agent\Tool\Toolbox;
 use App\Agent\Tool\ToolCall;
+use App\Agent\Tool\ToolDefinition;
 use App\Agent\Tool\ToolResult;
 use App\Config\Backend;
 use App\Kernel;
+use App\Permission\Approver;
+use App\Permission\ConfirmResult;
+use App\Permission\Offer;
 use App\Permission\PermissionBroker;
 use App\Permission\ProjectPermissions;
 use App\Permission\SessionPermissions;
@@ -218,6 +222,42 @@ final class WallTool
     }
 }
 
+#[AsTool(name: 'forbidden', description: 'Interdit', permission: Permission::DENY)]
+final class ForbiddenTool
+{
+    public function __invoke(#[Param('what')] string $what = ''): string
+    {
+        return 'ran anyway';
+    }
+}
+
+#[AsTool(name: 'asked', description: 'Demande', permission: Permission::CONFIRM)]
+final class AskedTool
+{
+    public int $ran = 0;
+
+    public function __invoke(#[Param('what')] string $what = ''): string
+    {
+        $this->ran++;
+
+        return 'ran';
+    }
+}
+
+/** Answers every question with the same Discuss message. */
+final class DiscussingApprover implements Approver
+{
+    public function confirm(ToolCall $call, ToolDefinition $def, Offer $offer): ConfirmResult
+    {
+        return ConfirmResult::discuss('use another file');
+    }
+
+    public function approvePlan(string $plan): ?bool
+    {
+        return null;
+    }
+}
+
 /**
  * A toolbox whose every call fails outside the tool itself — where Toolbox's
  * own catch cannot turn it into an error result. Stands in for a confirmation
@@ -269,7 +309,7 @@ function unpairedCalls(array $messages): array
 }
 
 /** @return array{0: Result|Throwable, 1: MessageBag, 2: ContextBudget, 3: InferenceSpeed} */
-function loopWith(PlatformInterface $platform, array $tools = [], string $toolbox = Toolbox::class): array
+function loopWith(PlatformInterface $platform, array $tools = [], string $toolbox = Toolbox::class, ?Approver $approver = null): array
 {
     $budget = new ContextBudget(contextWindow: 32768);
     $speed = new InferenceSpeed();
@@ -278,7 +318,7 @@ function loopWith(PlatformInterface $platform, array $tools = [], string $toolbo
         new $toolbox($tools),
         new PermissionBroker(
             new SessionPermissions(),
-            new ConfirmOverlay(new Terminal(), new FileWriteTool(), new FilePatchTool(), new ShellExecTool()),
+            $approver ?? new ConfirmOverlay(new Terminal(), new FileWriteTool(), new FilePatchTool(), new ShellExecTool()),
             new ProjectPermissions(new ProjectStore(new StackDetector())),
         ),
         new ChatPane(new Terminal(), new MarkdownRenderer()),
@@ -531,6 +571,19 @@ $progressing = new ScriptedPlatform(array_map(fn(int $i): array => [
 ], range(1, 8)) + [8 => ['role' => 'assistant', 'content' => 'fini']]);
 [$result] = loopWith($progressing, [new WallTool()]);
 check('errors broken up by a success do not stop it', $result->repeatedError === null && $result->content === 'fini', $result->content);
+
+// An answer is not a wall: neither the policy's nor the user's Discuss message.
+$askingAgain = fn(string $tool): ScriptedPlatform => new ScriptedPlatform(array_map(fn(int $i): array => [
+    'role' => 'assistant',
+    'content' => '',
+    'tool_calls' => [['function' => ['name' => $tool, 'arguments' => ['what' => "essai {$i}"]]]],
+], range(1, 4)) + [4 => ['role' => 'assistant', 'content' => 'fini']]);
+[$result] = loopWith($askingAgain('forbidden'), [new ForbiddenTool()]);
+check('calls denied by policy do not stop the turn', $result->repeatedError === null && $result->content === 'fini', $result->content);
+$asked = new AskedTool();
+[$result] = loopWith($askingAgain('asked'), [$asked], approver: new DiscussingApprover());
+check('nor do the same Discuss messages', $result->repeatedError === null && $result->content === 'fini', $result->content);
+check('and a discussed call never runs', $asked->ran === 0, (string) $asked->ran);
 
 
 // Varying arguments is work, not circling, and must not trip the guard.

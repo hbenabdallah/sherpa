@@ -13,6 +13,12 @@ use App\Agent\Tool\ToolResult;
 /** @open the suites extend it with brokers that answer for the user */
 class PermissionBroker
 {
+    public const string REFUSED = 'Refused by the user.';
+
+    public const string DENIED = 'Denied by policy.';
+
+    public const string DISCUSSED = 'The user discussed this action: ';
+
     public function __construct(
         private readonly SessionPermissions $session,
         // The terminal's overlay, or an editor over ACP.
@@ -81,7 +87,7 @@ class PermissionBroker
 
         return match ($def->permission) {
             Permission::AUTO   => null,
-            Permission::DENY   => new ToolResult($call->id, 'Denied by policy.', isError: true),
+            Permission::DENY   => new ToolResult($call->id, self::DENIED, isError: true),
             Permission::CONFIRM => $call->name === CommandPolicy::TOOL
                 ? $this->askAboutCommand($call, $def)
                 : $this->askConfirmation($call, $def),
@@ -99,12 +105,8 @@ class PermissionBroker
     {
         return match ($result->choice) {
             ConfirmChoice::Once, ConfirmChoice::Session, ConfirmChoice::Project => null,
-            ConfirmChoice::Discuss => new ToolResult(
-                $call->id,
-                'The user discussed this action: ' . ($result->message ?? ''),
-                isError: true,
-            ),
-            ConfirmChoice::Deny => new ToolResult($call->id, 'Refused by the user.', isError: true),
+            ConfirmChoice::Discuss => new ToolResult($call->id, self::DISCUSSED . ($result->message ?? ''), isError: true),
+            ConfirmChoice::Deny => new ToolResult($call->id, self::REFUSED, isError: true),
         };
     }
 
@@ -134,30 +136,22 @@ class PermissionBroker
         );
 
         $result = $this->approver->confirm($call, $def, $offer);
+        $blocked = $this->toToolResult($call, $result);
+        if ($blocked instanceof ToolResult) {
+            return $blocked;
+        }
+
         $choice = $result->choice;
-        if ($choice === ConfirmChoice::Discuss) {
-            return new ToolResult(
-                $call->id,
-                'The user discussed this action: ' . ($result->message ?? ''),
-                isError: true,
-            );
-        }
-        if ($choice === ConfirmChoice::Deny) {
-            return new ToolResult($call->id, 'Refused by the user.', isError: true);
-        }
         if ($choice === ConfirmChoice::Project && !$offer->persistable()) {
             $choice = ConfirmChoice::Session;
         }
         // Whatever an approver answers for a call that can only be allowed
         // once, nothing outlives it.
-        if ($onlyOnce === null) {
-            foreach ($offer->grants as $grant) {
-                match ($choice) {
-                    ConfirmChoice::Session => $this->grantForSession($grant),
-                    ConfirmChoice::Project => $this->grantForProject($grant),
-                    ConfirmChoice::Once    => null,
-                };
-            }
+        if ($onlyOnce !== null) {
+            return null;
+        }
+        foreach ($offer->grants as $grant) {
+            $this->grant($choice, $grant);
         }
 
         return null;
@@ -178,28 +172,25 @@ class PermissionBroker
         }
 
         $result = $this->approver->confirm($call, $def, new Offer());
-        $choice = $result->choice;
-        if ($choice === ConfirmChoice::Discuss) {
-            return new ToolResult(
-                $call->id,
-                'The user discussed this action: ' . ($result->message ?? ''),
-                isError: true,
-            );
+        $blocked = $this->toToolResult($call, $result);
+        if ($blocked instanceof ToolResult) {
+            return $blocked;
         }
 
-        return match ($choice) {
-            ConfirmChoice::Once    => null,
-            ConfirmChoice::Session => $this->grantForSession($call->name) ? null : null,
-            ConfirmChoice::Project => $this->grantForProject($call->name) ? null : null,
-            ConfirmChoice::Deny    => new ToolResult($call->id, 'Refused by the user.', isError: true),
-        };
+        $this->grant($result->choice, $call->name);
+
+        return null;
     }
 
-    private function grantForSession(string $toolName): bool
+    /** What an allowing answer grants: nothing for "once". */
+    private function grant(ConfirmChoice $choice, string $toolName): void
     {
-        $this->session->allowForSession($toolName);
-
-        return true;
+        if ($choice === ConfirmChoice::Session) {
+            $this->session->allowForSession($toolName);
+        }
+        if ($choice === ConfirmChoice::Project) {
+            $this->grantForProject($toolName);
+        }
     }
 
     /**
@@ -207,11 +198,9 @@ class PermissionBroker
      * nowhere to write to, and someone who answered "always" must not be asked
      * again for the rest of the session regardless.
      */
-    private function grantForProject(string $toolName): bool
+    private function grantForProject(string $toolName): void
     {
         $this->project->allow($toolName);
         $this->session->allowForSession($toolName);
-
-        return true;
     }
 }

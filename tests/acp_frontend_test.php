@@ -229,7 +229,9 @@ check('so is an answer naming no option offered', $front->confirm($call, $def, n
     ['action' => 'accept', 'content' => ['message' => 'Please reconsider this action']],
 ], true);
 $discussFront->showToolCall('file_patch', $call->arguments, 'p1');
-check('Discuss collects a message via elicitation', $discussFront->confirm($call, $def, new Offer())->choice === ConfirmChoice::Discuss);
+$discussed = $discussFront->confirm($call, $def, new Offer());
+check('Discuss collects a message via elicitation', $discussed->choice === ConfirmChoice::Discuss);
+check('and keeps the message the user typed', $discussed->message === 'Please reconsider this action', (string) $discussed->message);
 $elicitation = array_first(array_filter(out($discussEditor), fn(array $m): bool => ($m['method'] ?? '') === 'elicitation/create'))['params'] ?? [];
 check('the elicitation asks for a message', ($elicitation['message'] ?? '') !== '');
 check('the elicitation is linked to the tool call', ($elicitation['toolCallId'] ?? '') === 'p1');

@@ -42,8 +42,6 @@ final class AgentLoop
 
     private const string INTERRUPTED = 'Interrupted by the user.';
 
-    private const string REFUSED = 'Refused by the user.';
-
     private const string STUCK = 'Stopped: the model repeated the same tool call without getting anywhere.';
 
     private const string WALLED = 'Stopped: every call came back with the same error, %d times running: %s';
@@ -551,8 +549,10 @@ final class AgentLoop
         $content = trim($result->content);
         $failed = preg_match('/^\((?:exit code [1-9]\d*|command failed[^)]*)\)\s*/', $content, $status) === 1;
 
-        // The user's answer, or plan mode's: neither is a wall to report.
-        if (!$result->isError && !$failed || in_array($content, [self::REFUSED, PlanMode::BLOCKED], true)) {
+        // The user's answer, the policy's or plan mode's: none is a wall to report.
+        $answered = in_array($content, [PermissionBroker::REFUSED, PermissionBroker::DENIED, PlanMode::BLOCKED], true)
+            || str_starts_with($content, PermissionBroker::DISCUSSED);
+        if (!$result->isError && !$failed || $answered) {
             return null;
         }
 

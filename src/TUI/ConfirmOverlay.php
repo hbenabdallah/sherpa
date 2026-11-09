@@ -157,10 +157,7 @@ class ConfirmOverlay implements Approver
      */
     private function askForDiscussion(): ConfirmResult
     {
-        $this->terminal->restoreMode();
-        echo "\r\e[2K" . self::QUESTION_DISCUSS;
-        $line = trim(fgets(STDIN) ?: '');
-        $this->terminal->rawMode();
+        $line = $this->terminal->readLine("\r\e[2K" . self::QUESTION_DISCUSS);
 
         if (mb_strlen($line) < 3) {
             return ConfirmResult::deny();
