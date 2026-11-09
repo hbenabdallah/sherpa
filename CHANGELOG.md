@@ -7,7 +7,7 @@ Security, with its number. A release is a pull request of its own that renames t
 date; once it is merged, the version is tagged on `main`, and the release's notes are this section
 (`bin/release-notes.sh`), on its GitHub page and in `sherpa update`.
 
-## Unreleased
+## 1.9.0 (2026-11-09)
 
 ### Added
 
