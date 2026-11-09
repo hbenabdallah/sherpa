@@ -9,10 +9,18 @@ date; once it is merged, the version is tagged on `main`, and the release's note
 
 ## Unreleased
 
+### Added
+
+- MCP elicitation: when an MCP server asks for more information during a tool call, Sherpa shows its form in the
+  terminal (text, numbers, yes/no, choices and multi-select) and sends the answer back; cancelling it declines (#30).
+- Discuss, a fifth answer to a confirmation: the call does not run, and what the user types goes back to the model
+  instead of a plain refusal. In the terminal it is `[d]`; over ACP, the message is asked with a form (#32).
+
 ### Changed
 
 - The startup warning summarizes standing grants, showing whole-tool exposure first, grouping MCP tools and counting
   shell command grants instead of printing each command (#31).
+- Over ACP, Discuss is offered only to editors that can show a form to collect the message (#33).
 
 ### Security
 
