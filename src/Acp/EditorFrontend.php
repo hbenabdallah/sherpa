@@ -51,6 +51,9 @@ final class EditorFrontend implements AgentOutput, Approver
     /** Whether the editor shows notices; otherwise Sherpa's remarks go as thoughts. */
     private bool $notices = false;
 
+    /** Whether the editor supports form-mode elicitation. */
+    private bool $elicitation = false;
+
     private string $messageId = '';
 
     private string $withheld = '';
@@ -77,10 +80,11 @@ final class EditorFrontend implements AgentOutput, Approver
         private readonly TodoList $todos,
     ) {}
 
-    public function forSession(string $sessionId, bool $notices): void
+    public function forSession(string $sessionId, bool $notices, bool $elicitation = false): void
     {
         $this->sessionId = $sessionId;
         $this->notices = $notices;
+        $this->elicitation = $elicitation;
         $this->calls = [];
         $this->planCall = null;
     }
@@ -339,6 +343,10 @@ final class EditorFrontend implements AgentOutput, Approver
      */
     private function askForDiscussion(ToolCall $call): ConfirmResult
     {
+        if (!$this->elicitation) {
+            return ConfirmResult::deny();
+        }
+
         try {
             $result = $this->connection->request('elicitation/create', [
                 'sessionId' => $this->sessionId,

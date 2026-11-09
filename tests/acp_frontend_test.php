@@ -99,14 +99,14 @@ $paths->setRoot($project);
 $todos = new TodoList();
 
 /** A connection to nobody but a buffer this test reads, which answers questions as told. */
-function frontend(ProjectPathResolver $paths, TodoList $todos, array $answers = []): array
+function frontend(ProjectPathResolver $paths, TodoList $todos, array $answers = [], bool $elicitation = false): array
 {
     [$sherpa, $editor] = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
     foreach ($answers as $i => $answer) {
         fwrite($editor, json_encode(['jsonrpc' => '2.0', 'id' => $i + 1, 'result' => $answer]) . "\n");
     }
     $front = new EditorFrontend(new Connection($sherpa, $sherpa), new EditPreview(new FileWriteTool($paths), new FilePatchTool($paths)), $paths, new ShellExecTool($paths), $todos);
-    $front->forSession('s1', false);
+    $front->forSession('s1', false, $elicitation);
 
     return [$front, $editor];
 }
@@ -227,7 +227,7 @@ check('so is an answer naming no option offered', $front->confirm($call, $def, n
 [$discussFront, $discussEditor] = frontend($paths, $todos, [
     ['outcome' => ['outcome' => 'selected', 'optionId' => 'discuss']],
     ['action' => 'accept', 'content' => ['message' => 'Please reconsider this action']],
-]);
+], true);
 $discussFront->showToolCall('file_patch', $call->arguments, 'p1');
 check('Discuss collects a message via elicitation', $discussFront->confirm($call, $def, new Offer())->choice === ConfirmChoice::Discuss);
 $elicitation = array_first(array_filter(out($discussEditor), fn(array $m): bool => ($m['method'] ?? '') === 'elicitation/create'))['params'] ?? [];
@@ -239,7 +239,7 @@ fclose($discussEditor);
 [$shortFront, $shortEditor] = frontend($paths, $todos, [
     ['outcome' => ['outcome' => 'selected', 'optionId' => 'discuss']],
     ['action' => 'accept', 'content' => ['message' => 'ok']],
-]);
+], true);
 $shortFront->showToolCall('file_patch', $call->arguments, 'p1');
 check('a too-short Discuss message is a denial', $shortFront->confirm($call, $def, new Offer())->choice === ConfirmChoice::Deny);
 fclose($shortEditor);
