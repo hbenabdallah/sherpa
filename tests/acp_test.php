@@ -290,8 +290,8 @@ check(
     json_encode($diff),
 );
 check(
-    'and the five answers the terminal offers',
-    array_column($question['options'] ?? [], 'kind') === ['allow_once', 'allow_always', 'allow_always', 'reject_once', 'reject_once'],
+    'and the answers the terminal offers, but Discuss to an editor without forms',
+    array_column($question['options'] ?? [], 'optionId') === ['allow-once', 'allow-session', 'allow-project', 'reject'],
     json_encode($question['options'] ?? null),
 );
 $card = $editor->of('tool_call', $from)[0]['params']['update'] ?? [];
@@ -448,7 +448,7 @@ $oneShotQuestion = $editor->asked[$asked] ?? [];
 $oneShotCompletion = $editor->of('tool_call_update', $from)[0]['params']['update'] ?? [];
 check(
     'a one-shot shell command through ACP offers session but not project',
-    array_column($oneShotQuestion['options'] ?? [], 'optionId') === ['allow-once', 'allow-session', 'discuss', 'reject'],
+    array_column($oneShotQuestion['options'] ?? [], 'optionId') === ['allow-once', 'allow-session', 'reject'],
     json_encode($oneShotQuestion['options'] ?? []),
 );
 check(

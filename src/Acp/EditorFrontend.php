@@ -307,7 +307,7 @@ final class EditorFrontend implements AgentOutput, Approver
                     'status'     => 'pending',
                     'content'    => $content,
                 ],
-                'options' => self::options($offer),
+                'options' => $this->options($offer),
             ]);
         } catch (AcpError) {
             // No answer is not a yes.
@@ -316,7 +316,7 @@ final class EditorFrontend implements AgentOutput, Approver
 
         $chosen = self::chosen($answer);
         // Only what was offered: an answer naming another option is no answer.
-        if (!in_array($chosen, array_column(self::options($offer), 'optionId'), true)) {
+        if (!in_array($chosen, array_column($this->options($offer), 'optionId'), true)) {
             return ConfirmResult::deny();
         }
 
@@ -382,12 +382,28 @@ final class EditorFrontend implements AgentOutput, Approver
     }
 
     /**
-     * The answers offered: once and refuse only for what is asked every time,
-     * and for a command, the commands a longer answer would grant, named.
+     * The answers offered, Discuss only to an editor that can collect the
+     * message: elsewhere, choosing it could only become a silent refusal.
      *
      * @return list<array{optionId: string, name: string, kind: string}>
      */
-    private static function options(Offer $offer): array
+    private function options(Offer $offer): array
+    {
+        $options = self::allOptions($offer);
+        if ($this->elicitation) {
+            return $options;
+        }
+
+        return array_values(array_filter($options, static fn(array $option): bool => $option['optionId'] !== 'discuss'));
+    }
+
+    /**
+     * Every answer: once and refuse only for what is asked every time, and for
+     * a command, the commands a longer answer would grant, named.
+     *
+     * @return list<array{optionId: string, name: string, kind: string}>
+     */
+    private static function allOptions(Offer $offer): array
     {
         if (!$offer->standing()) {
             return [self::OPTIONS[0], self::OPTIONS[3], self::OPTIONS[4]];

@@ -232,7 +232,10 @@ $discussFront->showToolCall('file_patch', $call->arguments, 'p1');
 $discussed = $discussFront->confirm($call, $def, new Offer());
 check('Discuss collects a message via elicitation', $discussed->choice === ConfirmChoice::Discuss);
 check('and keeps the message the user typed', $discussed->message === 'Please reconsider this action', (string) $discussed->message);
-$elicitation = array_first(array_filter(out($discussEditor), fn(array $m): bool => ($m['method'] ?? '') === 'elicitation/create'))['params'] ?? [];
+$sentToEditor = out($discussEditor);
+$offered = array_first(array_filter($sentToEditor, fn(array $m): bool => ($m['method'] ?? '') === 'session/request_permission'))['params']['options'] ?? [];
+check('an editor that can collect a message is offered Discuss', array_column($offered, 'optionId') === ['allow-once', 'allow-session', 'allow-project', 'discuss', 'reject'], json_encode($offered));
+$elicitation = array_first(array_filter($sentToEditor, fn(array $m): bool => ($m['method'] ?? '') === 'elicitation/create'))['params'] ?? [];
 check('the elicitation asks for a message', ($elicitation['message'] ?? '') !== '');
 check('the elicitation is linked to the tool call', ($elicitation['toolCallId'] ?? '') === 'p1');
 fclose($discussEditor);
@@ -246,15 +249,17 @@ $shortFront->showToolCall('file_patch', $call->arguments, 'p1');
 check('a too-short Discuss message is a denial', $shortFront->confirm($call, $def, new Offer())->choice === ConfirmChoice::Deny);
 fclose($shortEditor);
 
-// Discuss when the editor doesn't support elicitation falls back to denial.
-[$sherpa2, $editor2] = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
-fwrite($editor2, json_encode(['jsonrpc' => '2.0', 'id' => 1, 'result' => ['outcome' => ['outcome' => 'selected', 'optionId' => 'discuss']]]) . "\n");
-fclose($editor2);
-$orphanFront = new EditorFrontend(new Connection($sherpa2, $sherpa2), new EditPreview(new FileWriteTool($paths), new FilePatchTool($paths)), $paths, new ShellExecTool($paths), $todos);
-$orphanFront->forSession('s1', false);
-$orphanFront->showToolCall('file_patch', $call->arguments, 'p1');
-check('Discuss without elicitation support is a denial', $orphanFront->confirm($call, $def, new Offer())->choice === ConfirmChoice::Deny);
-fclose($sherpa2);
+// An editor without elicitation is not offered Discuss: naming it anyway is no answer.
+[$formlessFront, $formlessEditor] = frontend($paths, $todos, [
+    ['outcome' => ['outcome' => 'selected', 'optionId' => 'discuss']],
+]);
+$formlessFront->showToolCall('file_patch', $call->arguments, 'p1');
+check('Discuss, not offered without elicitation, is a denial', $formlessFront->confirm($call, $def, new Offer())->choice === ConfirmChoice::Deny);
+$sentToEditor = out($formlessEditor);
+$offered = array_first(array_filter($sentToEditor, fn(array $m): bool => ($m['method'] ?? '') === 'session/request_permission'))['params']['options'] ?? [];
+check('and is left out of the options', array_column($offered, 'optionId') === ['allow-once', 'allow-session', 'allow-project', 'reject'], json_encode($offered));
+check('with no form sent', array_filter($sentToEditor, fn(array $m): bool => ($m['method'] ?? '') === 'elicitation/create') === []);
+fclose($formlessEditor);
 
 $front->showToolCall('plan_ready', ['plan' => '1. Fix'], 'r1');
 check('a plan carried out on "go"', $front->approvePlan('1. Fix') === true);
@@ -279,7 +284,7 @@ check(
 );
 $asked = array_values(array_map(fn(array $m) => $m['params'], array_filter(out($editor), fn(array $m): bool => ($m['method'] ?? '') === 'session/request_permission')));
 check('the grant offered names the command', str_contains(json_encode($asked[0]['options'] ?? []), 'Always allow make test * in this project'), json_encode($asked[0]['options'] ?? []));
-check('once, discuss, or refuse for what is asked every time', array_column($asked[1]['options'] ?? [], 'optionId') === ['allow-once', 'discuss', 'reject'], json_encode($asked[1]['options'] ?? []));
+check('once or refuse for what is asked every time', array_column($asked[1]['options'] ?? [], 'optionId') === ['allow-once', 'reject'], json_encode($asked[1]['options'] ?? []));
 check('with the reason', str_contains(json_encode($asked[1]['toolCall']['content'] ?? []), 'Asked every time: it pushes to a remote'));
 fclose($editor);
 
@@ -298,7 +303,7 @@ $sessionOnlyQuestion = array_first(array_filter(
 ))['params'] ?? [];
 check(
     'ACP offers once and session but not project for a one-shot grant',
-    array_column($sessionOnlyQuestion['options'] ?? [], 'optionId') === ['allow-once', 'allow-session', 'discuss', 'reject'],
+    array_column($sessionOnlyQuestion['options'] ?? [], 'optionId') === ['allow-once', 'allow-session', 'reject'],
     json_encode($sessionOnlyQuestion['options'] ?? []),
 );
 check(
