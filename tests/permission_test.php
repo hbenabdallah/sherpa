@@ -115,7 +115,7 @@ final class ScriptedOverlay extends ConfirmOverlay
 
     public ?Offer $offer = null;
 
-    public function __construct(private readonly ConfirmChoice $answer)
+    public function __construct(private readonly ConfirmChoice $answer, private readonly string $discussMessage = 'Please reconsider this action.')
     {
         parent::__construct(new Terminal(), new FileWriteTool(), new FilePatchTool(), new ShellExecTool());
     }
@@ -129,6 +129,7 @@ final class ScriptedOverlay extends ConfirmOverlay
             ConfirmChoice::Once => ConfirmResult::once(),
             ConfirmChoice::Session => ConfirmResult::session(),
             ConfirmChoice::Project => ConfirmResult::project(),
+            ConfirmChoice::Discuss => ConfirmResult::discuss($this->discussMessage),
             ConfirmChoice::Deny => ConfirmResult::deny(),
         };
     }
@@ -167,6 +168,15 @@ $b->check(call('file_write'), definition('file_write', Permission::CONFIRM));
 $b->check(call('file_write'), definition('file_write', Permission::CONFIRM));
 check('"once" asks again the next time', $overlay->asked === 2);
 check('"once" persists nothing', $perms->all() === [], json_encode($perms->all()));
+
+// ---- Discuss blocks the call and carries a message back ----------------------
+[$b, $overlay] = broker(ConfirmChoice::Discuss, $perms);
+$discussResult = $b->check(call('file_write'), definition('file_write', Permission::CONFIRM));
+check('Discuss blocks the call', $discussResult instanceof ToolResult);
+check('and the result carries the user\'s message', str_contains($discussResult->content, 'Please reconsider'), $discussResult->content);
+check('and the result is marked as an error', $discussResult->isError);
+check('Discuss does not grant anything', $perms->all() === [], json_encode($perms->all()));
+check('the overlay was asked', $overlay->asked === 1);
 
 [$b, $overlay] = broker(ConfirmChoice::Session, $perms);
 $b->check(call('file_write'), definition('file_write', Permission::CONFIRM));

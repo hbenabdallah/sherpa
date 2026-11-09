@@ -579,7 +579,13 @@ final class AgentLoop
         return $this->record($bag, $call, $this->decide($call));
     }
 
-    /** Run, unless plan mode or the user says not to. */
+    /**
+     * Decide whether to execute a tool call or block it.
+     *
+     * Checks plan mode first, then asks the permission broker. If the broker
+     * returns a blocked ToolResult (denial or discussion message), it is
+     * returned without executing the tool. Otherwise the call is executed.
+     */
     private function decide(ToolCall $call): ToolResult
     {
         $def = $this->toolbox->find($call->name);

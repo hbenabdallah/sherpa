@@ -272,6 +272,14 @@ final class EditorFrontend implements AgentOutput, Approver
 
     // ---- questions --------------------------------------------------------------
 
+    /**
+     * Ask the editor to approve or discuss a tool call.
+     *
+     * Sends a request_permission notification with the call preview and the
+     * available options. An invalid or missing answer is treated as a denial.
+     * When the editor chooses Discuss, the reply may carry a message back to
+     * the agent.
+     */
     public function confirm(ToolCall $call, ToolDefinition $def, Offer $offer): ConfirmResult
     {
         $edit = $this->calls[$call->id]['edit'] ?? $this->edits->of($call);
@@ -308,11 +316,12 @@ final class EditorFrontend implements AgentOutput, Approver
             return ConfirmResult::deny();
         }
 
-        // Discuss carries a message from the editor.
+        // Discuss carries a message from the editor; too-short messages are
+        // denied to avoid wasting the agent's context window.
         if ($chosen === 'discuss') {
-            $message = is_string($answer['message'] ?? null) ? $answer['message'] : '';
+            $message = is_string($answer['message'] ?? null) ? trim($answer['message']) : '';
 
-            return $message !== '' ? ConfirmResult::discuss($message) : ConfirmResult::deny();
+            return mb_strlen($message) >= 3 ? ConfirmResult::discuss($message) : ConfirmResult::deny();
         }
 
         return match ($chosen) {

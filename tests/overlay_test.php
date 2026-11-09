@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\OverlayTest;
 
+use App\Permission\ConfirmResult;
 use App\Permission\Offer;
 use ReflectionMethod;
 
@@ -181,6 +182,17 @@ check(
 check('allowing says it runs now', str_contains(Terminal::plain(ConfirmOverlay::verdict(ConfirmChoice::Once, 'shell_exec')), 'Allowed once — running shell_exec'));
 check('the standing grant says so', str_contains(Terminal::plain(ConfirmOverlay::verdict(ConfirmChoice::Project, 'shell_exec')), 'Always allowed in this project'));
 check('refusing says it does not run', str_contains(Terminal::plain(ConfirmOverlay::verdict(ConfirmChoice::Deny, 'shell_exec')), 'Refused — shell_exec does not run'));
+check('discussing says it does not run', str_contains(Terminal::plain(ConfirmOverlay::verdict(ConfirmChoice::Discuss, 'shell_exec')), 'Discussing — shell_exec does not run'));
+
+// ---- ConfirmResult::discuss() carries the message -----------------------------
+$discussResult = ConfirmResult::discuss('Please reconsider this action.');
+check('Discuss result has the Discuss choice', $discussResult->choice === ConfirmChoice::Discuss);
+check('and carries the message', $discussResult->message === 'Please reconsider this action.');
+
+// ---- Discuss verdict mentions the tool name -----------------------------------
+$discussVerdict = Terminal::plain(ConfirmOverlay::verdict(ConfirmChoice::Discuss, 'file_write', new Offer(['shell_exec: make test *'])));
+check('Discuss verdict names the tool', str_contains($discussVerdict, 'file_write'), $discussVerdict);
+check('Discuss verdict says it does not run', str_contains($discussVerdict, 'does not run'), $discussVerdict);
 
 exec('rm -rf ' . escapeshellarg($project));
 printf("\n%d passed, %d failed\n", $pass, $fail);

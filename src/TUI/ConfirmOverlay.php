@@ -147,7 +147,14 @@ class ConfirmOverlay implements Approver
         return $result;
     }
 
-    /** Prompt the user for a message to send to the agent. Restores mode for line input, then re-enters raw mode. */
+    /**
+     * Prompt the user to type a discussion message.
+     *
+     * Restores cooked mode so the user can type a full line, then re-enters
+     * raw mode. An empty line is treated as a denial; a message shorter than
+     * three characters is also denied to avoid trivially short replies that
+     * waste the agent's context window.
+     */
     private function askForDiscussion(): ConfirmResult
     {
         $this->terminal->restoreMode();
@@ -155,7 +162,7 @@ class ConfirmOverlay implements Approver
         $line = trim(fgets(STDIN) ?: '');
         $this->terminal->rawMode();
 
-        if ($line === '') {
+        if (mb_strlen($line) < 3) {
             return ConfirmResult::deny();
         }
 
@@ -187,7 +194,12 @@ class ConfirmOverlay implements Approver
         . Terminal::MAGENTA . 'Type your message to Sherpa (empty to refuse): '
         . Terminal::BOLD . '› ' . Terminal::RESET;
 
-    /** The line that replaces the question: what was chosen, and what happens now. */
+    /**
+     * Format the outcome line that replaces the question prompt.
+     *
+     * Shows what the user chose and whether the tool will run or is blocked.
+     * The line stays on screen after the overlay disappears.
+     */
     public static function verdict(ConfirmChoice $choice, string $tool, Offer $offer = new Offer()): string
     {
         $tool = Terminal::plain($tool, singleLine: true);

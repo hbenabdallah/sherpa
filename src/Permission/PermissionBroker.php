@@ -88,7 +88,13 @@ class PermissionBroker
         };
     }
 
-    /** Convert a ConfirmResult to a ToolResult (block) or null (proceed). */
+    /**
+     * Convert a confirmation result to a proceed signal or a blocked result.
+     *
+     * Allow choices return null so the call proceeds. Discuss and Deny return
+     * an error ToolResult that blocks execution and carries a message back to
+     * the agent.
+     */
     private function toToolResult(ToolCall $call, ConfirmResult $result): ?ToolResult
     {
         return match ($result->choice) {
@@ -157,6 +163,13 @@ class PermissionBroker
         return null;
     }
 
+    /**
+     * Ask about a non-command tool call that needs confirmation.
+     *
+     * If a standing grant already covers the tool, the call proceeds without
+     * asking. Otherwise the user is prompted and the answer determines whether
+     * the call runs and whether a grant is made.
+     */
     private function askConfirmation(ToolCall $call, ToolDefinition $def): ?ToolResult
     {
         // Standing grant from a previous session, or one made in this one?
