@@ -64,7 +64,11 @@ final readonly class JetBrainsAgents
             return new stdClass();
         }
 
-        $text = (string) file_get_contents($this->path);
+        $text = file_get_contents($this->path);
+        if ($text === false) {
+            throw new RuntimeException("Cannot read {$this->path}; it is left as it was.");
+        }
+
         if (trim($text) === '') {
             return new stdClass();
         }
@@ -82,7 +86,10 @@ final readonly class JetBrainsAgents
         return $config;
     }
 
-    /** Through a file beside it, renamed: the IDE never reads half of it. */
+    /**
+     * Through a file beside it, renamed: the IDE never reads half of it. Yours
+     * only, before anything is in it: an agent's env may hold its API key.
+     */
     private function write(stdClass $config): void
     {
         $directory = dirname($this->path);
@@ -92,7 +99,8 @@ final readonly class JetBrainsAgents
 
         $json = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR) . "\n";
         $partial = $this->path . '.' . bin2hex(random_bytes(4));
-        if (file_put_contents($partial, $json) === false || !rename($partial, $this->path)) {
+        $written = touch($partial) && chmod($partial, 0o600) && file_put_contents($partial, $json) !== false;
+        if (!$written || !rename($partial, $this->path)) {
             if (is_file($partial)) {
                 unlink($partial);
             }

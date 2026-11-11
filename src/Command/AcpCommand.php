@@ -72,6 +72,14 @@ final class AcpCommand extends Command
         }
 
         if ($input->getOption('jetbrains')) {
+            // The Docker launcher's container neither mounts ~/.jetbrains nor
+            // has the host's paths: what it wrote would be lost, and wrong.
+            if (Phar::running(false) === '' && is_file('/.dockerenv')) {
+                echo Terminal::RED . "✗ Sherpa runs in Docker here: add it to ~/.jetbrains/acp.json by hand, with the launcher (~/.local/bin/sherpa) as the command; see docs/how-to.md.\n" . Terminal::RESET;
+
+                return Command::FAILURE;
+            }
+
             return self::addToJetBrains(JetBrainsAgents::ofUser()) ? Command::SUCCESS : Command::FAILURE;
         }
 

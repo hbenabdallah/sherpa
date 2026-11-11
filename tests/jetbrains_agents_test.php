@@ -55,6 +55,7 @@ check(
 );
 check("an empty object stays one, not a list", str_contains((string) file_get_contents($path), '"env": {}'));
 check('nothing is left beside it', glob(dirname($path) . '/acp.json.*') === []);
+check('it is readable by its owner only: an env may hold a key', (fileperms($path) & 0o777) === 0o600, decoct(fileperms($path) & 0o777));
 
 // ---- a file it cannot read ----------------------------------------------------
 $path = $root . '/broken/acp.json';
@@ -82,6 +83,25 @@ check(
     $sherpa === ['command' => PHP_BINARY, 'args' => [realpath(__DIR__ . '/../bin/sherpa'), 'acp', '-m', 'devstral'], 'env' => []],
     json_encode($sherpa),
 );
+
+// ---- the real command, in Docker or not ---------------------------------------
+$home = $root . '/home';
+mkdir($home);
+$run = proc_open(
+    [PHP_BINARY, __DIR__ . '/../bin/sherpa', 'acp', '--jetbrains'],
+    [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+    $pipes,
+    null,
+    ['HOME' => $home, 'PATH' => (string) getenv('PATH')],
+);
+$said = stream_get_contents($pipes[1]) . stream_get_contents($pipes[2]);
+$code = proc_close($run);
+if (is_file('/.dockerenv')) {
+    check('in Docker, it refuses: the host would never see the file', $code !== 0 && str_contains($said, 'by hand'), $said);
+    check('and writes nothing', !file_exists($home . '/.jetbrains/acp.json'));
+} else {
+    check('on the host, sherpa acp --jetbrains adds Sherpa', $code === 0 && is_file($home . '/.jetbrains/acp.json'), $said);
+}
 
 exec('rm -rf ' . escapeshellarg($root));
 
