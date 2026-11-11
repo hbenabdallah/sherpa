@@ -57,6 +57,23 @@ check("an empty object stays one, not a list", str_contains((string) file_get_co
 check('nothing is left beside it', glob(dirname($path) . '/acp.json.*') === []);
 check('it is readable by its owner only: an env may hold a key', (fileperms($path) & 0o777) === 0o600, decoct(fileperms($path) & 0o777));
 
+// ---- a symlinked acp.json -----------------------------------------------------
+$dotfiles = $root . '/dotfiles/jetbrains';
+mkdir($dotfiles, 0777, true);
+file_put_contents($dotfiles . '/acp.json', '{"agent_servers": {"Other": {"command": "other", "args": [], "env": {}}}}');
+$path = $root . '/linked/.jetbrains/acp.json';
+mkdir(dirname($path), 0777, true);
+symlink('../../dotfiles/jetbrains/acp.json', $path);
+new JetBrainsAgents($path)->add('/opt/sherpa', ['acp']);
+$linked = json_decode((string) file_get_contents($dotfiles . '/acp.json'), true);
+check('a symlinked acp.json stays a link', is_link($path));
+check(
+    'and the file it points to gets Sherpa, the other agents kept',
+    isset($linked['agent_servers']['Sherpa'], $linked['agent_servers']['Other']),
+    json_encode($linked),
+);
+check('nothing is left beside the target', glob($dotfiles . '/acp.json.*') === [] && glob(dirname($path) . '/acp.json.*') === []);
+
 // ---- a file it cannot read ----------------------------------------------------
 $path = $root . '/broken/acp.json';
 mkdir(dirname($path));

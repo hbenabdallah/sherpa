@@ -87,20 +87,40 @@ final readonly class JetBrainsAgents
     }
 
     /**
+     * The file a symlinked acp.json points to (a dotfiles repository's, say):
+     * renaming over the link would replace it with a copy, cut from its source.
+     */
+    private function target(): string
+    {
+        $path = $this->path;
+        for ($hops = 0; $hops < 40 && is_link($path); $hops++) {
+            $link = readlink($path);
+            if ($link === false) {
+                throw new RuntimeException("Cannot follow the link {$path}.");
+            }
+
+            $path = str_starts_with($link, '/') ? $link : dirname($path) . '/' . $link;
+        }
+
+        return $path;
+    }
+
+    /**
      * Through a file beside it, renamed: the IDE never reads half of it. Yours
      * only, before anything is in it: an agent's env may hold its API key.
      */
     private function write(stdClass $config): void
     {
-        $directory = dirname($this->path);
+        $target = $this->target();
+        $directory = dirname($target);
         if (!is_dir($directory) && !mkdir($directory, 0o755, true) && !is_dir($directory)) {
             throw new RuntimeException("Cannot create {$directory}.");
         }
 
         $json = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR) . "\n";
-        $partial = $this->path . '.' . bin2hex(random_bytes(4));
+        $partial = $target . '.' . bin2hex(random_bytes(4));
         $written = touch($partial) && chmod($partial, 0o600) && file_put_contents($partial, $json) !== false;
-        if (!$written || !rename($partial, $this->path)) {
+        if (!$written || !rename($partial, $target)) {
             if (is_file($partial)) {
                 unlink($partial);
             }
