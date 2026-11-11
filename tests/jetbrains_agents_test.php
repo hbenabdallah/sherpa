@@ -12,6 +12,7 @@ require __DIR__ . '/../vendor/autoload.php';
 
 use App\Acp\JetBrainsAgents;
 use App\Command\AcpCommand;
+use RuntimeException;
 use UnexpectedValueException;
 
 $pass = 0;
@@ -73,6 +74,19 @@ check(
     json_encode($linked),
 );
 check('nothing is left beside the target', glob($dotfiles . '/acp.json.*') === [] && glob(dirname($path) . '/acp.json.*') === []);
+
+$path = $root . '/loop/acp.json';
+mkdir(dirname($path));
+symlink('other.json', $path);
+symlink('acp.json', dirname($path) . '/other.json');
+
+try {
+    new JetBrainsAgents($path)->add('/opt/sherpa', ['acp']);
+    check('a loop of links is refused', false);
+} catch (RuntimeException $e) {
+    check('a loop of links is refused, saying so', str_contains($e->getMessage(), 'loop'), $e->getMessage());
+}
+check('and stays a link', is_link($path));
 
 // ---- a file it cannot read ----------------------------------------------------
 $path = $root . '/broken/acp.json';

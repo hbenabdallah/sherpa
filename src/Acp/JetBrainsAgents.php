@@ -102,12 +102,18 @@ final readonly class JetBrainsAgents
             $path = str_starts_with($link, '/') ? $link : dirname($path) . '/' . $link;
         }
 
+        if (is_link($path)) {
+            throw new RuntimeException("{$this->path} is a loop of links; fix it, then run this again.");
+        }
+
         return $path;
     }
 
     /**
      * Through a file beside it, renamed: the IDE never reads half of it. Yours
      * only, before anything is in it: an agent's env may hold its API key.
+     * Created new and written through its handle, never reopened by name: a
+     * link put in its place meanwhile is not followed.
      */
     private function write(stdClass $config): void
     {
@@ -119,8 +125,14 @@ final readonly class JetBrainsAgents
 
         $json = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR) . "\n";
         $partial = $target . '.' . bin2hex(random_bytes(4));
-        $written = touch($partial) && chmod($partial, 0o600) && file_put_contents($partial, $json) !== false;
-        if (!$written || !rename($partial, $target)) {
+        $handle = fopen($partial, 'x');
+        if ($handle === false) {
+            throw new RuntimeException("Cannot write {$this->path}.");
+        }
+
+        $written = chmod($partial, 0o600) && fwrite($handle, $json) === strlen($json);
+        $closed = fclose($handle);
+        if (!$written || !$closed || !rename($partial, $target)) {
             if (is_file($partial)) {
                 unlink($partial);
             }
