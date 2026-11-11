@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Acp;
 
+use ErrorException;
 use JsonException;
 use RuntimeException;
 use stdClass;
@@ -125,13 +126,21 @@ final readonly class JetBrainsAgents
         $json = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR) . "\n";
         $partial = $target . '.' . bin2hex(random_bytes(4));
         $mask = umask(0o077);
-        $handle = fopen($partial, 'x');
-        umask($mask);
+
+        try {
+            $handle = fopen($partial, 'x');
+        } catch (ErrorException $e) {
+            throw new RuntimeException("Cannot write {$this->path}.", $e->getCode(), previous: $e);
+        } finally {
+            umask($mask);
+        }
+
         if ($handle === false) {
             throw new RuntimeException("Cannot write {$this->path}.");
         }
 
-        $written = fwrite($handle, $json) === strlen($json);
+        // A directory's default ACL wins over the umask.
+        $written = chmod($partial, 0o600) && fwrite($handle, $json) === strlen($json);
         $closed = fclose($handle);
         if (!$written || !$closed || !rename($partial, $target)) {
             if (is_file($partial)) {
