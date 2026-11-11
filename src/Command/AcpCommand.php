@@ -7,6 +7,7 @@ namespace App\Command;
 use App\Acp\AcpServer;
 use App\Acp\Connection;
 use App\Acp\EditorFrontend;
+use App\Acp\JetBrainsAgents;
 use App\Agent\TodoList;
 use App\Config\Backend;
 use App\Config\ModelProfile;
@@ -19,6 +20,8 @@ use App\Tool\BackgroundJobs;
 use App\Tool\Edit\EditPreview;
 use App\Tool\ShellExecTool;
 use App\TUI\Terminal;
+use Phar;
+use RuntimeException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -58,13 +61,26 @@ final class AcpCommand extends Command
             ->addOption('context', 'c', InputOption::VALUE_REQUIRED, 'Context window size, in tokens')
             // What an editor runs in a terminal when Sherpa says it is not set
             // up: ACP's terminal authentication.
-            ->addOption('setup', null, InputOption::VALUE_NONE, 'Choose the provider, its key and the model, in a terminal, then return to the editor');
+            ->addOption('setup', null, InputOption::VALUE_NONE, 'Choose the provider, its key and the model, in a terminal, then return to the editor')
+            ->addOption('jetbrains', null, InputOption::VALUE_NONE, "Add Sherpa to the JetBrains IDEs' agents (~/.jetbrains/acp.json), with the other options given");
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         if ($input->getOption('setup')) {
             return self::setUp($this->model, $input) ? Command::SUCCESS : Command::FAILURE;
+        }
+
+        if ($input->getOption('jetbrains')) {
+            // The Docker launcher's container neither mounts ~/.jetbrains nor
+            // has the host's paths: what it wrote would be lost, and wrong.
+            if (Phar::running(false) === '' && is_file('/.dockerenv')) {
+                echo Terminal::RED . "✗ Sherpa runs in Docker here: add it to ~/.jetbrains/acp.json by hand, with the launcher (~/.local/bin/sherpa) as the command; see docs/how-to.md.\n" . Terminal::RESET;
+
+                return Command::FAILURE;
+            }
+
+            return self::addToJetBrains(JetBrainsAgents::ofUser()) ? Command::SUCCESS : Command::FAILURE;
         }
 
         // Standard output carries the protocol and nothing else: a stray line
@@ -121,6 +137,35 @@ final class AcpCommand extends Command
             : Terminal::RED . "\n✗ Not set up yet. Run sherpa acp --setup again once that is fixed.\n" . Terminal::RESET;
 
         return $ready;
+    }
+
+    /**
+     * `--jetbrains`: the IDE then starts this very executable, with the
+     * options this was run with (`-P`, `-m`…).
+     */
+    public static function addToJetBrains(JetBrainsAgents $agents): bool
+    {
+        $argv = array_values(array_map(strval(...), (array) ($_SERVER['argv'] ?? [])));
+        $args = array_values(array_filter(array_slice($argv, 1), static fn(string $arg): bool => $arg !== '--jetbrains'));
+
+        // The single executable is its own program; a checkout is PHP running bin/sherpa.
+        $command = Phar::running(false);
+        if ($command === '') {
+            $command = PHP_BINARY;
+            $args = [(string) realpath($argv[0] ?? ''), ...$args];
+        }
+
+        try {
+            $agents->add($command, $args);
+        } catch (RuntimeException $e) {
+            echo Terminal::RED . "✗ {$e->getMessage()}\n" . Terminal::RESET;
+
+            return false;
+        }
+
+        echo Terminal::GREEN . '✓ Sherpa is in ' . $agents->path() . ": the JetBrains IDEs list it in the AI Chat's agents.\n" . Terminal::RESET;
+
+        return true;
     }
 
     /**

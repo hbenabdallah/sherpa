@@ -9,6 +9,7 @@ The mark is a mountain whose summit stands apart, in green: where the guide take
 | `logo-dark.svg` | The lockup on dark backgrounds |
 | `mark.svg`, `mark-dark.svg` | The mark alone, on light or dark backgrounds |
 | `icon.svg` | The app icon: the mark on a dark tile |
+| `acp-icon.svg` | The ACP registry's icon (`sherpa/icon.svg` there): the mark at 16 × 16, in `currentColor` only, so editors theme it |
 | `icon-512.png` | The GitHub avatar (square; GitHub rounds it) |
 | `social-preview.png` | The repository's social preview, 1280 × 640 |
 

@@ -73,8 +73,12 @@ and give it the full path of the executable:
 }
 ```
 
-**JetBrains IDEs.** In the AI Chat window, ⋯ then *Add Custom Agent* opens
-`~/.jetbrains/acp.json`:
+**JetBrains IDEs.** Run `sherpa acp --jetbrains` in a terminal: it adds Sherpa
+to `~/.jetbrains/acp.json`, the IDEs' custom agents, with the path of the
+executable you ran and the options given after it (`sherpa acp --jetbrains -P
+mistral`). The other agents in that file stay; run it again after moving the
+executable. By hand, in the AI Chat window, ⋯ then *Add Custom Agent* opens the
+same file:
 
 ```json
 {
