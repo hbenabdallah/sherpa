@@ -7,6 +7,13 @@ Security, with its number. A release is a pull request of its own that renames t
 date; once it is merged, the version is tagged on `main`, and the release's notes are this section
 (`bin/release-notes.sh`), on its GitHub page and in `sherpa update`.
 
+## Unreleased
+
+### Added
+
+- `sherpa acp --jetbrains` adds Sherpa to the JetBrains IDEs' agents (`~/.jetbrains/acp.json`), with the path of the
+  executable and the options given, keeping the file's other agents.
+
 ## 1.9.0 (2026-11-10)
 
 ### Added

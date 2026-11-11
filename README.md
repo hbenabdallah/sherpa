@@ -392,7 +392,8 @@ Ollama. Sherpa is a loop of tool calls, and says so when a model cannot make the
 **Can I use it in my editor rather than a terminal?** Yes: Zed and the
 JetBrains IDEs start `sherpa acp` and show the conversation in their own panel,
 with the same model, tools, permissions and saved conversations. Set it up once
-with `sherpa acp --setup`; [how-to](docs/how-to.md#use-sherpa-in-your-editor-zed-jetbrains).
+with `sherpa acp --setup`; `sherpa acp --jetbrains` adds it to the JetBrains IDEs' agents;
+[how-to](docs/how-to.md#use-sherpa-in-your-editor-zed-jetbrains).
 
 **Do I need PHP?** No. The executable bundles its own PHP runtime. Sherpa works
 on projects in any language; it is written in PHP 8.5 and Symfony 8.

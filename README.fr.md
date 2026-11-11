@@ -417,7 +417,8 @@ modèle ne sait pas le faire.
 et les IDE JetBrains lancent `sherpa acp` et affichent la conversation dans leur
 propre panneau, avec le même modèle, les mêmes outils, les mêmes autorisations
 et les mêmes conversations enregistrées. À configurer une fois avec
-`sherpa acp --setup` ; [mode d'emploi](docs/how-to.md#use-sherpa-in-your-editor-zed-jetbrains).
+`sherpa acp --setup` ; `sherpa acp --jetbrains` l'ajoute aux agents des IDE
+JetBrains ; [mode d'emploi](docs/how-to.md#use-sherpa-in-your-editor-zed-jetbrains).
 
 **Faut-il PHP ?** Non. L'exécutable embarque son propre PHP. Sherpa travaille
 sur des projets dans n'importe quel langage ; il est écrit en PHP 8.5 et
