@@ -42,9 +42,16 @@ final class ProjectStore
     /** Why the last save did not reach the disk, until it is said. */
     private ?string $writeError = null;
 
+    /** Whether the last read() renamed a project whose slug could not be a directory. */
+    private bool $repairedOnRead = false;
+
     private function load(): void
     {
         $this->projects = $this->read();
+
+        if ($this->repairedOnRead) {
+            $this->save();
+        }
     }
 
     /** @return array<string, Project> */
@@ -63,10 +70,61 @@ final class ProjectStore
             $projects[$slug] = Project::fromArray((string) $slug, $projectData);
         }
 
+        $projects = $this->repairUnusableSlugs($projects);
+
         // sort by last_used_at desc
         uasort($projects, fn(Project $a, Project $b): int => $b->lastUsedAt <=> $a->lastUsedAt);
 
         return $projects;
+    }
+
+    /**
+     * Before slugs had a length limit, a sentence typed as the project name was
+     * saved as a slug longer than a directory name may be, and every launch in
+     * that directory crashed opening its memory. No directory by that name can
+     * exist, so there is no memory or conversation to carry over: the project
+     * only needs a slug that works. Derived from the name, so two sessions
+     * repairing the same file at once choose the same one.
+     *
+     * @param  array<string, Project> $projects
+     * @return array<string, Project>
+     */
+    private function repairUnusableSlugs(array $projects): array
+    {
+        $this->repairedOnRead = false;
+
+        foreach ($projects as $slug => $project) {
+            if (strlen((string) $slug) <= self::NAME_MAX) {
+                continue;
+            }
+
+            unset($projects[$slug]);
+            $repaired = $this->slugify($project->name, $projects);
+            $projects[$repaired] = $this->renamed($project, $repaired);
+            $this->repairedOnRead = true;
+        }
+
+        return $projects;
+    }
+
+    private function renamed(Project $project, string $slug): Project
+    {
+        // A memory database the user pointed elsewhere stays where it is.
+        $memoryDb = $project->memoryDb === Project::defaultMemoryDb($project->slug)
+            ? Project::defaultMemoryDb($slug)
+            : $project->memoryDb;
+
+        return new Project(
+            slug: $slug,
+            name: $project->name,
+            path: $project->path,
+            memoryDb: $memoryDb,
+            docker: $project->docker,
+            stack: $project->stack,
+            createdAt: $project->createdAt,
+            lastUsedAt: $project->lastUsedAt,
+            allowedTools: $project->allowedTools,
+        );
     }
 
     /**
@@ -216,7 +274,7 @@ final class ProjectStore
      */
     public function draft(string $path, string $name, DockerConfig $docker): Project
     {
-        $slug = $this->slugify($name);
+        $slug = $this->slugify($name, $this->projects);
 
         return new Project(
             slug: $slug,
@@ -419,11 +477,25 @@ final class ProjectStore
         'χ' => 'ch', 'ψ' => 'ps', 'ω' => 'o', 'ώ' => 'o',
     ];
 
-    private function slugify(string $name): string
+    private const int SLUG_MAX = 64;
+
+    /** The longest directory name Linux and macOS filesystems accept, in bytes. */
+    private const int NAME_MAX = 255;
+
+    /** @param array<string, Project> $taken the slugs already in use */
+    private function slugify(string $name, array $taken): string
     {
         $spelled = strtr(mb_strtolower($name), self::TRANSLITERATION);
         $slug = new UnicodeString($spelled)->ascii()->lower()->toString();
         $slug = trim(preg_replace('/[^a-z0-9]+/', '-', $slug) ?? '', '-');
+
+        // The slug is one directory name, and a filesystem refuses one past
+        // 255 bytes: a sentence typed as the project name saved a project
+        // whose memory database could never be opened again. Cut at a word.
+        if (strlen($slug) > self::SLUG_MAX) {
+            $cut = substr($slug, 0, self::SLUG_MAX + 1);
+            $slug = trim(substr($cut, 0, (int) strrpos($cut, '-')) ?: substr($cut, 0, self::SLUG_MAX), '-');
+        }
 
         // A name with no ASCII spelling at all leaves nothing behind, and an
         // empty slug is a blank key in projects.yaml and a directory called
@@ -436,7 +508,7 @@ final class ProjectStore
         // ensure uniqueness
         $base = $slug;
         $i = 2;
-        while (isset($this->projects[$slug])) {
+        while (isset($taken[$slug])) {
             $slug = "{$base}-{$i}";
             $i++;
         }

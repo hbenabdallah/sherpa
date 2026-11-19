@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\ProjectTest;
 
+use App\Memory\MemoryStore;
 use App\Project\Project;
 use Symfony\Component\Yaml\Yaml;
 
@@ -67,6 +68,15 @@ check('and Ukrainian letters Russian does not have', $store->create('Київ', 
 $symbols = $store->create('***', $fresh(), $none);
 check('a name with no letters still gets a usable slug', $symbols->slug !== '' && preg_match('/^[a-z0-9-]+$/', $symbols->slug) === 1, $symbols->slug);
 check('and it lands in a real memory directory', !str_contains($symbols->memoryDb, '//'), $symbols->memoryDb);
+
+// ---- names too long for a directory ----------------------------------------
+// The slug is a directory name, which stops at 255 bytes: a sentence typed as
+// the project name saved a project whose memory database never opened again.
+$long = $store->create(str_repeat('fix the login bug ', 20), $fresh(), $none);
+check('a long name gets a slug short enough for a directory', strlen($long->slug) <= 64, (string) strlen($long->slug));
+check('cut at a word, not mid-way through one', str_starts_with(str_repeat('fix-the-login-bug-', 20), $long->slug . '-'), $long->slug);
+check('and its memory directory is created', is_dir(dirname($long->memoryDb)), $long->memoryDb);
+check('one unbroken word is cut too', strlen($store->create(str_repeat('a', 300), $fresh(), $none)->slug) <= 64);
 
 // Deriving it from the name rather than from the clock means retyping the same
 // name reaches the same project instead of a new one every time.
@@ -382,6 +392,39 @@ check('a slug edited into ".." does not take the configuration with it', is_file
 check('nor one into "../../.." the home directory', is_file($home . '/precieux/travail.txt'));
 check('nor an empty one every project\'s memory', is_dir($config . '/projects'));
 check('the entries themselves are forgotten all the same', !array_intersect(['..', '../../..', ''], array_map(fn(Project $p): string => $p->slug, new ProjectStore(new StackDetector())->all())));
+
+// ---- slugs saved too long by an earlier version ----------------------------
+// Before the limit, such a project was saved anyway and every launch in its
+// directory crashed opening its memory. Loading gives it a slug that works.
+$sentence = str_repeat('rename the billing module ', 15);
+$brokenSlug = trim(str_replace(' ', '-', $sentence), '-');
+$brokenPath = $fresh();
+$movedDb = $home . '/ailleurs/memory.db';
+$yaml = Yaml::parseFile($config . '/projects.yaml') ?? [];
+$yaml['projects'][$brokenSlug] = ['name' => $sentence, 'path' => $brokenPath, 'memory_db' => Project::defaultMemoryDb($brokenSlug), 'allowed_tools' => ['read_file']];
+$yaml['projects'][$brokenSlug . '-2'] = ['name' => $sentence, 'path' => $fresh(), 'memory_db' => $movedDb];
+$workingLong = str_repeat('long-', 20) . 'slug';
+$yaml['projects'][$workingLong] = ['name' => 'Long', 'path' => $fresh()];
+file_put_contents($config . '/projects.yaml', Yaml::dump($yaml, 4, 2));
+
+$repairing = new ProjectStore(new StackDetector());
+$repaired = $repairing->forDirectory($brokenPath);
+check('a project saved with an unusable slug is still found', $repaired instanceof Project);
+check('with a slug a directory can have', $repaired instanceof Project && strlen($repaired->slug) <= 64, (string) $repaired?->slug);
+check('its memory follows the new slug', $repaired?->memoryDb === Project::defaultMemoryDb((string) $repaired?->slug), (string) $repaired?->memoryDb);
+check('and its grants are kept', $repaired?->allowedTools === ['read_file']);
+$memory = new MemoryStore();
+$memory->open((string) $repaired?->memoryDb);
+check('its memory opens again', $memory->isOpen());
+
+$slugs = array_map(fn(Project $p): string => $p->slug, $repairing->all());
+check('two projects of the same long name get two slugs', count(array_filter($slugs, fn(string $s): bool => str_starts_with($s, 'rename-the-billing'))) === 2, json_encode($slugs));
+check('a memory database pointed elsewhere stays where it is', in_array($movedDb, array_map(fn(Project $p): string => $p->memoryDb, $repairing->all()), true));
+check('a long slug that works is left alone, memory and all', in_array($workingLong, $slugs, true));
+
+$onDisk = array_keys(Yaml::parseFile($config . '/projects.yaml')['projects']);
+check('the repair is written back', !in_array($brokenSlug, $onDisk, true) && in_array($repaired?->slug, $onDisk, true), json_encode($onDisk));
+check('and the next load finds the same slug', new ProjectStore(new StackDetector())->forDirectory($brokenPath)?->slug === $repaired?->slug);
 
 // ---- reload ----------------------------------------------------------------
 $reopened = new ProjectStore(new StackDetector());

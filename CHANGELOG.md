@@ -7,6 +7,14 @@ Security, with its number. A release is a pull request of its own that renames t
 date; once it is merged, the version is tagged on `main`, and the release's notes are this section
 (`bin/release-notes.sh`), on its GitHub page and in `sherpa update`.
 
+## Unreleased
+
+### Fixed
+
+- A project name too long for a directory (a sentence typed at "Project name") no longer saves a project whose memory
+  cannot be opened, which crashed every launch in that directory with "unable to open database file". Slugs stop at 64
+  characters, and projects already saved that way get a working slug when Sherpa starts (#37).
+
 ## 1.10.0 (2026-11-12)
 
 ### Added
